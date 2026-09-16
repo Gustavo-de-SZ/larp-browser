@@ -7,6 +7,8 @@ export const TOP_BAR_HEIGHT = 44;
 
 const DEFAULT_SETTINGS: BrowserSettings = {
   theme: 'dark',
+  darkPaletteId: 'obsidian-neon',
+  lightPaletteId: 'opal-frost',
   forcePageDarkMode: true,
   defaultSearchEngine: 'duckduckgo',
   autoHibernateTabs: true,

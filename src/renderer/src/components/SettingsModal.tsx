@@ -11,7 +11,9 @@ import {
   Globe,
   Sparkles,
   Zap,
+  RotateCcw,
 } from 'lucide-react';
+import { DARK_PALETTES, LIGHT_PALETTES, ColorPalette } from '../theme/palettes';
 import type { BrowserSettings } from '../../shared/types';
 import type { ThemeMode } from '../App';
 
@@ -33,9 +35,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onUpdateSettings,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('appearance');
+  // Sub-tab for appearance mode customization: dark or light
+  const [paletteModeTab, setPaletteModeTab] = useState<ThemeMode>(theme);
   const isDark = theme === 'dark';
 
   if (!isOpen) return null;
+
+  const currentPalettes = paletteModeTab === 'dark' ? DARK_PALETTES : LIGHT_PALETTES;
+  const currentActivePaletteId =
+    paletteModeTab === 'dark'
+      ? settings.darkPaletteId || 'obsidian-neon'
+      : settings.lightPaletteId || 'opal-frost';
+
+  const currentCustomAccent =
+    paletteModeTab === 'dark' ? settings.customDarkAccent : settings.customLightAccent;
+
+  const handleSelectPalette = (palette: ColorPalette) => {
+    if (palette.mode === 'dark') {
+      onUpdateSettings({ darkPaletteId: palette.id });
+    } else {
+      onUpdateSettings({ lightPaletteId: palette.id });
+    }
+  };
+
+  const handleCustomAccentChange = (color: string) => {
+    if (paletteModeTab === 'dark') {
+      onUpdateSettings({ customDarkAccent: color });
+    } else {
+      onUpdateSettings({ customLightAccent: color });
+    }
+  };
+
+  const handleResetAccent = () => {
+    if (paletteModeTab === 'dark') {
+      onUpdateSettings({ customDarkAccent: undefined });
+    } else {
+      onUpdateSettings({ customLightAccent: undefined });
+    }
+  };
 
   return (
     <div
@@ -45,7 +82,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       onClick={onClose}
     >
       <div
-        className={`w-full max-w-2xl rounded-3xl border shadow-2xl overflow-hidden flex flex-col md:flex-row h-[520px] animate-scale-up ${
+        className={`w-full max-w-3xl rounded-3xl border shadow-2xl overflow-hidden flex flex-col md:flex-row h-[580px] animate-scale-up ${
           isDark
             ? 'bg-[#0f111d]/95 border-purple-500/25 text-slate-100 shadow-[0_30px_70px_-15px_rgba(0,0,0,0.9),0_0_40px_rgba(168,85,247,0.18)]'
             : 'bg-white/95 border-indigo-100 text-slate-800 shadow-2xl'
@@ -79,7 +116,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               }`}
             >
               <Palette className="w-4 h-4 text-purple-400" />
-              <span>Appearance & Theme</span>
+              <span>Appearance & Palettes</span>
             </button>
 
             <button
@@ -143,7 +180,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             isDark ? 'border-purple-500/15' : 'border-slate-200'
           }`}>
             <h3 className="text-sm font-bold capitalize flex items-center space-x-2">
-              <span>{activeTab === 'appearance' ? 'Appearance & Web Theming' : activeTab}</span>
+              <span>{activeTab === 'appearance' ? 'Color Palettes & Web Theming' : activeTab}</span>
             </h3>
             <button
               onClick={onClose}
@@ -157,15 +194,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* Section Bodies */}
           <div className="p-6 flex-1 overflow-y-auto space-y-6">
-            {/* 1. Appearance Tab */}
+            {/* 1. Appearance & Palettes Tab */}
             {activeTab === 'appearance' && (
               <div className="space-y-6">
+                {/* Active Mode Selector */}
                 <div>
-                  <label className="text-xs font-semibold block mb-2 text-slate-300">
-                    Application Theme
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-semibold text-slate-300">
+                      Active Theme Mode
+                    </label>
+                    <span className="text-[11px] text-slate-400">
+                      Currently using: <strong className="text-purple-400">{theme.toUpperCase()}</strong>
+                    </span>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-3">
-                    {/* Dark Option */}
                     <button
                       onClick={() => onUpdateSettings({ theme: 'dark' })}
                       className={`p-3 rounded-2xl border flex items-center space-x-3 transition-all ${
@@ -178,13 +221,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <Moon className="w-4 h-4" />
                       </div>
                       <div className="text-left">
-                        <div className="text-xs font-bold text-white">Obsidian Neon</div>
-                        <div className="text-[10px] text-slate-400">Vibrant dark mode</div>
+                        <div className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Dark Theme</div>
+                        <div className="text-[10px] text-slate-400">Deep obsidian tones</div>
                       </div>
                       {isDark && <Check className="w-4 h-4 text-purple-400 ml-auto" />}
                     </button>
 
-                    {/* Light Option */}
                     <button
                       onClick={() => onUpdateSettings({ theme: 'light' })}
                       className={`p-3 rounded-2xl border flex items-center space-x-3 transition-all ${
@@ -198,12 +240,147 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </div>
                       <div className="text-left">
                         <div className={`text-xs font-bold ${!isDark ? 'text-slate-900' : 'text-slate-200'}`}>
-                          Opal Frost
+                          Light Theme
                         </div>
-                        <div className="text-[10px] text-slate-400">Crisp light mode</div>
+                        <div className="text-[10px] text-slate-400">Frosted luminous tones</div>
                       </div>
                       {!isDark && <Check className="w-4 h-4 text-indigo-600 ml-auto" />}
                     </button>
+                  </div>
+                </div>
+
+                {/* Customizable Color Palettes Section */}
+                <div className="space-y-3 pt-2 border-t border-white/[0.08]">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-200 flex items-center space-x-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                        <span>Customize Color Palettes</span>
+                      </h4>
+                      <p className="text-[11px] text-slate-400">
+                        Choose a distinct palette for each mode or customize your accent color.
+                      </p>
+                    </div>
+
+                    {/* Mode selector tab for customizing */}
+                    <div className="flex items-center bg-black/30 p-1 rounded-xl border border-white/[0.08]">
+                      <button
+                        onClick={() => setPaletteModeTab('dark')}
+                        className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                          paletteModeTab === 'dark'
+                            ? 'bg-purple-600 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Dark Palettes
+                      </button>
+                      <button
+                        onClick={() => setPaletteModeTab('light')}
+                        className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                          paletteModeTab === 'light'
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Light Palettes
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Palette Presets Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-56 overflow-y-auto pr-1">
+                    {currentPalettes.map((p) => {
+                      const isSelected = p.id === currentActivePaletteId;
+                      return (
+                        <div
+                          key={p.id}
+                          onClick={() => handleSelectPalette(p)}
+                          className={`p-3 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between group ${
+                            isSelected
+                              ? 'border-purple-500 bg-purple-950/20 ring-1 ring-purple-400 shadow-md'
+                              : isDark
+                              ? 'border-white/[0.06] bg-[#141624] hover:border-purple-400/40 hover:bg-[#191d30]'
+                              : 'border-slate-200 bg-slate-50 hover:border-indigo-300 hover:bg-white'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-slate-200 group-hover:text-purple-300 transition-colors">
+                                {p.name}
+                              </div>
+                              <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
+                                {p.description}
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <Check className="w-4 h-4 text-purple-400 flex-shrink-0 ml-2" />
+                            )}
+                          </div>
+
+                          {/* Color Swatch Preview Dots */}
+                          <div className="flex items-center space-x-1.5 mt-3 pt-2 border-t border-white/[0.06]">
+                            <div
+                              className="w-4 h-4 rounded-full border border-black/20 shadow-sm"
+                              style={{ backgroundColor: p.colors.bgApp }}
+                              title="Background"
+                            />
+                            <div
+                              className="w-4 h-4 rounded-full border border-black/20 shadow-sm"
+                              style={{ backgroundColor: p.colors.bgCardSelected }}
+                              title="Surface"
+                            />
+                            <div
+                              className="w-4 h-4 rounded-full border border-black/20 shadow-sm"
+                              style={{ backgroundColor: p.colors.accentPrimary }}
+                              title="Primary Accent"
+                            />
+                            <div
+                              className="w-4 h-4 rounded-full border border-black/20 shadow-sm"
+                              style={{ backgroundColor: p.colors.accentSecondary }}
+                              title="Secondary Accent"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Custom Accent Color Picker */}
+                  <div className={`p-3.5 rounded-2xl border flex items-center justify-between mt-2 ${
+                    isDark ? 'bg-[#151829] border-purple-500/20' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-bold text-slate-200 flex items-center space-x-2">
+                        <span>Custom Accent Color ({paletteModeTab.toUpperCase()})</span>
+                        {currentCustomAccent && (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 font-mono">
+                            {currentCustomAccent}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        Overrides the primary neon highlight for the selected mode.
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="color"
+                        value={currentCustomAccent || (paletteModeTab === 'dark' ? '#a855f7' : '#7c3aed')}
+                        onChange={(e) => handleCustomAccentChange(e.target.value)}
+                        className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0 p-0"
+                        title="Pick custom color"
+                      />
+                      {currentCustomAccent && (
+                        <button
+                          onClick={handleResetAccent}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+                          title="Reset to palette default"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 

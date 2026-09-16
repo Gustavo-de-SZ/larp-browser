@@ -3,6 +3,7 @@ import { TopBar } from './components/TopBar';
 import { TabSwitcher } from './components/TabSwitcher';
 import { NewTabPage } from './components/NewTabPage';
 import { SettingsModal } from './components/SettingsModal';
+import { getPalette, applyPalette } from './theme/palettes';
 import type { BrowserState, BrowserSettings } from '../shared/types';
 
 export type ThemeMode = 'dark' | 'light';
@@ -21,11 +22,32 @@ export const App: React.FC = () => {
     mruTabIds: [],
     settings: {
       theme: 'dark',
+      darkPaletteId: 'obsidian-neon',
+      lightPaletteId: 'opal-frost',
       forcePageDarkMode: true,
       defaultSearchEngine: 'duckduckgo',
       autoHibernateTabs: true,
     },
   });
+
+  // Apply active palette and custom accent colors
+  useEffect(() => {
+    const paletteId = theme === 'dark' 
+      ? (state.settings?.darkPaletteId || 'obsidian-neon')
+      : (state.settings?.lightPaletteId || 'opal-frost');
+    const customAccent = theme === 'dark'
+      ? state.settings?.customDarkAccent
+      : state.settings?.customLightAccent;
+
+    const palette = getPalette(paletteId, theme);
+    applyPalette(palette, customAccent);
+  }, [
+    theme,
+    state.settings?.darkPaletteId,
+    state.settings?.lightPaletteId,
+    state.settings?.customDarkAccent,
+    state.settings?.customLightAccent,
+  ]);
 
   // Sync theme with document element and Electron nativeTheme
   useEffect(() => {
