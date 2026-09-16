@@ -1,5 +1,5 @@
 {
-  "name": "aero-browser",
+  "name": "larp-browser",
   "version": "1.0.0",
   "type": "module",
   "main": "dist/main/index.cjs",
@@ -17,11 +17,11 @@
     "electron",
     "tabs",
     "alt-tab",
-    "minimalist"
+    "larp"
   ],
   "author": "",
   "license": "MIT",
-  "description": "Custom modern browser with Alt-Tab visual tab switching and zero tab clutter",
+  "description": "Larp Browser - Modern desktop browser with Alt-Tab visual tab switching and vibrant themes",
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^24.13.5",
