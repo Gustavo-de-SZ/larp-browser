@@ -4,11 +4,15 @@ import { TabManager } from './tab-manager';
 import { registerIpcHandlers } from './ipc-handlers';
 import { registerShortcuts } from './shortcuts';
 
-// Linux display, GPU, and shared memory compatibility
+// Linux performance & hardware GPU acceleration flags
 if (process.platform === 'linux') {
-  app.disableHardwareAcceleration();
+  // Avoid Wayland/Vulkan crash while keeping full OpenGL/EGL GPU acceleration
+  app.commandLine.appendSwitch('disable-features', 'Vulkan');
+  app.commandLine.appendSwitch('disable-vulkan-fallback');
   app.commandLine.appendSwitch('disable-dev-shm-usage');
-  app.commandLine.appendSwitch('no-sandbox');
+  app.commandLine.appendSwitch('enable-gpu-rasterization');
+  app.commandLine.appendSwitch('enable-zero-copy');
+  app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
 }
 
 let mainWindow: BrowserWindow | null = null;
@@ -71,10 +75,10 @@ async function createWindow() {
     await mainWindow.loadFile(indexPath);
   }
 
-  // Create initial demo tabs
+  // Create initial demo tabs asynchronously
   await tabManager.createTab('https://news.ycombinator.com');
-  await tabManager.createTab('https://github.com');
-  await tabManager.createTab('https://en.wikipedia.org');
+  tabManager.createTab('https://github.com');
+  tabManager.createTab('https://en.wikipedia.org');
 
   mainWindow.on('closed', () => {
     mainWindow = null;
