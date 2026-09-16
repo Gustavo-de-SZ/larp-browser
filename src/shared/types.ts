@@ -12,12 +12,20 @@ export interface TabInfo {
   isMuted?: boolean;
 }
 
+export interface BrowserSettings {
+  theme: 'dark' | 'light';
+  forcePageDarkMode: boolean; // Forces dark theme even on sites without dark mode
+  defaultSearchEngine: 'duckduckgo' | 'google' | 'brave' | 'bing';
+  autoHibernateTabs: boolean;
+}
+
 export interface BrowserState {
   tabs: TabInfo[];
   activeTabId: string | null;
   isSwitcherOpen: boolean;
   selectedSwitcherIndex: number;
   mruTabIds: string[];
+  settings: BrowserSettings;
 }
 
 export type SwitcherDirection = 'forward' | 'backward';
@@ -36,6 +44,11 @@ export interface IpcRendererApi {
   goForward: (tabId: string) => Promise<void>;
   reloadTab: (tabId: string) => Promise<void>;
   toggleMuteTab: (tabId: string) => Promise<void>;
+
+  // Settings & Theme
+  setTheme: (theme: 'dark' | 'light') => Promise<void>;
+  getSettings: () => Promise<BrowserSettings>;
+  updateSettings: (settings: Partial<BrowserSettings>) => Promise<BrowserSettings>;
 
   // Switcher HUD operations
   openSwitcher: () => Promise<void>;

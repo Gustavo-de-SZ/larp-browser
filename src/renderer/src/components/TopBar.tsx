@@ -15,6 +15,7 @@ import {
   Sun,
   Moon,
   Sparkles,
+  Settings,
 } from 'lucide-react';
 import type { BrowserState } from '../../shared/types';
 import type { ThemeMode } from '../App';
@@ -23,9 +24,10 @@ interface TopBarProps {
   state: BrowserState;
   theme: ThemeMode;
   onToggleTheme: () => void;
+  onOpenSettings: () => void;
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ state, theme, onToggleTheme }) => {
+export const TopBar: React.FC<TopBarProps> = ({ state, theme, onToggleTheme, onOpenSettings }) => {
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
   const [urlInput, setUrlInput] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -187,6 +189,19 @@ export const TopBar: React.FC<TopBarProps> = ({ state, theme, onToggleTheme }) =
           title={isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
         >
           {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
+
+        {/* Settings Button */}
+        <button
+          onClick={onOpenSettings}
+          className={`p-1.5 rounded-xl border transition-all ${
+            isDark
+              ? 'bg-purple-950/30 border-purple-500/20 text-slate-300 hover:text-white hover:bg-purple-900/40 hover:border-purple-400/40'
+              : 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 hover:shadow-sm'
+          }`}
+          title="Settings (Ctrl+,)"
+        >
+          <Settings className="w-4 h-4" />
         </button>
 
         {/* Alt-Tab Switcher Trigger Button */}

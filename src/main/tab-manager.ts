@@ -1,19 +1,66 @@
-import { BrowserWindow, WebContentsView } from 'electron';
-import type { BrowserState, TabInfo, SwitcherDirection } from '../shared/types';
+import { app, BrowserWindow, WebContentsView, nativeTheme } from 'electron';
+import fs from 'fs';
+import path from 'path';
+import type { BrowserState, BrowserSettings, TabInfo, SwitcherDirection } from '../shared/types';
 
 export const TOP_BAR_HEIGHT = 44;
 
+const DEFAULT_SETTINGS: BrowserSettings = {
+  theme: 'dark',
+  forcePageDarkMode: true,
+  defaultSearchEngine: 'duckduckgo',
+  autoHibernateTabs: true,
+};
+
+const SMART_DARK_CSS = `
+  :root {
+    color-scheme: dark !important;
+  }
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme="dark"]) {
+      background-color: #090a10 !important;
+    }
+  }
+`;
+
 export class TabManager {
   private window: BrowserWindow;
-  private tabs: Map<string, { info: TabInfo; view: WebContentsView }> = new Map();
+  private tabs: Map<string, { info: TabInfo; view: WebContentsView; cssKey?: string }> = new Map();
   private activeTabId: string | null = null;
   private mruTabIds: string[] = [];
   private isSwitcherOpen = false;
   private selectedSwitcherIndex = 0;
+  private settings: BrowserSettings = { ...DEFAULT_SETTINGS };
+  private settingsPath: string;
   private onStateChangeCallback?: (state: BrowserState) => void;
 
   constructor(window: BrowserWindow) {
     this.window = window;
+    this.settingsPath = path.join(app.getPath('userData'), 'larp-settings.json');
+    this.loadSettings();
+
+    // Set Chromium native theme
+    nativeTheme.themeSource = this.settings.theme;
+  }
+
+  private loadSettings() {
+    try {
+      if (fs.existsSync(this.settingsPath)) {
+        const raw = fs.readFileSync(this.settingsPath, 'utf8');
+        const parsed = JSON.parse(raw);
+        this.settings = { ...DEFAULT_SETTINGS, ...parsed };
+      }
+    } catch {
+      this.settings = { ...DEFAULT_SETTINGS };
+    }
+  }
+
+  private saveSettings() {
+    try {
+      fs.writeFileSync(this.settingsPath, JSON.stringify(this.settings, null, 2), 'utf8');
+    } catch (err) {
+      console.error('Failed to save settings:', err);
+    }
   }
 
   public setOnStateChange(cb: (state: BrowserState) => void) {
@@ -34,7 +81,56 @@ export class TabManager {
       isSwitcherOpen: this.isSwitcherOpen,
       selectedSwitcherIndex: this.selectedSwitcherIndex,
       mruTabIds: [...this.mruTabIds],
+      settings: { ...this.settings },
     };
+  }
+
+  public getSettings(): BrowserSettings {
+    return { ...this.settings };
+  }
+
+  public async setTheme(theme: 'dark' | 'light') {
+    this.settings.theme = theme;
+    nativeTheme.themeSource = theme;
+    this.saveSettings();
+    await this.applyThemeToAllTabs();
+    this.notifyStateChange();
+  }
+
+  public async updateSettings(newSettings: Partial<BrowserSettings>): Promise<BrowserSettings> {
+    this.settings = { ...this.settings, ...newSettings };
+    if (newSettings.theme) {
+      nativeTheme.themeSource = newSettings.theme;
+    }
+    this.saveSettings();
+    await this.applyThemeToAllTabs();
+    this.notifyStateChange();
+    return { ...this.settings };
+  }
+
+  private async applyThemeToTab(tabId: string) {
+    const tab = this.tabs.get(tabId);
+    if (!tab || tab.view.webContents.isDestroyed()) return;
+
+    try {
+      // Clean previous custom CSS
+      if (tab.cssKey) {
+        await tab.view.webContents.removeInsertedCSS(tab.cssKey).catch(() => {});
+        tab.cssKey = undefined;
+      }
+
+      if (this.settings.theme === 'dark' && this.settings.forcePageDarkMode) {
+        tab.cssKey = await tab.view.webContents.insertCSS(SMART_DARK_CSS);
+      }
+    } catch (err) {
+      // Ignore CSS insertion errors
+    }
+  }
+
+  private async applyThemeToAllTabs() {
+    for (const [id] of this.tabs) {
+      await this.applyThemeToTab(id);
+    }
   }
 
   public async createTab(initialUrl = 'about:blank'): Promise<string> {
@@ -98,7 +194,9 @@ export class TabManager {
         tab.info.canGoBack = wc.navigationHistory ? wc.navigationHistory.canGoBack() : wc.canGoBack();
         tab.info.canGoForward = wc.navigationHistory ? wc.navigationHistory.canGoForward() : wc.canGoForward();
         this.notifyStateChange();
-        // Capture snapshot in background without blocking UI
+        
+        // Apply theme and capture snapshot in background
+        this.applyThemeToTab(tabId);
         this.capturePreview(tabId).then((img) => {
           if (img) this.notifyStateChange();
         });
@@ -278,7 +376,14 @@ export class TabManager {
       if (targetUrl.includes('.') && !targetUrl.includes(' ')) {
         targetUrl = 'https://' + targetUrl;
       } else {
-        targetUrl = `https://duckduckgo.com/?q=${encodeURIComponent(targetUrl)}`;
+        const engines = {
+          duckduckgo: 'https://duckduckgo.com/?q=',
+          google: 'https://www.google.com/search?q=',
+          brave: 'https://search.brave.com/search?q=',
+          bing: 'https://www.bing.com/search?q=',
+        };
+        const base = engines[this.settings.defaultSearchEngine] || engines.duckduckgo;
+        targetUrl = `${base}${encodeURIComponent(targetUrl)}`;
       }
     }
 
@@ -346,7 +451,7 @@ export class TabManager {
     // Set index to the next tab in MRU order (index 1 if available, otherwise 0)
     this.selectedSwitcherIndex = this.mruTabIds.length > 1 ? 1 : 0;
 
-    // Detach or hide active web contents view so HUD is fully visible in window
+    // Detach active web contents view so HUD is fully visible in window
     this.detachActiveTabView();
     this.notifyStateChange();
   }

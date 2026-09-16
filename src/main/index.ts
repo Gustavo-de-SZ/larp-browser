@@ -4,15 +4,15 @@ import { TabManager } from './tab-manager';
 import { registerIpcHandlers } from './ipc-handlers';
 import { registerShortcuts } from './shortcuts';
 
-// Linux performance & hardware GPU acceleration flags
+// Linux performance, display backend, and hardware GPU acceleration flags
 if (process.platform === 'linux') {
-  // Avoid Wayland/Vulkan crash while keeping full OpenGL/EGL GPU acceleration
-  app.commandLine.appendSwitch('disable-features', 'Vulkan');
-  app.commandLine.appendSwitch('disable-vulkan-fallback');
+  // Use X11 / Xwayland backend and disable GPU sandbox to ensure crash-free rendering
+  app.commandLine.appendSwitch('ozone-platform', 'x11');
+  app.commandLine.appendSwitch('disable-gpu-sandbox');
   app.commandLine.appendSwitch('disable-dev-shm-usage');
   app.commandLine.appendSwitch('enable-gpu-rasterization');
   app.commandLine.appendSwitch('enable-zero-copy');
-  app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
+  app.commandLine.appendSwitch('no-sandbox');
 }
 
 let mainWindow: BrowserWindow | null = null;

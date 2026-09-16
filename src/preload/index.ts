@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { BrowserState, IpcRendererApi, SwitcherDirection } from '../shared/types';
+import type { BrowserState, BrowserSettings, IpcRendererApi, SwitcherDirection } from '../shared/types';
 
 const api: IpcRendererApi = {
   onStateUpdate: (callback: (state: BrowserState) => void) => {
@@ -22,6 +22,10 @@ const api: IpcRendererApi = {
   goForward: (tabId: string) => ipcRenderer.invoke('browser:go-forward', tabId),
   reloadTab: (tabId: string) => ipcRenderer.invoke('browser:reload-tab', tabId),
   toggleMuteTab: (tabId: string) => ipcRenderer.invoke('browser:toggle-mute-tab', tabId),
+
+  setTheme: (theme: 'dark' | 'light') => ipcRenderer.invoke('browser:set-theme', theme),
+  getSettings: () => ipcRenderer.invoke('browser:get-settings'),
+  updateSettings: (settings: Partial<BrowserSettings>) => ipcRenderer.invoke('browser:update-settings', settings),
 
   openSwitcher: () => ipcRenderer.invoke('browser:open-switcher'),
   closeSwitcher: () => ipcRenderer.invoke('browser:close-switcher'),

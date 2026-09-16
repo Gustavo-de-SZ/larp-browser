@@ -1,6 +1,6 @@
 import { ipcMain, BrowserWindow } from 'electron';
 import { TabManager } from './tab-manager';
-import type { SwitcherDirection } from '../shared/types';
+import type { BrowserSettings, SwitcherDirection } from '../shared/types';
 
 export function registerIpcHandlers(window: BrowserWindow, tabManager: TabManager) {
   ipcMain.handle('browser:get-state', () => {
@@ -37,6 +37,19 @@ export function registerIpcHandlers(window: BrowserWindow, tabManager: TabManage
 
   ipcMain.handle('browser:toggle-mute-tab', (_event, tabId: string) => {
     tabManager.toggleMuteTab(tabId);
+  });
+
+  // Settings & Theme handlers
+  ipcMain.handle('browser:set-theme', (_event, theme: 'dark' | 'light') => {
+    return tabManager.setTheme(theme);
+  });
+
+  ipcMain.handle('browser:get-settings', () => {
+    return tabManager.getSettings();
+  });
+
+  ipcMain.handle('browser:update-settings', (_event, settings: Partial<BrowserSettings>) => {
+    return tabManager.updateSettings(settings);
   });
 
   // Switcher HUD handlers
