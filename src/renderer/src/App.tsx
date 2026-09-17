@@ -32,38 +32,28 @@ export const App: React.FC = () => {
     },
   });
 
-  // Apply active palette and custom accent colors whenever theme or palette changes
+  // Apply active palette whenever theme or palette ID changes
   useEffect(() => {
-    const currentTheme = state.settings?.theme || theme;
-    const paletteId = currentTheme === 'dark'
+    const paletteId = theme === 'dark'
       ? (state.settings?.darkPaletteId || 'graphite')
       : (state.settings?.lightPaletteId || 'paper');
-    const customAccent = currentTheme === 'dark'
+    const customAccent = theme === 'dark'
       ? state.settings?.customDarkAccent
       : state.settings?.customLightAccent;
 
-    const palette = getPalette(paletteId, currentTheme);
+    const palette = getPalette(paletteId, theme);
     applyPalette(palette, customAccent);
   }, [
     theme,
-    state.settings?.theme,
     state.settings?.darkPaletteId,
     state.settings?.lightPaletteId,
     state.settings?.customDarkAccent,
     state.settings?.customLightAccent,
   ]);
 
-  // Sync theme with document class and Electron nativeTheme
+  // Persist theme choice and sync Electron nativeTheme (for web-content dark mode)
   useEffect(() => {
     localStorage.setItem('larp-theme', theme);
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-      document.documentElement.classList.remove('light');
-    } else {
-      document.documentElement.classList.add('light');
-      document.documentElement.classList.remove('dark');
-    }
-
     if (window.browserApi) {
       window.browserApi.setTheme(theme);
     }
@@ -72,10 +62,15 @@ export const App: React.FC = () => {
   const toggleTheme = () => {
     const nextTheme: ThemeMode = theme === 'dark' ? 'light' : 'dark';
     setTheme(nextTheme);
-    handleUpdateSettings({ theme: nextTheme });
+    if (window.browserApi) {
+      window.browserApi.updateSettings({ theme: nextTheme }).then((updated) => {
+        setState((prev) => ({ ...prev, settings: updated }));
+      });
+    }
   };
 
   const handleUpdateSettings = async (newSettings: Partial<BrowserSettings>) => {
+    // If theme is changing, update local state immediately so the palette effect fires right away
     if (newSettings.theme && newSettings.theme !== theme) {
       setTheme(newSettings.theme);
     }

@@ -225,6 +225,17 @@ export function applyPalette(palette: ColorPalette, customAccent?: string) {
   const colors = palette.colors;
   const primaryAccent = customAccent || colors.accentPrimary;
 
+  // Keep html.dark class and color-scheme in sync with palette mode
+  if (palette.mode === 'dark') {
+    root.classList.add('dark');
+    root.classList.remove('light');
+    root.style.setProperty('color-scheme', 'dark');
+  } else {
+    root.classList.add('light');
+    root.classList.remove('dark');
+    root.style.setProperty('color-scheme', 'light');
+  }
+
   root.style.setProperty('--bg-app', colors.bgApp);
   root.style.setProperty('--bg-topbar', colors.bgTopbar);
   root.style.setProperty('--bg-card', colors.bgCard);
