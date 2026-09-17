@@ -78,6 +78,15 @@
           "StartupWMClass": "larp-browser"
         }
       }
+    },
+    "pacman": {
+      "depends": [
+        "gtk3",
+        "nss",
+        "alsa-lib",
+        "libnotify",
+        "libxss"
+      ]
     }
   },
   "desktopName": "larp-browser"
