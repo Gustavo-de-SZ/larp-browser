@@ -10,7 +10,11 @@
     "start": "cross-env NODE_ENV=production electron dist/main/index.cjs --in-process-gpu",
     "dev:renderer": "vite",
     "dev:electron": "wait-on tcp:5173 && electron dist/main/index.cjs --in-process-gpu",
-    "dev": "cross-env NODE_ENV=development concurrently -k \"npm run dev:renderer\" \"npm run build:main && npm run dev:electron\""
+    "dev": "cross-env NODE_ENV=development concurrently -k \"npm run dev:renderer\" \"npm run build:main && npm run dev:electron\"",
+    "dist": "npm run build && electron-builder --linux",
+    "dist:dir": "npm run build && electron-builder --linux --dir",
+    "dist:appimage": "npm run build && electron-builder --linux AppImage",
+    "dist:pacman": "npm run build && electron-builder --linux pacman"
   },
   "keywords": [
     "browser",
@@ -19,7 +23,7 @@
     "alt-tab",
     "larp"
   ],
-  "author": "",
+  "author": "Larp Browser Team <dev@larpbrowser.org>",
   "license": "MIT",
   "description": "Larp Browser - Modern desktop browser with Alt-Tab visual tab switching and vibrant themes",
   "devDependencies": {
@@ -32,6 +36,7 @@
     "concurrently": "^9.2.4",
     "cross-env": "^10.1.0",
     "electron": "^41.7.1",
+    "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
     "postcss": "^8.5.28",
     "tailwindcss": "^4.3.3",
@@ -45,5 +50,35 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "tailwind-merge": "^3.7.0"
-  }
+  },
+  "build": {
+    "appId": "com.larp.browser",
+    "productName": "Larp Browser",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "pacman"
+      ],
+      "maintainer": "Larp Browser Team <dev@larpbrowser.org>",
+      "category": "Network",
+      "executableArgs": [
+        "--in-process-gpu"
+      ],
+      "synopsis": "Fast, keyboard-driven web browser",
+      "syncDesktopName": true,
+      "desktop": {
+        "entry": {
+          "StartupWMClass": "larp-browser"
+        }
+      }
+    }
+  },
+  "desktopName": "larp-browser"
 }
