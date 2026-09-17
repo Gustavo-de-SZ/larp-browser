@@ -426,7 +426,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     Fast Live Snapshot Previews
                   </div>
                   <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
-                    Tabs are captured as downscaled thumbnails with non-blocking snapshots, ensuring instantaneous cycling with zero latency when pressing <kbd className="font-mono px-1 py-0.2 rounded border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10">Ctrl+Shift+Tab</kbd>.
+                    Tabs are captured as downscaled thumbnails with non-blocking snapshots, ensuring instantaneous cycling with zero latency when pressing <kbd className="font-mono px-1 py-0.2 rounded border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10">Ctrl+Tab</kbd>.
                   </p>
                 </div>
 
@@ -532,7 +532,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   }}
                 >
                   <p>
-                    A clean, distraction-free web browser built around a keyboard-driven visual Alt-Tab tab switcher HUD (<kbd className="font-mono px-1 py-0.2 rounded border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">Ctrl+Shift+Tab</kbd>).
+                    A clean, distraction-free web browser built around a keyboard-driven visual Alt-Tab tab switcher HUD (<kbd className="font-mono px-1 py-0.2 rounded border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">Ctrl+Tab</kbd>).
                   </p>
                   <p className="text-[11px] pt-2 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
                     Built with Electron WebContentsView, React 19, and Tailwind CSS.

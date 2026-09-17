@@ -206,6 +206,40 @@ export class TabManager {
       }
     });
 
+    wc.on('did-start-navigation', (_event, url, _isInPlace, isMainFrame) => {
+      if (isMainFrame) {
+        const tab = this.tabs.get(tabId);
+        if (tab) {
+          tab.info.url = url;
+          if (tabId === this.activeTabId && !this.isSwitcherOpen) {
+            if (url && url !== 'about:blank') {
+              this.attachActiveTabView();
+            } else {
+              this.detachActiveTabView();
+            }
+          }
+          this.notifyStateChange();
+        }
+      }
+    });
+
+    wc.on('did-navigate', (_event, url) => {
+      const tab = this.tabs.get(tabId);
+      if (tab) {
+        tab.info.url = url;
+        tab.info.canGoBack = wc.navigationHistory ? wc.navigationHistory.canGoBack() : wc.canGoBack();
+        tab.info.canGoForward = wc.navigationHistory ? wc.navigationHistory.canGoForward() : wc.canGoForward();
+        if (tabId === this.activeTabId && !this.isSwitcherOpen) {
+          if (url && url !== 'about:blank') {
+            this.attachActiveTabView();
+          } else {
+            this.detachActiveTabView();
+          }
+        }
+        this.notifyStateChange();
+      }
+    });
+
     wc.on('did-stop-loading', () => {
       const tab = this.tabs.get(tabId);
       if (tab) {
@@ -214,6 +248,16 @@ export class TabManager {
         tab.info.title = wc.getTitle() || tab.info.url || 'New Tab';
         tab.info.canGoBack = wc.navigationHistory ? wc.navigationHistory.canGoBack() : wc.canGoBack();
         tab.info.canGoForward = wc.navigationHistory ? wc.navigationHistory.canGoForward() : wc.canGoForward();
+
+        // Ensure active tab view is attached when page finishes loading
+        if (tabId === this.activeTabId && !this.isSwitcherOpen) {
+          if (tab.info.url && tab.info.url !== 'about:blank') {
+            this.attachActiveTabView();
+          } else {
+            this.detachActiveTabView();
+          }
+        }
+
         this.notifyStateChange();
         
         // Apply theme and capture snapshot in background
@@ -221,6 +265,15 @@ export class TabManager {
         this.capturePreview(tabId).then((img) => {
           if (img) this.notifyStateChange();
         });
+      }
+    });
+
+    wc.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+      console.error(`Tab ${tabId} failed to load ${validatedURL}: [${errorCode}] ${errorDescription}`);
+      const tab = this.tabs.get(tabId);
+      if (tab) {
+        tab.info.isLoading = false;
+        this.notifyStateChange();
       }
     });
 
@@ -324,14 +377,22 @@ export class TabManager {
       return;
     }
 
-    // Check if view is already attached
-    try {
-      this.window.contentView.removeChildView(tab.view);
-    } catch {
-      // Ignore
+    // Detach any other tab's view
+    for (const [id, otherTab] of this.tabs) {
+      if (id !== this.activeTabId) {
+        try {
+          if (this.window.contentView.children.includes(otherTab.view)) {
+            this.window.contentView.removeChildView(otherTab.view);
+          }
+        } catch {
+          // Ignore
+        }
+      }
     }
 
-    this.window.contentView.addChildView(tab.view);
+    if (!this.window.contentView.children.includes(tab.view)) {
+      this.window.contentView.addChildView(tab.view);
+    }
     this.updateActiveViewBounds();
   }
 
@@ -339,7 +400,9 @@ export class TabManager {
     if (!this.activeTabId || !this.tabs.has(this.activeTabId)) return;
     const tab = this.tabs.get(this.activeTabId)!;
     try {
-      this.window.contentView.removeChildView(tab.view);
+      if (this.window.contentView.children.includes(tab.view)) {
+        this.window.contentView.removeChildView(tab.view);
+      }
     } catch {
       // Ignore
     }
@@ -407,6 +470,20 @@ export class TabManager {
         targetUrl = `${base}${encodeURIComponent(targetUrl)}`;
       }
     }
+
+    tab.info.url = targetUrl;
+    tab.info.isLoading = true;
+
+    // Immediately attach the view if this is the active tab and it is not about:blank
+    if (tabId === this.activeTabId && !this.isSwitcherOpen) {
+      if (targetUrl && targetUrl !== 'about:blank') {
+        this.attachActiveTabView();
+      } else {
+        this.detachActiveTabView();
+      }
+    }
+
+    this.notifyStateChange();
 
     try {
       await tab.view.webContents.loadURL(targetUrl);

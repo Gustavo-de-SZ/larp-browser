@@ -153,7 +153,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
           <div className="flex items-center space-x-2 truncate mr-2">
             <Layers className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
             <span className="truncate text-[11px]">
-              Press <kbd className="px-1.5 py-0.5 rounded font-mono font-medium border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">Ctrl+Shift+Tab</kbd> to see open tabs
+              Press <kbd className="px-1.5 py-0.5 rounded font-mono font-medium border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">Ctrl+Tab</kbd> to see open tabs
             </span>
           </div>
           <button

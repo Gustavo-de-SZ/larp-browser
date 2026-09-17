@@ -202,7 +202,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             borderColor: 'var(--border-subtle)',
             color: 'var(--text-main)',
           }}
-          title="Switch Tabs (Ctrl+Shift+Tab)"
+          title="Switch Tabs (Ctrl+Tab)"
         >
           <Layers className="w-3.5 h-3.5 text-[var(--text-muted)]" />
           <span className="text-[11px] font-medium">
@@ -216,7 +216,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               borderColor: 'var(--border-subtle)',
             }}
           >
-            Ctrl+Shift+Tab
+            Ctrl+Tab
           </span>
         </button>
 
