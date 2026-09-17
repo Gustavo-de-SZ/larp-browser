@@ -220,10 +220,10 @@ export function getPalette(id: string, mode: 'dark' | 'light'): ColorPalette {
   return list.find((p) => p.id === id) || list[0];
 }
 
-export function applyPalette(palette: ColorPalette, customAccent?: string) {
+export function applyPalette(palette: ColorPalette, customAccent?: string | null) {
   const root = document.documentElement;
   const colors = palette.colors;
-  const primaryAccent = customAccent || colors.accentPrimary;
+  const primaryAccent = (customAccent && customAccent.trim()) || colors.accentPrimary;
 
   // Keep html.dark class and color-scheme in sync with palette mode
   if (palette.mode === 'dark') {
@@ -248,5 +248,5 @@ export function applyPalette(palette: ColorPalette, customAccent?: string) {
   root.style.setProperty('--text-muted', colors.textMuted);
   root.style.setProperty('--accent-primary', primaryAccent);
   root.style.setProperty('--accent-secondary', colors.accentSecondary);
-  root.style.setProperty('--glow-color', customAccent ? `${customAccent}25` : colors.glowColor);
+  root.style.setProperty('--glow-color', (customAccent && customAccent.trim()) ? `${customAccent}25` : colors.glowColor);
 }

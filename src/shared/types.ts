@@ -16,8 +16,8 @@ export interface BrowserSettings {
   theme: 'dark' | 'light';
   darkPaletteId: string;
   lightPaletteId: string;
-  customDarkAccent?: string;
-  customLightAccent?: string;
+  customDarkAccent?: string | null;
+  customLightAccent?: string | null;
   forcePageDarkMode: boolean; // Forces dark theme even on sites without dark mode
   defaultSearchEngine: 'duckduckgo' | 'google' | 'brave' | 'bing';
   autoHibernateTabs: boolean;

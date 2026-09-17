@@ -124,7 +124,14 @@ export class TabManager {
     const themeChanged = newSettings.theme !== undefined && newSettings.theme !== this.settings.theme;
     const forceDarkChanged = newSettings.forcePageDarkMode !== undefined && newSettings.forcePageDarkMode !== this.settings.forcePageDarkMode;
 
-    this.settings = { ...this.settings, ...newSettings };
+    for (const [key, value] of Object.entries(newSettings)) {
+      if (value === null || value === undefined) {
+        delete (this.settings as any)[key];
+      } else {
+        (this.settings as any)[key] = value;
+      }
+    }
+
     if (newSettings.theme) {
       nativeTheme.themeSource = newSettings.theme;
     }

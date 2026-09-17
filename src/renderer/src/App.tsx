@@ -81,10 +81,20 @@ export const App: React.FC = () => {
       setTheme(newSettings.theme);
     }
     // Optimistically update React state immediately: 0ms latency for all toggles, palettes, and options!
-    setState((prev) => ({
-      ...prev,
-      settings: { ...prev.settings, ...newSettings },
-    }));
+    setState((prev) => {
+      const updated = { ...prev.settings };
+      for (const [key, value] of Object.entries(newSettings)) {
+        if (value === null || value === undefined) {
+          delete (updated as any)[key];
+        } else {
+          (updated as any)[key] = value;
+        }
+      }
+      return {
+        ...prev,
+        settings: updated as BrowserSettings,
+      };
+    });
     if (window.browserApi) {
       window.browserApi.updateSettings(newSettings).then((updated) => {
         if (updated) {

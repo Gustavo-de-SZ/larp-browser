@@ -11,7 +11,7 @@ import {
   Globe,
   RotateCcw,
 } from 'lucide-react';
-import { DARK_PALETTES, LIGHT_PALETTES, ColorPalette } from '../theme/palettes';
+import { DARK_PALETTES, LIGHT_PALETTES, ColorPalette, getPalette } from '../theme/palettes';
 import type { BrowserSettings } from '../../shared/types';
 import type { ThemeMode } from '../App';
 
@@ -70,14 +70,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       ? safeSettings.darkPaletteId || 'graphite'
       : safeSettings.lightPaletteId || 'paper';
 
+  const activePalette = getPalette(currentActivePaletteId, paletteModeTab);
+  const currentPaletteDefaultAccent = activePalette.colors.accentPrimary;
+
   const currentCustomAccent =
     paletteModeTab === 'dark' ? safeSettings.customDarkAccent : safeSettings.customLightAccent;
 
   const handleSelectPalette = (palette: ColorPalette) => {
+    // When switching to a curated palette, reset any custom accent overrides for that mode so its authentic colors shine
     if (palette.mode === 'dark') {
-      onUpdateSettings({ darkPaletteId: palette.id, theme: 'dark' });
+      onUpdateSettings({ darkPaletteId: palette.id, theme: 'dark', customDarkAccent: null });
     } else {
-      onUpdateSettings({ lightPaletteId: palette.id, theme: 'light' });
+      onUpdateSettings({ lightPaletteId: palette.id, theme: 'light', customLightAccent: null });
     }
   };
 
@@ -90,10 +94,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleResetAccent = () => {
+    // Explicitly send null instead of undefined so IPC and JSON serializer preserve the key deletion
     if (paletteModeTab === 'dark') {
-      onUpdateSettings({ customDarkAccent: undefined });
+      onUpdateSettings({ customDarkAccent: null });
     } else {
-      onUpdateSettings({ customLightAccent: undefined });
+      onUpdateSettings({ customLightAccent: null });
     }
   };
 
@@ -381,8 +386,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div className="flex items-center space-x-1.5">
                       <input
                         type="color"
-                        value={currentCustomAccent || (paletteModeTab === 'dark' ? '#3b82f6' : '#2563eb')}
+                        value={currentCustomAccent || currentPaletteDefaultAccent}
                         onChange={(e) => handleCustomAccentChange(e.target.value)}
+                        onInput={(e) => handleCustomAccentChange((e.target as HTMLInputElement).value)}
                         className="w-7 h-7 rounded-md cursor-pointer bg-transparent border-0 p-0 transition-transform hover:scale-105"
                         title="Pick custom accent color"
                       />
@@ -517,7 +523,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                   <div>
                     <h4 className="text-xs font-semibold text-[var(--text-main)]">Larp Browser</h4>
-                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.2.0</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.2.1</p>
                   </div>
                 </div>
 
