@@ -73,11 +73,9 @@ export class TabManager {
   }
 
   private saveSettings() {
-    try {
-      fs.writeFileSync(this.settingsPath, JSON.stringify(this.settings, null, 2), 'utf8');
-    } catch (err) {
+    fs.promises.writeFile(this.settingsPath, JSON.stringify(this.settings, null, 2), 'utf8').catch((err) => {
       console.error('Failed to save settings:', err);
-    }
+    });
   }
 
   public setOnStateChange(cb: (state: BrowserState) => void) {
@@ -112,20 +110,34 @@ export class TabManager {
   }
 
   public async setTheme(theme: 'dark' | 'light') {
+    if (this.settings.theme === theme) return;
     this.settings.theme = theme;
     nativeTheme.themeSource = theme;
     this.saveSettings();
-    await this.applyThemeToAllTabs();
+    this.applyThemeToAllTabs().catch((err) => {
+      console.error('Failed to apply theme to tabs:', err);
+    });
     this.notifyStateChange();
   }
 
   public async updateSettings(newSettings: Partial<BrowserSettings>): Promise<BrowserSettings> {
+    const themeChanged = newSettings.theme !== undefined && newSettings.theme !== this.settings.theme;
+    const forceDarkChanged = newSettings.forcePageDarkMode !== undefined && newSettings.forcePageDarkMode !== this.settings.forcePageDarkMode;
+
     this.settings = { ...this.settings, ...newSettings };
     if (newSettings.theme) {
       nativeTheme.themeSource = newSettings.theme;
     }
     this.saveSettings();
-    await this.applyThemeToAllTabs();
+
+    // Only apply theme/CSS to tabs if theme or forcePageDarkMode actually changed
+    // And run it in background so IPC return is instantaneous!
+    if (themeChanged || forceDarkChanged) {
+      this.applyThemeToAllTabs().catch((err) => {
+        console.error('Failed to apply theme to tabs:', err);
+      });
+    }
+
     this.notifyStateChange();
     return { ...this.settings };
   }
@@ -150,9 +162,8 @@ export class TabManager {
   }
 
   private async applyThemeToAllTabs() {
-    for (const [id] of this.tabs) {
-      await this.applyThemeToTab(id);
-    }
+    const promises = Array.from(this.tabs.keys()).map((id) => this.applyThemeToTab(id));
+    await Promise.all(promises);
   }
 
   public async createTab(initialUrl = 'about:blank'): Promise<string> {

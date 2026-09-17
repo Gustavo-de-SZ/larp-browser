@@ -115,7 +115,7 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({ onClose, t
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5"
+            className="p-1.5 rounded-lg transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>

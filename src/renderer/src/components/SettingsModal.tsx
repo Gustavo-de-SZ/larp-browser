@@ -136,9 +136,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             <button
               onClick={() => setActiveTab('appearance')}
-              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                 activeTab === 'appearance'
-                  ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)]'
+                  ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)] font-semibold'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
               }`}
             >
@@ -148,9 +148,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             <button
               onClick={() => setActiveTab('switcher')}
-              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                 activeTab === 'switcher'
-                  ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)]'
+                  ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)] font-semibold'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
               }`}
             >
@@ -160,9 +160,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             <button
               onClick={() => setActiveTab('search')}
-              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                 activeTab === 'search'
-                  ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)]'
+                  ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)] font-semibold'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
               }`}
             >
@@ -172,9 +172,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             <button
               onClick={() => setActiveTab('about')}
-              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                 activeTab === 'about'
-                  ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)]'
+                  ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)] font-semibold'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
               }`}
             >
@@ -203,7 +203,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </h3>
             <button
               onClick={onClose}
-              className="p-1 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5"
+              className="p-1.5 rounded-lg transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -222,11 +222,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="grid grid-cols-2 gap-2.5">
                     <button
                       onClick={() => onUpdateSettings({ theme: 'dark' })}
-                      className="p-3 rounded-xl border flex items-center space-x-3 transition-colors text-left"
-                      style={{
-                        backgroundColor: isDark ? 'var(--bg-card-selected)' : 'var(--bg-card)',
-                        borderColor: isDark ? 'var(--border-selected)' : 'var(--border-card)',
-                      }}
+                      className={`p-3 rounded-xl border flex items-center space-x-3 transition-all text-left cursor-pointer ${
+                        isDark
+                          ? 'border-[var(--border-selected)] bg-[var(--bg-card-selected)] ring-1 ring-[var(--accent-primary)]/20 shadow-xs'
+                          : 'border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/50 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                      }`}
                     >
                       <div className="p-2 rounded-lg bg-black/20 text-slate-200">
                         <Moon className="w-4 h-4" />
@@ -240,11 +240,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                     <button
                       onClick={() => onUpdateSettings({ theme: 'light' })}
-                      className="p-3 rounded-xl border flex items-center space-x-3 transition-colors text-left"
-                      style={{
-                        backgroundColor: !isDark ? 'var(--bg-card-selected)' : 'var(--bg-card)',
-                        borderColor: !isDark ? 'var(--border-selected)' : 'var(--border-card)',
-                      }}
+                      className={`p-3 rounded-xl border flex items-center space-x-3 transition-all text-left cursor-pointer ${
+                        !isDark
+                          ? 'border-[var(--border-selected)] bg-[var(--bg-card-selected)] ring-1 ring-[var(--accent-primary)]/20 shadow-xs'
+                          : 'border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/50 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                      }`}
                     >
                       <div className="p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
                         <Sun className="w-4 h-4" />
@@ -280,20 +280,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     >
                       <button
                         onClick={() => setPaletteModeTab('dark')}
-                        className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
                           paletteModeTab === 'dark'
-                            ? 'bg-black/20 dark:bg-white/20 text-[var(--text-main)]'
-                            : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                            ? 'bg-black/20 dark:bg-white/20 text-[var(--text-main)] shadow-xs'
+                            : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
                         }`}
                       >
                         Dark
                       </button>
                       <button
                         onClick={() => setPaletteModeTab('light')}
-                        className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
                           paletteModeTab === 'light'
-                            ? 'bg-black/20 dark:bg-white/20 text-[var(--text-main)]'
-                            : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                            ? 'bg-black/20 dark:bg-white/20 text-[var(--text-main)] shadow-xs'
+                            : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
                         }`}
                       >
                         Light
@@ -309,11 +309,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <div
                           key={p.id}
                           onClick={() => handleSelectPalette(p)}
-                          className="p-2.5 rounded-xl border cursor-pointer transition-all flex flex-col justify-between group"
-                          style={{
-                            backgroundColor: isSelected ? 'var(--bg-card-selected)' : 'var(--bg-card)',
-                            borderColor: isSelected ? 'var(--border-selected)' : 'var(--border-card)',
-                          }}
+                          className={`p-2.5 rounded-xl border cursor-pointer transition-all flex flex-col justify-between group ${
+                            isSelected
+                              ? 'border-[var(--border-selected)] bg-[var(--bg-card-selected)] ring-1 ring-[var(--accent-primary)]/20 shadow-xs'
+                              : 'border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/50 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] hover:scale-[1.01]'
+                          }`}
                         >
                           <div className="flex items-start justify-between">
                             <div>
@@ -362,11 +362,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                   {/* Custom Accent Color */}
                   <div
-                    className="p-3 rounded-xl border flex items-center justify-between mt-1"
-                    style={{
-                      backgroundColor: 'var(--bg-card)',
-                      borderColor: 'var(--border-card)',
-                    }}
+                    className="p-3 rounded-xl border flex items-center justify-between mt-1 border-[var(--border-card)] bg-[var(--bg-card)]"
                   >
                     <div>
                       <div className="text-xs font-medium text-[var(--text-main)] flex items-center space-x-1.5">
@@ -387,13 +383,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         type="color"
                         value={currentCustomAccent || (paletteModeTab === 'dark' ? '#3b82f6' : '#2563eb')}
                         onChange={(e) => handleCustomAccentChange(e.target.value)}
-                        className="w-7 h-7 rounded-md cursor-pointer bg-transparent border-0 p-0"
+                        className="w-7 h-7 rounded-md cursor-pointer bg-transparent border-0 p-0 transition-transform hover:scale-105"
                         title="Pick custom accent color"
                       />
                       {currentCustomAccent && (
                         <button
                           onClick={handleResetAccent}
-                          className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                          className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                           title="Reset to palette default"
                         >
                           <RotateCcw className="w-3 h-3" />
@@ -405,13 +401,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 {/* Dark Mode Sync with Web Pages */}
                 <div
-                  className="p-3 rounded-xl border flex items-center justify-between"
-                  style={{
-                    backgroundColor: 'var(--bg-card)',
-                    borderColor: 'var(--border-card)',
-                  }}
+                  onClick={() => onUpdateSettings({ forcePageDarkMode: !safeSettings.forcePageDarkMode })}
+                  className="p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/40 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
                 >
-                  <div className="space-y-0.5 mr-3">
+                  <div className="space-y-0.5 mr-3 select-none">
                     <div className="text-xs font-medium text-[var(--text-main)]">
                       Sync Webpage Theme
                     </div>
@@ -420,15 +413,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </p>
                   </div>
 
-                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                  <div className="relative inline-flex items-center flex-shrink-0 pointer-events-none">
                     <input
                       type="checkbox"
+                      readOnly
                       checked={safeSettings.forcePageDarkMode}
-                      onChange={(e) => onUpdateSettings({ forcePageDarkMode: e.target.checked })}
                       className="sr-only peer"
                     />
                     <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
-                  </label>
+                  </div>
                 </div>
               </div>
             )}
@@ -437,11 +430,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {activeTab === 'switcher' && (
               <div className="space-y-3">
                 <div
-                  className="p-3.5 rounded-xl border space-y-1"
-                  style={{
-                    backgroundColor: 'var(--bg-card)',
-                    borderColor: 'var(--border-card)',
-                  }}
+                  className="p-3.5 rounded-xl border space-y-1 border-[var(--border-card)] bg-[var(--bg-card)]"
                 >
                   <div className="text-xs font-medium text-[var(--text-main)]">
                     Fast Live Snapshot Previews
@@ -452,13 +441,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 <div
-                  className="p-3.5 rounded-xl border flex items-center justify-between"
-                  style={{
-                    backgroundColor: 'var(--bg-card)',
-                    borderColor: 'var(--border-card)',
-                  }}
+                  onClick={() => onUpdateSettings({ autoHibernateTabs: !safeSettings.autoHibernateTabs })}
+                  className="p-3.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/40 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
                 >
-                  <div className="space-y-0.5 mr-3">
+                  <div className="space-y-0.5 mr-3 select-none">
                     <div className="text-xs font-medium text-[var(--text-main)]">
                       Auto-Hibernate Idle Tabs
                     </div>
@@ -466,15 +452,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       Suspends heavy background processes on tabs idle for more than 30 minutes.
                     </div>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                  <div className="relative inline-flex items-center flex-shrink-0 pointer-events-none">
                     <input
                       type="checkbox"
+                      readOnly
                       checked={safeSettings.autoHibernateTabs}
-                      onChange={(e) => onUpdateSettings({ autoHibernateTabs: e.target.checked })}
                       className="sr-only peer"
                     />
                     <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
-                  </label>
+                  </div>
                 </div>
               </div>
             )}
@@ -497,11 +483,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <button
                         key={engine.id}
                         onClick={() => onUpdateSettings({ defaultSearchEngine: engine.id as any })}
-                        className="w-full p-3 rounded-xl border flex items-center justify-between transition-colors text-left"
-                        style={{
-                          backgroundColor: isSelected ? 'var(--bg-card-selected)' : 'var(--bg-card)',
-                          borderColor: isSelected ? 'var(--border-selected)' : 'var(--border-card)',
-                        }}
+                        className={`w-full p-3 rounded-xl border flex items-center justify-between transition-all text-left cursor-pointer ${
+                          isSelected
+                            ? 'border-[var(--border-selected)] bg-[var(--bg-card-selected)] ring-1 ring-[var(--accent-primary)]/20 shadow-xs'
+                            : 'border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/50 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] hover:scale-[1.005]'
+                        }`}
                       >
                         <div className="flex items-center space-x-3">
                           <Globe className="w-4 h-4 text-[var(--text-muted)]" />
@@ -531,7 +517,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                   <div>
                     <h4 className="text-xs font-semibold text-[var(--text-main)]">Larp Browser</h4>
-                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.1.1</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.1.2</p>
                   </div>
                 </div>
 
@@ -564,7 +550,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             <button
               onClick={onClose}
-              className="px-3.5 py-1.5 rounded-lg text-white text-xs font-medium shadow-sm transition-opacity hover:opacity-90"
+              className="px-3.5 py-1.5 rounded-lg text-white text-xs font-medium shadow-sm transition-all hover:opacity-90 active:scale-95 cursor-pointer"
               style={{ backgroundColor: 'var(--accent-primary)' }}
             >
               Done

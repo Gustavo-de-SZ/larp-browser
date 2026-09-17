@@ -94,7 +94,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         <button
           onClick={() => activeTab && window.browserApi.goBack(activeTab.id)}
           disabled={!activeTab?.canGoBack}
-          className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-25 disabled:hover:bg-transparent"
+          className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-25 disabled:hover:bg-transparent cursor-pointer disabled:cursor-default"
           title="Back (Alt+Left)"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
@@ -104,7 +104,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         <button
           onClick={() => activeTab && window.browserApi.goForward(activeTab.id)}
           disabled={!activeTab?.canGoForward}
-          className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-25 disabled:hover:bg-transparent"
+          className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-25 disabled:hover:bg-transparent cursor-pointer disabled:cursor-default"
           title="Forward (Alt+Right)"
         >
           <ArrowRight className="w-3.5 h-3.5" />
@@ -113,7 +113,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Reload Button */}
         <button
           onClick={() => activeTab && window.browserApi.reloadTab(activeTab.id)}
-          className={`p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 ${
+          className={`p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer ${
             activeTab?.isLoading ? 'animate-spin' : ''
           }`}
           style={{
@@ -197,7 +197,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Tab Switcher Trigger Button */}
         <button
           onClick={() => window.browserApi.openSwitcher()}
-          className="flex items-center space-x-1.5 px-2 py-1 rounded-md text-xs border transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+          className="flex items-center space-x-1.5 px-2 py-1 rounded-md text-xs border transition-colors hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
           style={{
             borderColor: 'var(--border-subtle)',
             color: 'var(--text-main)',
@@ -223,7 +223,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* New Tab Button */}
         <button
           onClick={() => window.browserApi.createTab()}
-          className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5"
+          className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
           title="New Tab (Ctrl+T)"
         >
           <Plus className="w-3.5 h-3.5" />
@@ -232,7 +232,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Settings Button */}
         <button
           onClick={onOpenSettings}
-          className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5"
+          className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
           title="Settings (Ctrl+,)"
         >
           <Settings className="w-3.5 h-3.5" />
@@ -241,7 +241,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Keyboard Shortcuts Button */}
         <button
           onClick={onOpenShortcuts}
-          className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5"
+          className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
           title="Keyboard Shortcuts (Ctrl+/)"
         >
           <Keyboard className="w-3.5 h-3.5" />
@@ -250,7 +250,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Theme Toggle Button */}
         <button
           onClick={onToggleTheme}
-          className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5"
+          className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
           title={isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
         >
           {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
@@ -263,21 +263,21 @@ export const TopBar: React.FC<TopBarProps> = ({
         >
           <button
             onClick={() => window.browserApi.minimizeWindow()}
-            className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5"
+            className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
             title="Minimize"
           >
             <Minus className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => window.browserApi.maximizeWindow()}
-            className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5"
+            className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
             title="Maximize"
           >
             <Square className="w-3 h-3" />
           </button>
           <button
             onClick={() => window.browserApi.closeWindow()}
-            className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10"
+            className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10 cursor-pointer"
             title="Close"
           >
             <X className="w-3.5 h-3.5" />

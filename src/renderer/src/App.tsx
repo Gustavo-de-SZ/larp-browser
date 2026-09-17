@@ -62,21 +62,35 @@ export const App: React.FC = () => {
   const toggleTheme = () => {
     const nextTheme: ThemeMode = theme === 'dark' ? 'light' : 'dark';
     setTheme(nextTheme);
+    setState((prev) => ({
+      ...prev,
+      settings: { ...prev.settings, theme: nextTheme },
+    }));
     if (window.browserApi) {
       window.browserApi.updateSettings({ theme: nextTheme }).then((updated) => {
-        setState((prev) => ({ ...prev, settings: updated }));
-      });
+        if (updated) {
+          setState((prev) => ({ ...prev, settings: updated }));
+        }
+      }).catch(console.error);
     }
   };
 
-  const handleUpdateSettings = async (newSettings: Partial<BrowserSettings>) => {
+  const handleUpdateSettings = (newSettings: Partial<BrowserSettings>) => {
     // If theme is changing, update local state immediately so the palette effect fires right away
     if (newSettings.theme && newSettings.theme !== theme) {
       setTheme(newSettings.theme);
     }
+    // Optimistically update React state immediately: 0ms latency for all toggles, palettes, and options!
+    setState((prev) => ({
+      ...prev,
+      settings: { ...prev.settings, ...newSettings },
+    }));
     if (window.browserApi) {
-      const updated = await window.browserApi.updateSettings(newSettings);
-      setState((prev) => ({ ...prev, settings: updated }));
+      window.browserApi.updateSettings(newSettings).then((updated) => {
+        if (updated) {
+          setState((prev) => ({ ...prev, settings: updated }));
+        }
+      }).catch(console.error);
     }
   };
 
