@@ -36,6 +36,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [paletteModeTab, setPaletteModeTab] = useState<ThemeMode>(theme);
   const isDark = theme === 'dark';
 
+  // Keep sub-tab in sync if main theme changes
+  useEffect(() => {
+    setPaletteModeTab(theme);
+  }, [theme]);
+
   if (!isOpen) return null;
 
   const currentPalettes = paletteModeTab === 'dark' ? DARK_PALETTES : LIGHT_PALETTES;
@@ -49,9 +54,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSelectPalette = (palette: ColorPalette) => {
     if (palette.mode === 'dark') {
-      onUpdateSettings({ darkPaletteId: palette.id });
+      onUpdateSettings({ darkPaletteId: palette.id, theme: 'dark' });
     } else {
-      onUpdateSettings({ lightPaletteId: palette.id });
+      onUpdateSettings({ lightPaletteId: palette.id, theme: 'light' });
     }
   };
 
@@ -461,12 +466,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </label>
                 <div className="space-y-2">
                   {[
+                    { id: 'google', name: 'Google', desc: 'Standard search results (Recommended)' },
                     { id: 'duckduckgo', name: 'DuckDuckGo', desc: 'Privacy-focused search without trackers' },
-                    { id: 'google', name: 'Google', desc: 'Standard search results' },
                     { id: 'brave', name: 'Brave Search', desc: 'Independent search index' },
                     { id: 'bing', name: 'Microsoft Bing', desc: 'Bing web search' },
                   ].map((engine) => {
-                    const isSelected = settings.defaultSearchEngine === engine.id;
+                    const isSelected = (settings.defaultSearchEngine || 'google') === engine.id;
                     return (
                       <button
                         key={engine.id}

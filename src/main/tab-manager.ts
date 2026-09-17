@@ -10,7 +10,7 @@ const DEFAULT_SETTINGS: BrowserSettings = {
   darkPaletteId: 'graphite',
   lightPaletteId: 'paper',
   forcePageDarkMode: true,
-  defaultSearchEngine: 'duckduckgo',
+  defaultSearchEngine: 'google',
   autoHibernateTabs: true,
 };
 
@@ -55,6 +55,20 @@ export class TabManager {
     } catch {
       this.settings = { ...DEFAULT_SETTINGS };
     }
+
+    const validDark = ['graphite', 'midnight', 'warm-charcoal', 'forest-sage', 'pitch-black'];
+    const validLight = ['paper', 'warm-sand', 'cool-slate', 'matcha-garden'];
+
+    if (!validDark.includes(this.settings.darkPaletteId)) {
+      this.settings.darkPaletteId = 'graphite';
+    }
+    if (!validLight.includes(this.settings.lightPaletteId)) {
+      this.settings.lightPaletteId = 'paper';
+    }
+    if (!['google', 'duckduckgo', 'brave', 'bing'].includes(this.settings.defaultSearchEngine)) {
+      this.settings.defaultSearchEngine = 'google';
+    }
+    this.saveSettings();
   }
 
   private saveSettings() {
@@ -379,12 +393,12 @@ export class TabManager {
         targetUrl = 'https://' + targetUrl;
       } else {
         const engines = {
-          duckduckgo: 'https://duckduckgo.com/?q=',
           google: 'https://www.google.com/search?q=',
+          duckduckgo: 'https://duckduckgo.com/?q=',
           brave: 'https://search.brave.com/search?q=',
           bing: 'https://www.bing.com/search?q=',
         };
-        const base = engines[this.settings.defaultSearchEngine] || engines.duckduckgo;
+        const base = engines[this.settings.defaultSearchEngine] || engines.google;
         targetUrl = `${base}${encodeURIComponent(targetUrl)}`;
       }
     }

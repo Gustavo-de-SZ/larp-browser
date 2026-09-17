@@ -147,9 +147,7 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-6 backdrop-blur-sm transition-all duration-150 select-none ${
-        isDark ? 'bg-black/60' : 'bg-slate-900/30'
-      }`}
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center p-6 backdrop-blur-md transition-all duration-150 select-none bg-black/35"
       onClick={() => window.browserApi.closeSwitcher()}
     >
       {/* Main HUD Container */}

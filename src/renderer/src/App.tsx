@@ -25,31 +25,33 @@ export const App: React.FC = () => {
       darkPaletteId: 'graphite',
       lightPaletteId: 'paper',
       forcePageDarkMode: true,
-      defaultSearchEngine: 'duckduckgo',
+      defaultSearchEngine: 'google',
       autoHibernateTabs: true,
     },
   });
 
-  // Apply active palette and custom accent colors
+  // Apply active palette and custom accent colors whenever theme or palette changes
   useEffect(() => {
-    const paletteId = theme === 'dark' 
+    const currentTheme = state.settings?.theme || theme;
+    const paletteId = currentTheme === 'dark'
       ? (state.settings?.darkPaletteId || 'graphite')
       : (state.settings?.lightPaletteId || 'paper');
-    const customAccent = theme === 'dark'
+    const customAccent = currentTheme === 'dark'
       ? state.settings?.customDarkAccent
       : state.settings?.customLightAccent;
 
-    const palette = getPalette(paletteId, theme);
+    const palette = getPalette(paletteId, currentTheme);
     applyPalette(palette, customAccent);
   }, [
     theme,
+    state.settings?.theme,
     state.settings?.darkPaletteId,
     state.settings?.lightPaletteId,
     state.settings?.customDarkAccent,
     state.settings?.customLightAccent,
   ]);
 
-  // Sync theme with document element and Electron nativeTheme
+  // Sync theme with document class and Electron nativeTheme
   useEffect(() => {
     localStorage.setItem('larp-theme', theme);
     if (theme === 'dark') {
@@ -66,11 +68,13 @@ export const App: React.FC = () => {
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+    const nextTheme: ThemeMode = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    handleUpdateSettings({ theme: nextTheme });
   };
 
   const handleUpdateSettings = async (newSettings: Partial<BrowserSettings>) => {
-    if (newSettings.theme) {
+    if (newSettings.theme && newSettings.theme !== theme) {
       setTheme(newSettings.theme);
     }
     if (window.browserApi) {
@@ -106,7 +110,7 @@ export const App: React.FC = () => {
       // Listen for updates from Electron main process
       const unsubscribe = window.browserApi.onStateUpdate((updatedState) => {
         setState(updatedState);
-        if (updatedState.settings?.theme && updatedState.settings.theme !== theme) {
+        if (updatedState.settings?.theme) {
           setTheme(updatedState.settings.theme);
         }
       });
@@ -116,10 +120,16 @@ export const App: React.FC = () => {
   }, []);
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
-  const isNewTab = !activeTab || activeTab.url === 'about:blank';
+  const isNewTab = !activeTab || !activeTab.url || activeTab.url === 'about:blank';
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden text-slate-100 transition-colors duration-200">
+    <div
+      className="flex flex-col h-screen w-screen overflow-hidden transition-colors duration-150"
+      style={{
+        backgroundColor: 'var(--bg-app)',
+        color: 'var(--text-main)',
+      }}
+    >
       {/* Top Floating / Minimal Bar */}
       <TopBar
         state={state}
@@ -130,11 +140,25 @@ export const App: React.FC = () => {
 
       {/* Main Content Area:
           When active tab is about:blank or empty, render the native React New Tab dashboard.
-          When active tab has a real web URL, the WebContentsView is attached by the main process
-          directly below the TopBar.
+          When active tab has a real web URL:
+            - While browsing, WebContentsView is attached directly below TopBar.
+            - When TabSwitcher HUD is open, activeTab's snapshot preview is rendered here so the background never goes black!
       */}
-      <main className="flex-1 w-full h-[calc(100vh-44px)] relative overflow-hidden">
-        {isNewTab && <NewTabPage state={state} theme={theme} />}
+      <main
+        className="flex-1 w-full h-[calc(100vh-44px)] relative overflow-hidden"
+        style={{ backgroundColor: 'var(--bg-app)' }}
+      >
+        {isNewTab ? (
+          <NewTabPage state={state} theme={theme} />
+        ) : (
+          state.isSwitcherOpen && activeTab?.previewImage ? (
+            <img
+              src={activeTab.previewImage}
+              alt="Active tab preview"
+              className="w-full h-full object-cover object-top"
+            />
+          ) : null
+        )}
       </main>
 
       {/* Alt-Tab / Ctrl-Shift-Tab Switcher HUD Modal */}

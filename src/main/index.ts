@@ -22,7 +22,7 @@ async function createWindow() {
     minWidth: 800,
     minHeight: 500,
     frame: false, // Sleek frameless window with custom controls
-    backgroundColor: '#0a0b10',
+    backgroundColor: '#121214',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.cjs'),
       nodeIntegration: false,
@@ -70,10 +70,8 @@ async function createWindow() {
     await mainWindow.loadFile(indexPath);
   }
 
-  // Create initial demo tabs asynchronously
-  await tabManager.createTab('https://news.ycombinator.com');
-  tabManager.createTab('https://github.com');
-  tabManager.createTab('https://en.wikipedia.org');
+  // Create a single initial clean new tab
+  await tabManager.createTab('about:blank');
 
   mainWindow.on('closed', () => {
     mainWindow = null;
