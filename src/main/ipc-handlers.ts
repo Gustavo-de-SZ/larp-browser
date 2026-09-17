@@ -39,6 +39,23 @@ export function registerIpcHandlers(window: BrowserWindow, tabManager: TabManage
     tabManager.toggleMuteTab(tabId);
   });
 
+  // Bookmarks handlers
+  ipcMain.handle('browser:get-bookmarks', () => {
+    return tabManager.getBookmarks();
+  });
+
+  ipcMain.handle('browser:add-bookmark', (_event, bookmark: { title: string; url: string; favicon?: string }) => {
+    return tabManager.addBookmark(bookmark);
+  });
+
+  ipcMain.handle('browser:remove-bookmark', (_event, idOrUrl: string) => {
+    tabManager.removeBookmark(idOrUrl);
+  });
+
+  ipcMain.handle('browser:toggle-bookmark', (_event, bookmark: { title: string; url: string; favicon?: string }) => {
+    return tabManager.toggleBookmark(bookmark);
+  });
+
   // Settings & Theme handlers
   ipcMain.handle('browser:set-theme', (_event, theme: 'dark' | 'light') => {
     return tabManager.setTheme(theme);

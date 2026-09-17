@@ -1,8 +1,83 @@
 import { app, BrowserWindow, WebContents } from 'electron';
 import { TabManager } from './tab-manager';
+import { SHORTCUT_DEFINITIONS, ShortcutActionId } from '../shared/types';
+
+interface ParsedShortcut {
+  ctrl: boolean;
+  alt: boolean;
+  shift: boolean;
+  meta: boolean;
+  key: string;
+}
+
+export function parseShortcut(combo: string): ParsedShortcut {
+  const parts = combo.split('+').map((p) => p.trim());
+  let ctrl = false;
+  let alt = false;
+  let shift = false;
+  let meta = false;
+  let key = '';
+
+  for (const part of parts) {
+    const lower = part.toLowerCase();
+    if (lower === 'ctrl' || lower === 'control') {
+      ctrl = true;
+    } else if (lower === 'alt') {
+      alt = true;
+    } else if (lower === 'shift') {
+      shift = true;
+    } else if (lower === 'meta' || lower === 'cmd' || lower === 'super') {
+      meta = true;
+    } else {
+      key = part;
+    }
+  }
+
+  return { ctrl, alt, shift, meta, key };
+}
+
+export function matchesInput(input: Electron.Input, parsed: ParsedShortcut): boolean {
+  if (input.type !== 'keyDown') return false;
+
+  const ctrlMatch = !!input.control === parsed.ctrl;
+  const altMatch = !!input.alt === parsed.alt;
+  const shiftMatch = !!input.shift === parsed.shift;
+  const metaMatch = !!input.meta === parsed.meta;
+
+  if (!ctrlMatch || !altMatch || !shiftMatch || !metaMatch) return false;
+
+  const targetKey = parsed.key.toLowerCase();
+  const inputKey = input.key.toLowerCase();
+
+  if (targetKey === inputKey) return true;
+
+  // Key aliases
+  if (targetKey === 'left' && (inputKey === 'arrowleft' || inputKey === 'left')) return true;
+  if (targetKey === 'right' && (inputKey === 'arrowright' || inputKey === 'right')) return true;
+  if (targetKey === 'up' && (inputKey === 'arrowup' || inputKey === 'up')) return true;
+  if (targetKey === 'down' && (inputKey === 'arrowdown' || inputKey === 'down')) return true;
+
+  return false;
+}
 
 export function registerShortcuts(window: BrowserWindow, tabManager: TabManager) {
   let isCtrlPressed = false;
+
+  const getShortcutKey = (actionId: ShortcutActionId): string => {
+    const settings = tabManager.getSettings();
+    if (settings.customShortcuts && settings.customShortcuts[actionId]) {
+      return settings.customShortcuts[actionId];
+    }
+    const def = SHORTCUT_DEFINITIONS.find((d) => d.id === actionId);
+    return def ? def.defaultKey : '';
+  };
+
+  const isTriggered = (actionId: ShortcutActionId, input: Electron.Input): boolean => {
+    const combo = getShortcutKey(actionId);
+    if (!combo) return false;
+    const parsed = parseShortcut(combo);
+    return matchesInput(input, parsed);
+  };
 
   const handleInputEvent = (event: Electron.Event, input: Electron.Input) => {
     // Track Ctrl modifier state for switcher commit-on-release
@@ -21,24 +96,13 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
 
     if (input.type !== 'keyDown') return;
 
-    // ── Tab Switcher HUD ────────────────────────────────────────────────────
-    if (input.control && input.key.toLowerCase() === 'tab') {
-      event.preventDefault();
-      if (!tabManager.getState().isSwitcherOpen) {
-        tabManager.openSwitcher();
-      } else {
-        tabManager.cycleSwitcher(input.shift ? 'backward' : 'forward');
-      }
-      return;
-    }
-
-    if (input.key === 'Escape' && tabManager.getState().isSwitcherOpen) {
-      event.preventDefault();
-      tabManager.closeSwitcher();
-      return;
-    }
-
+    // ── Tab Switcher HUD Navigation & Esc ──────────────────────────────────
     if (tabManager.getState().isSwitcherOpen) {
+      if (input.key === 'Escape') {
+        event.preventDefault();
+        tabManager.closeSwitcher();
+        return;
+      }
       if (input.key === 'ArrowRight' || input.key === 'ArrowDown') {
         event.preventDefault();
         tabManager.cycleSwitcher('forward');
@@ -56,44 +120,71 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
       }
     }
 
-    // ── Navigation ──────────────────────────────────────────────────────────
-    if (input.alt && input.key === 'ArrowLeft') {
+    // ── Dynamic Customizable Shortcuts ─────────────────────────────────────
+    // 1. Tab Switcher Toggle / Cycle
+    if (isTriggered('openSwitcher', input)) {
       event.preventDefault();
-      const { activeTabId } = tabManager.getState();
-      if (activeTabId) tabManager.goBack(activeTabId);
+      if (!tabManager.getState().isSwitcherOpen) {
+        tabManager.openSwitcher();
+      } else {
+        tabManager.cycleSwitcher(input.shift ? 'backward' : 'forward');
+      }
       return;
     }
 
-    if (input.alt && input.key === 'ArrowRight') {
+    // 2. New Tab
+    if (isTriggered('newTab', input)) {
       event.preventDefault();
-      const { activeTabId } = tabManager.getState();
-      if (activeTabId) tabManager.goForward(activeTabId);
+      tabManager.createTab();
       return;
     }
 
-    // ── F-key shortcuts ─────────────────────────────────────────────────────
-    if (!input.control && !input.alt && !input.shift) {
-      // F5 – Reload
-      if (input.key === 'F5') {
-        event.preventDefault();
-        const { activeTabId } = tabManager.getState();
-        if (activeTabId) tabManager.reloadTab(activeTabId);
-        return;
-      }
-      // F11 – Toggle maximize
-      if (input.key === 'F11') {
-        event.preventDefault();
-        if (window.isMaximized()) {
-          window.unmaximize();
-        } else {
-          window.maximize();
-        }
-        return;
-      }
+    // 3. Close Tab
+    if (isTriggered('closeTab', input)) {
+      event.preventDefault();
+      const { activeTabId } = tabManager.getState();
+      if (activeTabId) tabManager.closeTab(activeTabId);
+      return;
     }
 
-    // Ctrl+Shift+R – Hard reload (bypass cache)
-    if (input.control && input.shift && input.key.toLowerCase() === 'r') {
+    // 4. Duplicate Tab
+    if (isTriggered('duplicateTab', input)) {
+      event.preventDefault();
+      const { activeTabId, tabs } = tabManager.getState();
+      const current = tabs.find((t) => t.id === activeTabId);
+      if (current && current.url && current.url !== 'about:blank') {
+        tabManager.createTab(current.url);
+      } else {
+        tabManager.createTab();
+      }
+      return;
+    }
+
+    // 5. Bookmark Page
+    if (isTriggered('toggleBookmark', input)) {
+      event.preventDefault();
+      const { activeTabId, tabs } = tabManager.getState();
+      const current = tabs.find((t) => t.id === activeTabId);
+      if (current && current.url && current.url !== 'about:blank') {
+        tabManager.toggleBookmark({
+          title: current.title,
+          url: current.url,
+          favicon: current.favicon,
+        });
+      }
+      return;
+    }
+
+    // 6. Toggle Bookmarks Bar
+    if (isTriggered('toggleBookmarksBar', input)) {
+      event.preventDefault();
+      const currentSetting = tabManager.getSettings().showBookmarksBar;
+      tabManager.updateSettings({ showBookmarksBar: !currentSetting });
+      return;
+    }
+
+    // 7. Hard Reload (Bypass cache)
+    if (isTriggered('hardReloadTab', input)) {
       event.preventDefault();
       const { activeTabId } = tabManager.getState();
       if (activeTabId) {
@@ -103,47 +194,65 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
       return;
     }
 
-    // ── Ctrl-only shortcuts ─────────────────────────────────────────────────
+    // 8. Normal Reload
+    if (isTriggered('reloadTab', input) || (!input.control && !input.alt && !input.shift && input.key === 'F5')) {
+      event.preventDefault();
+      const { activeTabId } = tabManager.getState();
+      if (activeTabId) tabManager.reloadTab(activeTabId);
+      return;
+    }
+
+    // 9. Go Back
+    if (isTriggered('goBack', input)) {
+      event.preventDefault();
+      const { activeTabId } = tabManager.getState();
+      if (activeTabId) tabManager.goBack(activeTabId);
+      return;
+    }
+
+    // 10. Go Forward
+    if (isTriggered('goForward', input)) {
+      event.preventDefault();
+      const { activeTabId } = tabManager.getState();
+      if (activeTabId) tabManager.goForward(activeTabId);
+      return;
+    }
+
+    // 11. Focus Address Bar
+    if (isTriggered('focusOmnibar', input)) {
+      event.preventDefault();
+      window.webContents.send('browser:focus-omnibar');
+      return;
+    }
+
+    // 12. Open Settings
+    if (isTriggered('openSettings', input)) {
+      event.preventDefault();
+      window.webContents.send('browser:toggle-modal', 'settings');
+      return;
+    }
+
+    // 13. Open Shortcuts Cheatsheet
+    if (isTriggered('openShortcuts', input)) {
+      event.preventDefault();
+      window.webContents.send('browser:toggle-modal', 'shortcuts');
+      return;
+    }
+
+    // 14. Toggle Maximize Window
+    if (isTriggered('toggleMaximize', input) || (!input.control && !input.alt && !input.shift && input.key === 'F11')) {
+      event.preventDefault();
+      if (window.isMaximized()) {
+        window.unmaximize();
+      } else {
+        window.maximize();
+      }
+      return;
+    }
+
+    // ── Number keys: Ctrl+1–Ctrl+8 / Ctrl+9 ──────────────────────────────
     if (input.control && !input.shift && !input.alt) {
       const key = input.key.toLowerCase();
-
-      // Ctrl+T – New Tab
-      if (key === 't') {
-        event.preventDefault();
-        tabManager.createTab();
-        return;
-      }
-
-      // Ctrl+W – Close Active Tab
-      if (key === 'w') {
-        event.preventDefault();
-        const { activeTabId } = tabManager.getState();
-        if (activeTabId) tabManager.closeTab(activeTabId);
-        return;
-      }
-
-      // Ctrl+R – Reload
-      if (key === 'r') {
-        event.preventDefault();
-        const { activeTabId } = tabManager.getState();
-        if (activeTabId) tabManager.reloadTab(activeTabId);
-        return;
-      }
-
-      // Ctrl+D – Duplicate Tab
-      if (key === 'd') {
-        event.preventDefault();
-        const { activeTabId, tabs } = tabManager.getState();
-        const current = tabs.find(t => t.id === activeTabId);
-        if (current && current.url && current.url !== 'about:blank') {
-          tabManager.createTab(current.url);
-        } else {
-          tabManager.createTab();
-        }
-        return;
-      }
-
-      // Ctrl+1–Ctrl+8 – Switch to tab by 1-based position
       const num = parseInt(key, 10);
       if (num >= 1 && num <= 8) {
         event.preventDefault();
@@ -153,7 +262,6 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
         return;
       }
 
-      // Ctrl+9 – Switch to last tab
       if (key === '9') {
         event.preventDefault();
         const { tabs } = tabManager.getState();

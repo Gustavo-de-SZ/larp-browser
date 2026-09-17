@@ -1,9 +1,10 @@
 import { app, BrowserWindow, WebContentsView, nativeTheme } from 'electron';
 import fs from 'fs';
 import path from 'path';
-import type { BrowserState, BrowserSettings, TabInfo, SwitcherDirection } from '../shared/types';
+import type { BrowserState, BrowserSettings, TabInfo, SwitcherDirection, BookmarkItem } from '../shared/types';
 
 export const TOP_BAR_HEIGHT = 44;
+export const BOOKMARKS_BAR_HEIGHT = 28;
 
 const DEFAULT_SETTINGS: BrowserSettings = {
   theme: 'dark',
@@ -12,6 +13,7 @@ const DEFAULT_SETTINGS: BrowserSettings = {
   forcePageDarkMode: true,
   defaultSearchEngine: 'google',
   autoHibernateTabs: true,
+  showBookmarksBar: false,
 };
 
 const SMART_DARK_CSS = `
@@ -35,12 +37,16 @@ export class TabManager {
   private selectedSwitcherIndex = 0;
   private settings: BrowserSettings = { ...DEFAULT_SETTINGS };
   private settingsPath: string;
+  private bookmarks: BookmarkItem[] = [];
+  private bookmarksPath: string;
   private onStateChangeCallback?: (state: BrowserState) => void;
 
   constructor(window: BrowserWindow) {
     this.window = window;
     this.settingsPath = path.join(app.getPath('userData'), 'larp-settings.json');
+    this.bookmarksPath = path.join(app.getPath('userData'), 'larp-bookmarks.json');
     this.loadSettings();
+    this.loadBookmarks();
 
     // Set Chromium native theme
     nativeTheme.themeSource = this.settings.theme;
@@ -69,6 +75,9 @@ export class TabManager {
     if (!['google', 'duckduckgo', 'brave', 'bing'].includes(this.settings.defaultSearchEngine)) {
       this.settings.defaultSearchEngine = 'google';
     }
+    if (typeof this.settings.showBookmarksBar !== 'boolean') {
+      this.settings.showBookmarksBar = false;
+    }
     this.saveSettings();
   }
 
@@ -76,6 +85,71 @@ export class TabManager {
     fs.promises.writeFile(this.settingsPath, JSON.stringify(this.settings, null, 2), 'utf8').catch((err) => {
       console.error('Failed to save settings:', err);
     });
+  }
+
+  private loadBookmarks() {
+    try {
+      if (fs.existsSync(this.bookmarksPath)) {
+        const raw = fs.readFileSync(this.bookmarksPath, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          this.bookmarks = parsed;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load bookmarks:', err);
+      this.bookmarks = [];
+    }
+  }
+
+  private saveBookmarks() {
+    fs.promises.writeFile(this.bookmarksPath, JSON.stringify(this.bookmarks, null, 2), 'utf8').catch((err) => {
+      console.error('Failed to save bookmarks:', err);
+    });
+  }
+
+  public getBookmarks(): BookmarkItem[] {
+    return [...this.bookmarks];
+  }
+
+  public addBookmark(data: { title: string; url: string; favicon?: string }): BookmarkItem {
+    const existing = this.bookmarks.find((b) => b.url === data.url);
+    if (existing) {
+      existing.title = data.title || existing.title;
+      if (data.favicon) existing.favicon = data.favicon;
+      this.saveBookmarks();
+      this.notifyStateChange();
+      return existing;
+    }
+
+    const newBookmark: BookmarkItem = {
+      id: 'bm-' + Math.random().toString(36).substring(2, 9),
+      title: data.title || data.url,
+      url: data.url,
+      favicon: data.favicon,
+      createdAt: Date.now(),
+    };
+    this.bookmarks.unshift(newBookmark);
+    this.saveBookmarks();
+    this.notifyStateChange();
+    return newBookmark;
+  }
+
+  public removeBookmark(idOrUrl: string) {
+    this.bookmarks = this.bookmarks.filter((b) => b.id !== idOrUrl && b.url !== idOrUrl);
+    this.saveBookmarks();
+    this.notifyStateChange();
+  }
+
+  public toggleBookmark(data: { title: string; url: string; favicon?: string }): { bookmarked: boolean; item?: BookmarkItem } {
+    const existing = this.bookmarks.find((b) => b.url === data.url);
+    if (existing) {
+      this.removeBookmark(existing.id);
+      return { bookmarked: false };
+    } else {
+      const item = this.addBookmark(data);
+      return { bookmarked: true, item };
+    }
   }
 
   public setOnStateChange(cb: (state: BrowserState) => void) {
@@ -96,6 +170,7 @@ export class TabManager {
       isSwitcherOpen: this.isSwitcherOpen,
       selectedSwitcherIndex: this.selectedSwitcherIndex,
       mruTabIds: [...this.mruTabIds],
+      bookmarks: [...this.bookmarks],
       settings: { ...this.settings },
     };
   }
@@ -123,6 +198,7 @@ export class TabManager {
   public async updateSettings(newSettings: Partial<BrowserSettings>): Promise<BrowserSettings> {
     const themeChanged = newSettings.theme !== undefined && newSettings.theme !== this.settings.theme;
     const forceDarkChanged = newSettings.forcePageDarkMode !== undefined && newSettings.forcePageDarkMode !== this.settings.forcePageDarkMode;
+    const bookmarksBarChanged = newSettings.showBookmarksBar !== undefined;
 
     for (const [key, value] of Object.entries(newSettings)) {
       if (value === null || value === undefined) {
@@ -136,6 +212,10 @@ export class TabManager {
       nativeTheme.themeSource = newSettings.theme;
     }
     this.saveSettings();
+
+    if (bookmarksBarChanged) {
+      this.updateActiveViewBounds();
+    }
 
     // Only apply theme/CSS to tabs if theme or forcePageDarkMode actually changed
     // And run it in background so IPC return is instantaneous!
@@ -455,12 +535,13 @@ export class TabManager {
     const tab = this.tabs.get(this.activeTabId);
     if (!tab || !tab.info.url || tab.info.url === 'about:blank') return;
 
+    const topOffset = this.settings.showBookmarksBar ? (TOP_BAR_HEIGHT + BOOKMARKS_BAR_HEIGHT) : TOP_BAR_HEIGHT;
     const [width, height] = this.window.getContentSize();
     tab.view.setBounds({
       x: 0,
-      y: TOP_BAR_HEIGHT,
+      y: topOffset,
       width: width,
-      height: Math.max(0, height - TOP_BAR_HEIGHT),
+      height: Math.max(0, height - topOffset),
     });
   }
 

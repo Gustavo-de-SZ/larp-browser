@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Search, Globe, Code, Terminal, BookOpen, Compass, Layers } from 'lucide-react';
-import type { BrowserState } from '../../shared/types';
+import { Search, Globe, Code, Terminal, BookOpen, Compass, Layers, Star, Plus } from 'lucide-react';
+import type { BrowserState } from '@/shared/types';
 import type { ThemeMode } from '../App';
 
 interface NewTabPageProps {
@@ -63,16 +63,20 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
     return 'Good evening';
   };
 
+  // Combine user bookmarks with default shortcuts
+  const userBookmarks = state.bookmarks || [];
+  const hasUserBookmarks = userBookmarks.length > 0;
+
   return (
     <div
-      className="w-full h-full flex flex-col items-center justify-center p-6 select-none relative overflow-hidden transition-colors duration-150"
+      className="w-full h-full flex flex-col items-center justify-center p-6 select-none relative overflow-y-auto no-scrollbar transition-colors duration-150"
       style={{
         backgroundColor: 'var(--bg-app)',
         color: 'var(--text-main)',
       }}
     >
-      <div className="w-full max-w-lg flex flex-col items-center space-y-7 z-10 -mt-10">
-        {/* Simple, warm greeting or title */}
+      <div className="w-full max-w-lg flex flex-col items-center space-y-7 z-10 -mt-8">
+        {/* Simple, warm greeting */}
         <div className="flex flex-col items-center space-y-1.5 text-center">
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-base font-bold shadow-sm mb-1"
@@ -116,29 +120,73 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
           />
         </form>
 
-        {/* Quick Speed Dial Shortcuts */}
-        <div className="grid grid-cols-5 gap-3 w-full pt-1">
-          {DEFAULT_SHORTCUTS.map((shortcut) => {
-            const Icon = shortcut.icon;
-            return (
-              <button
-                key={shortcut.url}
-                onClick={() => handleShortcutClick(shortcut.url)}
-                className="flex flex-col items-center justify-center p-3 rounded-xl border transition-all duration-150 group hover:border-[var(--border-selected)]/50 hover:-translate-y-0.5"
-                style={{
-                  backgroundColor: 'var(--bg-card)',
-                  borderColor: 'var(--border-card)',
-                }}
-              >
-                <div className={`p-2.5 rounded-lg ${shortcut.bg} mb-2 transition-transform group-hover:scale-105`}>
-                  <Icon className="w-4 h-4" />
-                </div>
-                <span className="text-[11px] font-medium truncate w-full text-center text-[var(--text-muted)] group-hover:text-[var(--text-main)] transition-colors">
-                  {shortcut.title}
-                </span>
-              </button>
-            );
-          })}
+        {/* Bookmarks / Quick Links Speed Dial */}
+        <div className="w-full space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[11px] font-semibold tracking-wider uppercase text-[var(--text-muted)] flex items-center space-x-1">
+              {hasUserBookmarks ? (
+                <>
+                  <Star className="w-3 h-3 inline mr-1 text-amber-400 fill-amber-400" />
+                  Favorites
+                </>
+              ) : (
+                'Quick Links'
+              )}
+            </span>
+            {hasUserBookmarks && (
+              <span className="text-[10px] text-[var(--text-muted)]">
+                {userBookmarks.length} {userBookmarks.length === 1 ? 'saved' : 'saved'}
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-5 gap-3 w-full">
+            {hasUserBookmarks
+              ? userBookmarks.slice(0, 10).map((bm) => (
+                  <button
+                    key={bm.id}
+                    onClick={() => handleShortcutClick(bm.url)}
+                    className="flex flex-col items-center justify-center p-3 rounded-xl border transition-all duration-150 group hover:border-[var(--border-selected)]/50 hover:-translate-y-0.5 cursor-pointer"
+                    style={{
+                      backgroundColor: 'var(--bg-card)',
+                      borderColor: 'var(--border-card)',
+                    }}
+                    title={`${bm.title}\n${bm.url}`}
+                  >
+                    <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500 mb-2 transition-transform group-hover:scale-105 flex items-center justify-center w-8 h-8">
+                      {bm.favicon ? (
+                        <img src={bm.favicon} alt="" className="w-4 h-4 rounded-xs" />
+                      ) : (
+                        <Globe className="w-4 h-4" />
+                      )}
+                    </div>
+                    <span className="text-[11px] font-medium truncate w-full text-center text-[var(--text-muted)] group-hover:text-[var(--text-main)] transition-colors">
+                      {bm.title || bm.url}
+                    </span>
+                  </button>
+                ))
+              : DEFAULT_SHORTCUTS.map((shortcut) => {
+                  const Icon = shortcut.icon;
+                  return (
+                    <button
+                      key={shortcut.url}
+                      onClick={() => handleShortcutClick(shortcut.url)}
+                      className="flex flex-col items-center justify-center p-3 rounded-xl border transition-all duration-150 group hover:border-[var(--border-selected)]/50 hover:-translate-y-0.5 cursor-pointer"
+                      style={{
+                        backgroundColor: 'var(--bg-card)',
+                        borderColor: 'var(--border-card)',
+                      }}
+                    >
+                      <div className={`p-2.5 rounded-lg ${shortcut.bg} mb-2 transition-transform group-hover:scale-105`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <span className="text-[11px] font-medium truncate w-full text-center text-[var(--text-muted)] group-hover:text-[var(--text-main)] transition-colors">
+                        {shortcut.title}
+                      </span>
+                    </button>
+                  );
+                })}
+          </div>
         </div>
 
         {/* Subtle, humane feature hint */}
@@ -153,12 +201,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
           <div className="flex items-center space-x-2 truncate mr-2">
             <Layers className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
             <span className="truncate text-[11px]">
-              Press <kbd className="px-1.5 py-0.5 rounded font-mono font-medium border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">Ctrl+Tab</kbd> to see open tabs
+              Press <kbd className="px-1.5 py-0.5 rounded font-mono font-medium border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">Ctrl+Tab</kbd> to switch tabs, or <kbd className="px-1.5 py-0.5 rounded font-mono font-medium border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">Ctrl+D</kbd> to favorite
             </span>
           </div>
           <button
             onClick={() => window.browserApi.openSwitcher()}
-            className="text-[11px] font-medium hover:underline flex-shrink-0"
+            className="text-[11px] font-medium hover:underline flex-shrink-0 cursor-pointer"
             style={{ color: 'var(--accent-primary)' }}
           >
             Open switcher

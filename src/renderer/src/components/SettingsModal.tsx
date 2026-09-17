@@ -10,30 +10,45 @@ import {
   Check,
   Globe,
   RotateCcw,
+  Keyboard,
+  Star,
+  Trash2,
+  ExternalLink,
+  Bookmark,
+  AlertTriangle,
 } from 'lucide-react';
 import { DARK_PALETTES, LIGHT_PALETTES, ColorPalette, getPalette } from '../theme/palettes';
-import type { BrowserSettings } from '../../shared/types';
+import {
+  BrowserSettings,
+  BookmarkItem,
+  SHORTCUT_DEFINITIONS,
+  ShortcutActionId,
+} from '@/shared/types';
 import type { ThemeMode } from '../App';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings: BrowserSettings;
+  bookmarks?: BookmarkItem[];
   theme: ThemeMode;
   onUpdateSettings: (settings: Partial<BrowserSettings>) => void;
 }
 
-type TabType = 'appearance' | 'switcher' | 'search' | 'about';
+type TabType = 'appearance' | 'shortcuts' | 'bookmarks' | 'switcher' | 'search' | 'about';
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
   settings,
+  bookmarks = [],
   theme,
   onUpdateSettings,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('appearance');
   const [paletteModeTab, setPaletteModeTab] = useState<ThemeMode>(theme);
+  const [recordingActionId, setRecordingActionId] = useState<ShortcutActionId | null>(null);
+  const [bookmarkFilter, setBookmarkFilter] = useState('');
   const isDark = theme === 'dark';
 
   // Keep sub-tab in sync if main theme changes
@@ -41,17 +56,64 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setPaletteModeTab(theme);
   }, [theme]);
 
-  // Close on Escape key
+  // Close on Escape key (when not recording a shortcut)
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (recordingActionId) return; // recording handler catches Escape
       if (e.key === 'Escape') {
         onClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, recordingActionId]);
+
+  // Interactive Shortcut Recorder listener
+  useEffect(() => {
+    if (!recordingActionId) return;
+
+    const handleRecordKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (e.key === 'Escape') {
+        setRecordingActionId(null);
+        return;
+      }
+
+      // Ignore solitary modifier keypresses
+      if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) {
+        return;
+      }
+
+      const parts: string[] = [];
+      if (e.ctrlKey) parts.push('Ctrl');
+      if (e.altKey) parts.push('Alt');
+      if (e.shiftKey) parts.push('Shift');
+      if (e.metaKey) parts.push('Meta');
+
+      let mainKey = e.key;
+      if (e.key === 'ArrowLeft') mainKey = 'Left';
+      else if (e.key === 'ArrowRight') mainKey = 'Right';
+      else if (e.key === 'ArrowUp') mainKey = 'Up';
+      else if (e.key === 'ArrowDown') mainKey = 'Down';
+      else if (e.key === ' ') mainKey = 'Space';
+      else if (e.key.length === 1) mainKey = e.key.toUpperCase();
+
+      parts.push(mainKey);
+      const combo = parts.join('+');
+
+      const customShortcuts = { ...(settings.customShortcuts || {}) };
+      customShortcuts[recordingActionId] = combo;
+
+      onUpdateSettings({ customShortcuts });
+      setRecordingActionId(null);
+    };
+
+    window.addEventListener('keydown', handleRecordKey, true);
+    return () => window.removeEventListener('keydown', handleRecordKey, true);
+  }, [recordingActionId, settings.customShortcuts, onUpdateSettings]);
 
   if (!isOpen) return null;
 
@@ -62,6 +124,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     forcePageDarkMode: true,
     defaultSearchEngine: 'google',
     autoHibernateTabs: true,
+    showBookmarksBar: false,
   };
 
   const currentPalettes = paletteModeTab === 'dark' ? DARK_PALETTES : LIGHT_PALETTES;
@@ -77,7 +140,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     paletteModeTab === 'dark' ? safeSettings.customDarkAccent : safeSettings.customLightAccent;
 
   const handleSelectPalette = (palette: ColorPalette) => {
-    // When switching to a curated palette, reset any custom accent overrides for that mode so its authentic colors shine
     if (palette.mode === 'dark') {
       onUpdateSettings({ darkPaletteId: palette.id, theme: 'dark', customDarkAccent: null });
     } else {
@@ -94,13 +156,54 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleResetAccent = () => {
-    // Explicitly send null instead of undefined so IPC and JSON serializer preserve the key deletion
     if (paletteModeTab === 'dark') {
       onUpdateSettings({ customDarkAccent: null });
     } else {
       onUpdateSettings({ customLightAccent: null });
     }
   };
+
+  const getEffectiveShortcut = (actionId: ShortcutActionId): string => {
+    if (safeSettings.customShortcuts && safeSettings.customShortcuts[actionId]) {
+      return safeSettings.customShortcuts[actionId];
+    }
+    const def = SHORTCUT_DEFINITIONS.find((d) => d.id === actionId);
+    return def ? def.defaultKey : '';
+  };
+
+  const isShortcutModified = (actionId: ShortcutActionId): boolean => {
+    return !!(safeSettings.customShortcuts && safeSettings.customShortcuts[actionId]);
+  };
+
+  const handleResetSingleShortcut = (actionId: ShortcutActionId) => {
+    const updated = { ...(safeSettings.customShortcuts || {}) };
+    delete updated[actionId];
+    onUpdateSettings({
+      customShortcuts: Object.keys(updated).length > 0 ? updated : null,
+    });
+  };
+
+  const handleResetAllShortcuts = () => {
+    onUpdateSettings({ customShortcuts: null });
+  };
+
+  // Find shortcut conflicts
+  const getConflictAction = (actionId: ShortcutActionId, combo: string): string | null => {
+    for (const def of SHORTCUT_DEFINITIONS) {
+      if (def.id === actionId) continue;
+      const otherCombo = getEffectiveShortcut(def.id);
+      if (otherCombo.toLowerCase() === combo.toLowerCase()) {
+        return def.label;
+      }
+    }
+    return null;
+  };
+
+  const filteredBookmarks = bookmarks.filter(
+    (b) =>
+      b.title.toLowerCase().includes(bookmarkFilter.toLowerCase()) ||
+      b.url.toLowerCase().includes(bookmarkFilter.toLowerCase())
+  );
 
   return (
     <div
@@ -110,7 +213,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-3xl rounded-2xl border shadow-xl overflow-hidden flex flex-col md:flex-row h-[560px] animate-scale-up"
+        className="w-full max-w-3xl rounded-2xl border shadow-xl overflow-hidden flex flex-col md:flex-row h-[580px] animate-scale-up"
         style={{
           backgroundColor: 'var(--bg-app)',
           borderColor: 'var(--border-subtle)',
@@ -120,7 +223,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       >
         {/* Left Sidebar */}
         <div
-          className="w-full md:w-52 p-3 border-b md:border-b-0 md:border-r flex flex-col justify-between"
+          className="w-full md:w-52 p-3 border-b md:border-b-0 md:border-r flex flex-col justify-between flex-shrink-0"
           style={{
             borderColor: 'var(--border-subtle)',
             backgroundColor: 'rgba(128, 128, 128, 0.03)',
@@ -149,6 +252,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             >
               <Palette className="w-4 h-4 text-[var(--text-muted)]" />
               <span>Appearance</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('shortcuts')}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                activeTab === 'shortcuts'
+                  ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)] font-semibold'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
+            >
+              <Keyboard className="w-4 h-4 text-[var(--text-muted)]" />
+              <span>Shortcuts</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('bookmarks')}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                activeTab === 'bookmarks'
+                  ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)] font-semibold'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
+            >
+              <Star className="w-4 h-4 text-[var(--text-muted)]" />
+              <span>Bookmarks</span>
             </button>
 
             <button
@@ -189,7 +316,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           <div className="text-[10px] text-[var(--text-muted)] font-mono px-3 py-2">
-            Shortcut: <kbd className="px-1 py-0.2 rounded border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 font-semibold">Ctrl+,</kbd>
+            Shortcut:{' '}
+            <kbd className="px-1 py-0.2 rounded border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 font-semibold">
+              Ctrl+,
+            </kbd>
           </div>
         </div>
 
@@ -197,11 +327,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="flex-1 flex flex-col justify-between overflow-hidden">
           {/* Header */}
           <div
-            className="p-3.5 px-5 border-b flex items-center justify-between"
+            className="p-3.5 px-5 border-b flex items-center justify-between flex-shrink-0"
             style={{ borderColor: 'var(--border-subtle)' }}
           >
             <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
               {activeTab === 'appearance' && 'Appearance & Colors'}
+              {activeTab === 'shortcuts' && 'Keyboard Shortcuts'}
+              {activeTab === 'bookmarks' && 'Bookmarks & Favorites'}
               {activeTab === 'switcher' && 'Tab Switcher (Alt-Tab)'}
               {activeTab === 'search' && 'Default Search Engine'}
               {activeTab === 'about' && 'About Larp Browser'}
@@ -251,174 +383,197 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           : 'border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/50 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
                       }`}
                     >
-                      <div className="p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                      <div className="p-2 rounded-lg bg-white text-amber-500 shadow-xs">
                         <Sun className="w-4 h-4" />
                       </div>
                       <div className="flex-1">
                         <div className="text-xs font-medium text-[var(--text-main)]">Light Mode</div>
-                        <div className="text-[10px] text-[var(--text-muted)]">Clean, paper-like light tones</div>
+                        <div className="text-[10px] text-[var(--text-muted)]">Clean, breathable light tones</div>
                       </div>
                       {!isDark && <Check className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />}
                     </button>
                   </div>
                 </div>
 
-                {/* Customizable Color Palettes */}
-                <div className="space-y-3 pt-3 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-xs font-medium text-[var(--text-main)]">
-                        Curated Palettes
-                      </h4>
-                      <p className="text-[11px] text-[var(--text-muted)]">
-                        Select a humane, grounded colorway for {paletteModeTab} mode.
-                      </p>
-                    </div>
-
-                    {/* Mode tab toggle */}
-                    <div
-                      className="flex items-center p-0.5 rounded-lg border"
-                      style={{
-                        backgroundColor: 'var(--bg-input)',
-                        borderColor: 'var(--border-subtle)',
-                      }}
-                    >
+                {/* Palette Palette Mode Sub-Tab */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-[var(--text-main)]">
+                      Color Palettes ({paletteModeTab === 'dark' ? 'Dark' : 'Light'})
+                    </label>
+                    <div className="flex items-center space-x-1 p-0.5 rounded-lg border bg-black/5 dark:bg-white/5 border-[var(--border-subtle)]">
                       <button
                         onClick={() => setPaletteModeTab('dark')}
-                        className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
                           paletteModeTab === 'dark'
-                            ? 'bg-black/20 dark:bg-white/20 text-[var(--text-main)] shadow-xs'
-                            : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
+                            ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-xs'
+                            : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
                         }`}
                       >
-                        Dark
+                        Dark Palettes
                       </button>
                       <button
                         onClick={() => setPaletteModeTab('light')}
-                        className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
                           paletteModeTab === 'light'
-                            ? 'bg-black/20 dark:bg-white/20 text-[var(--text-main)] shadow-xs'
-                            : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
+                            ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-xs'
+                            : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
                         }`}
                       >
-                        Light
+                        Light Palettes
                       </button>
                     </div>
                   </div>
 
-                  {/* Palette Presets Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-52 overflow-y-auto pr-1">
-                    {currentPalettes.map((p) => {
-                      const isSelected = p.id === currentActivePaletteId;
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {currentPalettes.map((palette) => {
+                      const isSelected = palette.id === currentActivePaletteId;
                       return (
-                        <div
-                          key={p.id}
-                          onClick={() => handleSelectPalette(p)}
-                          className={`p-2.5 rounded-xl border cursor-pointer transition-all flex flex-col justify-between group ${
+                        <button
+                          key={palette.id}
+                          onClick={() => handleSelectPalette(palette)}
+                          className={`p-3 rounded-xl border flex flex-col justify-between transition-all text-left cursor-pointer group ${
                             isSelected
-                              ? 'border-[var(--border-selected)] bg-[var(--bg-card-selected)] ring-1 ring-[var(--accent-primary)]/20 shadow-xs'
-                              : 'border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/50 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] hover:scale-[1.01]'
+                              ? 'border-[var(--border-selected)] ring-1 ring-[var(--accent-primary)]/20 shadow-xs'
+                              : 'border-[var(--border-card)] hover:border-[var(--accent-primary)]/40 hover:scale-[1.01]'
                           }`}
+                          style={{
+                            backgroundColor: palette.colors.bgApp,
+                            borderColor: isSelected ? 'var(--accent-primary)' : undefined,
+                          }}
                         >
-                          <div className="flex items-start justify-between">
+                          <div className="flex items-start justify-between mb-2 w-full">
                             <div>
-                              <div className="text-xs font-semibold text-[var(--text-main)]">
-                                {p.name}
+                              <div
+                                className="text-xs font-semibold tracking-tight"
+                                style={{ color: palette.colors.textMain }}
+                              >
+                                {palette.name}
                               </div>
-                              <div className="text-[10px] text-[var(--text-muted)] line-clamp-1 mt-0.5">
-                                {p.description}
+                              <div
+                                className="text-[10px] leading-tight opacity-75"
+                                style={{ color: palette.colors.textMuted }}
+                              >
+                                {palette.description}
                               </div>
                             </div>
                             {isSelected && (
-                              <Check className="w-3.5 h-3.5 flex-shrink-0 ml-1.5" style={{ color: 'var(--accent-primary)' }} />
+                              <div
+                                className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] font-bold shadow-xs"
+                                style={{ backgroundColor: palette.colors.accentPrimary }}
+                              >
+                                ✓
+                              </div>
                             )}
                           </div>
 
-                          {/* Color Swatches */}
-                          <div
-                            className="flex items-center space-x-1.5 mt-2.5 pt-1.5 border-t"
-                            style={{ borderColor: 'var(--border-subtle)' }}
-                          >
-                            <div
-                              className="w-3.5 h-3.5 rounded-full border border-black/10 dark:border-white/10"
-                              style={{ backgroundColor: p.colors.bgApp }}
-                              title="Background"
+                          <div className="flex items-center space-x-1.5 mt-2">
+                            <span
+                              className="w-3.5 h-3.5 rounded-full border shadow-xs"
+                              style={{
+                                backgroundColor: palette.colors.bgTopbar,
+                                borderColor: palette.colors.borderSubtle,
+                              }}
+                              title="Topbar"
                             />
-                            <div
-                              className="w-3.5 h-3.5 rounded-full border border-black/10 dark:border-white/10"
-                              style={{ backgroundColor: p.colors.bgCardSelected }}
-                              title="Surface"
+                            <span
+                              className="w-3.5 h-3.5 rounded-full border shadow-xs"
+                              style={{
+                                backgroundColor: palette.colors.bgCard,
+                                borderColor: palette.colors.borderSubtle,
+                              }}
+                              title="Cards"
                             />
-                            <div
-                              className="w-3.5 h-3.5 rounded-full border border-black/10 dark:border-white/10"
-                              style={{ backgroundColor: p.colors.accentPrimary }}
-                              title="Primary Accent"
-                            />
-                            <div
-                              className="w-3.5 h-3.5 rounded-full border border-black/10 dark:border-white/10"
-                              style={{ backgroundColor: p.colors.accentSecondary }}
-                              title="Secondary Accent"
+                            <span
+                              className="w-3.5 h-3.5 rounded-full shadow-xs"
+                              style={{ backgroundColor: palette.colors.accentPrimary }}
+                              title="Accent"
                             />
                           </div>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
+                </div>
 
-                  {/* Custom Accent Color */}
-                  <div
-                    className="p-3 rounded-xl border flex items-center justify-between mt-1 border-[var(--border-card)] bg-[var(--bg-card)]"
-                  >
-                    <div>
-                      <div className="text-xs font-medium text-[var(--text-main)] flex items-center space-x-1.5">
-                        <span>Custom Accent Color ({paletteModeTab})</span>
-                        {currentCustomAccent && (
-                          <span className="text-[10px] font-mono px-1 py-0.2 rounded border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10">
-                            {currentCustomAccent}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-[var(--text-muted)]">
-                        Overrides the primary highlight color for {paletteModeTab} mode.
-                      </div>
+                {/* Custom Accent Color Picker */}
+                <div
+                  className="p-3.5 rounded-xl border flex items-center justify-between"
+                  style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-card)' }}
+                >
+                  <div className="space-y-0.5">
+                    <div className="text-xs font-medium text-[var(--text-main)]">
+                      Custom Accent Color Override
                     </div>
+                    <div className="text-[11px] text-[var(--text-muted)]">
+                      {currentCustomAccent
+                        ? `Custom: ${currentCustomAccent}`
+                        : `Default (${activePalette.name}): ${currentPaletteDefaultAccent}`}
+                    </div>
+                  </div>
 
-                    <div className="flex items-center space-x-1.5">
-                      <input
-                        type="color"
-                        value={currentCustomAccent || currentPaletteDefaultAccent}
-                        onChange={(e) => handleCustomAccentChange(e.target.value)}
-                        onInput={(e) => handleCustomAccentChange((e.target as HTMLInputElement).value)}
-                        className="w-7 h-7 rounded-md cursor-pointer bg-transparent border-0 p-0 transition-transform hover:scale-105"
-                        title="Pick custom accent color"
-                      />
-                      {currentCustomAccent && (
-                        <button
-                          onClick={handleResetAccent}
-                          className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                          title="Reset to palette default"
-                        >
-                          <RotateCcw className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
+                  <div className="flex items-center space-x-2">
+                    {currentCustomAccent && (
+                      <button
+                        onClick={handleResetAccent}
+                        className="p-1.5 rounded-lg border text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                        title="Reset to active palette's authentic color"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <input
+                      type="color"
+                      value={currentCustomAccent || currentPaletteDefaultAccent}
+                      onChange={(e) => handleCustomAccentChange(e.target.value)}
+                      className="w-8 h-8 rounded-lg cursor-pointer border p-0.5"
+                      style={{
+                        backgroundColor: 'var(--bg-app)',
+                        borderColor: 'var(--border-subtle)',
+                      }}
+                    />
                   </div>
                 </div>
 
-                {/* Dark Mode Sync with Web Pages */}
+                {/* Bookmarks Bar Toggle */}
                 <div
-                  onClick={() => onUpdateSettings({ forcePageDarkMode: !safeSettings.forcePageDarkMode })}
-                  className="p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/40 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
+                  onClick={() => onUpdateSettings({ showBookmarksBar: !safeSettings.showBookmarksBar })}
+                  className="p-3.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/40 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
                 >
                   <div className="space-y-0.5 mr-3 select-none">
                     <div className="text-xs font-medium text-[var(--text-main)]">
-                      Sync Webpage Theme
+                      Show Bookmarks Bar
                     </div>
-                    <p className="text-[11px] text-[var(--text-muted)]">
-                      Websites (like Google, GitHub, YouTube) automatically match your Larp theme.
-                    </p>
+                    <div className="text-[11px] text-[var(--text-muted)]">
+                      Display a fast-access bookmarks bar directly beneath the address bar (Ctrl+Shift+B)
+                    </div>
                   </div>
+                  <div className="relative inline-flex items-center flex-shrink-0 pointer-events-none">
+                    <input
+                      type="checkbox"
+                      readOnly
+                      checked={safeSettings.showBookmarksBar}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
+                  </div>
+                </div>
 
+                {/* Smart Page Dark Mode */}
+                <div
+                  onClick={() =>
+                    onUpdateSettings({ forcePageDarkMode: !safeSettings.forcePageDarkMode })
+                  }
+                  className="p-3.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/40 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
+                >
+                  <div className="space-y-0.5 mr-3 select-none">
+                    <div className="text-xs font-medium text-[var(--text-main)]">
+                      Smart Inverted Web Page Dark Theme
+                    </div>
+                    <div className="text-[11px] text-[var(--text-muted)]">
+                      Automatically darkens light-themed web pages when Larp is set to Dark Mode.
+                    </div>
+                  </div>
                   <div className="relative inline-flex items-center flex-shrink-0 pointer-events-none">
                     <input
                       type="checkbox"
@@ -432,22 +587,217 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
 
-            {/* 2. Tab Switcher */}
-            {activeTab === 'switcher' && (
-              <div className="space-y-3">
-                <div
-                  className="p-3.5 rounded-xl border space-y-1 border-[var(--border-card)] bg-[var(--bg-card)]"
-                >
-                  <div className="text-xs font-medium text-[var(--text-main)]">
-                    Fast Live Snapshot Previews
-                  </div>
-                  <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
-                    Tabs are captured as downscaled thumbnails with non-blocking snapshots, ensuring instantaneous cycling with zero latency when pressing <kbd className="font-mono px-1 py-0.2 rounded border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10">Ctrl+Tab</kbd>.
+            {/* 2. Shortcuts Editor */}
+            {activeTab === 'shortcuts' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Click on any shortcut badge to record a new key combination.
                   </p>
+                  {safeSettings.customShortcuts &&
+                    Object.keys(safeSettings.customShortcuts).length > 0 && (
+                      <button
+                        onClick={handleResetAllShortcuts}
+                        className="text-[11px] text-[var(--accent-primary)] hover:underline flex items-center space-x-1 cursor-pointer"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Reset All Defaults</span>
+                      </button>
+                    )}
                 </div>
 
+                {recordingActionId && (
+                  <div
+                    className="p-3 rounded-xl border border-[var(--accent-primary)] bg-[var(--accent-primary)]/10 flex items-center justify-between text-xs animate-pulse"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Keyboard className="w-4 h-4 text-[var(--accent-primary)]" />
+                      <span>
+                        Recording shortcut for{' '}
+                        <strong>
+                          {SHORTCUT_DEFINITIONS.find((d) => d.id === recordingActionId)?.label}
+                        </strong>
+                        ... Press your desired keys now.
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setRecordingActionId(null)}
+                      className="text-[11px] font-mono px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-black/10 dark:bg-white/10 hover:bg-black/20 cursor-pointer"
+                    >
+                      Cancel (Esc)
+                    </button>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  {SHORTCUT_DEFINITIONS.map((def) => {
+                    const currentCombo = getEffectiveShortcut(def.id);
+                    const isModified = isShortcutModified(def.id);
+                    const isRecording = recordingActionId === def.id;
+                    const conflict = getConflictAction(def.id, currentCombo);
+
+                    return (
+                      <div
+                        key={def.id}
+                        className={`p-3 rounded-xl border flex items-center justify-between transition-all ${
+                          isRecording
+                            ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]/5'
+                            : 'border-[var(--border-card)] bg-[var(--bg-card)]'
+                        }`}
+                      >
+                        <div className="space-y-0.5 mr-3">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs font-medium text-[var(--text-main)]">
+                              {def.label}
+                            </span>
+                            <span className="text-[9px] px-1.5 py-0.2 rounded font-mono uppercase bg-black/5 dark:bg-white/5 text-[var(--text-muted)]">
+                              {def.category}
+                            </span>
+                            {isModified && (
+                              <span className="text-[9px] px-1.5 py-0.2 rounded font-mono bg-blue-500/10 text-blue-400">
+                                Customized
+                              </span>
+                            )}
+                            {conflict && (
+                              <span
+                                className="text-[9px] px-1.5 py-0.2 rounded font-mono bg-amber-500/15 text-amber-400 flex items-center space-x-1"
+                                title={`Conflicts with: ${conflict}`}
+                              >
+                                <AlertTriangle className="w-2.5 h-2.5 inline mr-0.5" />
+                                Conflict
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-[var(--text-muted)]">
+                            {def.description}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          {isModified && !isRecording && (
+                            <button
+                              onClick={() => handleResetSingleShortcut(def.id)}
+                              className="p-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                              title={`Reset to default (${def.defaultKey})`}
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() =>
+                              setRecordingActionId(isRecording ? null : def.id)
+                            }
+                            className={`px-2.5 py-1 rounded-lg text-xs font-mono font-medium border transition-all cursor-pointer ${
+                              isRecording
+                                ? 'bg-[var(--accent-primary)] text-white border-transparent'
+                                : 'bg-black/5 dark:bg-white/5 border-[var(--border-subtle)] text-[var(--text-main)] hover:border-[var(--accent-primary)]/60'
+                            }`}
+                          >
+                            {isRecording ? 'Press keys...' : currentCombo}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 3. Bookmarks Manager */}
+            {activeTab === 'bookmarks' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="relative flex-1 mr-3">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-[var(--text-muted)] pointer-events-none" />
+                    <input
+                      type="text"
+                      value={bookmarkFilter}
+                      onChange={(e) => setBookmarkFilter(e.target.value)}
+                      placeholder="Search bookmarks..."
+                      className="w-full h-8 pl-8 pr-3 rounded-lg text-xs border border-[var(--border-subtle)] bg-[var(--bg-input)] text-[var(--text-main)] focus:outline-none focus:border-[var(--border-selected)]"
+                    />
+                  </div>
+                  <span className="text-[11px] text-[var(--text-muted)] flex-shrink-0">
+                    {filteredBookmarks.length}{' '}
+                    {filteredBookmarks.length === 1 ? 'bookmark' : 'bookmarks'}
+                  </span>
+                </div>
+
+                {filteredBookmarks.length > 0 ? (
+                  <div className="space-y-2">
+                    {filteredBookmarks.map((bm) => (
+                      <div
+                        key={bm.id}
+                        className="p-2.5 px-3 rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] flex items-center justify-between hover:border-[var(--accent-primary)]/30 transition-colors"
+                      >
+                        <div className="flex items-center space-x-3 overflow-hidden mr-3">
+                          <div className="w-7 h-7 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center flex-shrink-0">
+                            {bm.favicon ? (
+                              <img src={bm.favicon} alt="" className="w-3.5 h-3.5 rounded-xs" />
+                            ) : (
+                              <Globe className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                            )}
+                          </div>
+                          <div className="overflow-hidden">
+                            <div className="text-xs font-medium text-[var(--text-main)] truncate">
+                              {bm.title || bm.url}
+                            </div>
+                            <div className="text-[10px] text-[var(--text-muted)] truncate font-mono">
+                              {bm.url}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-1.5 flex-shrink-0">
+                          <button
+                            onClick={() => {
+                              window.browserApi.createTab(bm.url);
+                              onClose();
+                            }}
+                            className="p-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                            title="Open in new tab"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => window.browserApi.removeBookmark(bm.id)}
+                            className="p-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                            title="Delete bookmark"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div
+                    className="p-8 rounded-xl border border-dashed border-[var(--border-subtle)] flex flex-col items-center justify-center text-center space-y-2 text-[var(--text-muted)]"
+                  >
+                    <Bookmark className="w-6 h-6 opacity-40" />
+                    <div className="text-xs font-medium text-[var(--text-main)]">
+                      {bookmarkFilter ? 'No matching bookmarks' : 'No bookmarks yet'}
+                    </div>
+                    <p className="text-[11px] max-w-xs">
+                      Click the star icon in the address bar or press{' '}
+                      <kbd className="px-1 py-0.2 rounded font-mono border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">
+                        {getEffectiveShortcut('toggleBookmark')}
+                      </kbd>{' '}
+                      to save pages to your favorites.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 4. Tab Switcher Preferences */}
+            {activeTab === 'switcher' && (
+              <div className="space-y-4">
                 <div
-                  onClick={() => onUpdateSettings({ autoHibernateTabs: !safeSettings.autoHibernateTabs })}
+                  onClick={() =>
+                    onUpdateSettings({ autoHibernateTabs: !safeSettings.autoHibernateTabs })
+                  }
                   className="p-3.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/40 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
                 >
                   <div className="space-y-0.5 mr-3 select-none">
@@ -471,7 +821,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
 
-            {/* 3. Search Engine */}
+            {/* 5. Search Engine */}
             {activeTab === 'search' && (
               <div className="space-y-3">
                 <label className="text-xs font-medium block text-[var(--text-main)]">
@@ -514,16 +864,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
 
-            {/* 4. About */}
+            {/* 6. About */}
             {activeTab === 'about' && (
               <div className="space-y-4">
-                <div className="flex items-center space-x-3 p-3.5 rounded-xl border" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-card)' }}>
+                <div
+                  className="flex items-center space-x-3 p-3.5 rounded-xl border"
+                  style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-card)' }}
+                >
                   <div className="w-10 h-10 rounded-xl bg-[var(--accent-primary)]/10 flex items-center justify-center">
                     <Info className="w-5 h-5 text-[var(--accent-primary)]" />
                   </div>
                   <div>
                     <h4 className="text-xs font-semibold text-[var(--text-main)]">Larp Browser</h4>
-                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.2.1</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.3.0</p>
                   </div>
                 </div>
 
@@ -536,9 +889,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   }}
                 >
                   <p>
-                    A clean, distraction-free web browser built around a keyboard-driven visual Alt-Tab tab switcher HUD (<kbd className="font-mono px-1 py-0.2 rounded border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">Ctrl+Tab</kbd>).
+                    A clean, distraction-free web browser built around a keyboard-driven visual
+                    Alt-Tab tab switcher HUD (
+                    <kbd className="font-mono px-1 py-0.2 rounded border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">
+                      Ctrl+Tab
+                    </kbd>
+                    ).
                   </p>
-                  <p className="text-[11px] pt-2 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+                  <p>
+                    Features editable keyboard shortcuts, dynamic favorites & bookmarks bar, and 9
+                    curated color palettes with 0ms optimistic theme updates.
+                  </p>
+                  <p
+                    className="text-[11px] pt-2 border-t"
+                    style={{ borderColor: 'var(--border-subtle)' }}
+                  >
                     Built with Electron WebContentsView, React 19, and Tailwind CSS.
                   </p>
                 </div>
@@ -548,7 +913,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* Footer */}
           <div
-            className="p-3 px-5 border-t flex items-center justify-end"
+            className="p-3 px-5 border-t flex items-center justify-end flex-shrink-0"
             style={{
               borderColor: 'var(--border-subtle)',
               backgroundColor: 'rgba(128, 128, 128, 0.03)',

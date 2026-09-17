@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { BrowserState, BrowserSettings, IpcRendererApi, SwitcherDirection } from '../shared/types';
+import type { BrowserState, BrowserSettings, IpcRendererApi, SwitcherDirection, BookmarkItem } from '../shared/types';
 
 const api: IpcRendererApi = {
   onStateUpdate: (callback: (state: BrowserState) => void) => {
@@ -9,6 +9,26 @@ const api: IpcRendererApi = {
     ipcRenderer.on('browser:state-update', listener);
     return () => {
       ipcRenderer.removeListener('browser:state-update', listener);
+    };
+  },
+
+  onToggleModal: (callback: (modal: 'settings' | 'shortcuts') => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, modal: 'settings' | 'shortcuts') => {
+      callback(modal);
+    };
+    ipcRenderer.on('browser:toggle-modal', listener);
+    return () => {
+      ipcRenderer.removeListener('browser:toggle-modal', listener);
+    };
+  },
+
+  onFocusOmnibar: (callback: () => void) => {
+    const listener = () => {
+      callback();
+    };
+    ipcRenderer.on('browser:focus-omnibar', listener);
+    return () => {
+      ipcRenderer.removeListener('browser:focus-omnibar', listener);
     };
   },
 
@@ -22,6 +42,14 @@ const api: IpcRendererApi = {
   goForward: (tabId: string) => ipcRenderer.invoke('browser:go-forward', tabId),
   reloadTab: (tabId: string) => ipcRenderer.invoke('browser:reload-tab', tabId),
   toggleMuteTab: (tabId: string) => ipcRenderer.invoke('browser:toggle-mute-tab', tabId),
+
+  // Bookmarks
+  getBookmarks: () => ipcRenderer.invoke('browser:get-bookmarks'),
+  addBookmark: (bookmark: { title: string; url: string; favicon?: string }) =>
+    ipcRenderer.invoke('browser:add-bookmark', bookmark),
+  removeBookmark: (idOrUrl: string) => ipcRenderer.invoke('browser:remove-bookmark', idOrUrl),
+  toggleBookmark: (bookmark: { title: string; url: string; favicon?: string }) =>
+    ipcRenderer.invoke('browser:toggle-bookmark', bookmark),
 
   setTheme: (theme: 'dark' | 'light') => ipcRenderer.invoke('browser:set-theme', theme),
   getSettings: () => ipcRenderer.invoke('browser:get-settings'),

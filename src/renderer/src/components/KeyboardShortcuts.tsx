@@ -1,65 +1,13 @@
 import React, { useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Keyboard } from 'lucide-react';
 import type { ThemeMode } from '../App';
+import { SHORTCUT_DEFINITIONS, ShortcutActionId } from '@/shared/types';
 
 interface KeyboardShortcutsProps {
   onClose: () => void;
   theme: ThemeMode;
+  customShortcuts?: Record<string, string>;
 }
-
-interface Shortcut {
-  keys: string[];
-  description: string;
-}
-
-interface Group {
-  label: string;
-  shortcuts: Shortcut[];
-}
-
-const SHORTCUT_GROUPS: Group[] = [
-  {
-    label: 'Navigation',
-    shortcuts: [
-      { keys: ['Alt', '←'], description: 'Go back' },
-      { keys: ['Alt', '→'], description: 'Go forward' },
-      { keys: ['Ctrl', 'R'], description: 'Reload page' },
-      { keys: ['F5'], description: 'Reload page' },
-      { keys: ['Ctrl', 'Shift', 'R'], description: 'Hard reload (bypass cache)' },
-      { keys: ['Ctrl', 'L'], description: 'Focus address bar' },
-    ],
-  },
-  {
-    label: 'Tabs',
-    shortcuts: [
-      { keys: ['Ctrl', 'T'], description: 'New tab' },
-      { keys: ['Ctrl', 'W'], description: 'Close current tab' },
-      { keys: ['Ctrl', 'D'], description: 'Duplicate current tab' },
-      { keys: ['Ctrl', '1'], description: 'Switch to 1st tab' },
-      { keys: ['Ctrl', '2–8'], description: 'Switch to tab by position' },
-      { keys: ['Ctrl', '9'], description: 'Switch to last tab' },
-    ],
-  },
-  {
-    label: 'Tab Switcher',
-    shortcuts: [
-      { keys: ['Ctrl', 'Tab'], description: 'Open / cycle forwards' },
-      { keys: ['Ctrl', 'Shift', 'Tab'], description: 'Cycle backwards' },
-      { keys: ['← →'], description: 'Navigate cards while open' },
-      { keys: ['Enter'], description: 'Switch to selected tab' },
-      { keys: ['W'], description: 'Close selected tab' },
-      { keys: ['Esc'], description: 'Cancel and close' },
-    ],
-  },
-  {
-    label: 'Interface',
-    shortcuts: [
-      { keys: ['Ctrl', ','], description: 'Open Settings' },
-      { keys: ['Ctrl', '/'], description: 'Show / hide this cheatsheet' },
-      { keys: ['F11'], description: 'Toggle maximize window' },
-    ],
-  },
-];
 
 function Kbd({ text }: { text: string }) {
   return (
@@ -76,7 +24,11 @@ function Kbd({ text }: { text: string }) {
   );
 }
 
-export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({ onClose, theme }) => {
+export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
+  onClose,
+  theme,
+  customShortcuts = {},
+}) => {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' || (e.ctrlKey && e.key === '/')) {
@@ -88,9 +40,62 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({ onClose, t
     return () => window.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
+  const getKey = (actionId: ShortcutActionId): string[] => {
+    if (customShortcuts[actionId]) {
+      return customShortcuts[actionId].split('+');
+    }
+    const def = SHORTCUT_DEFINITIONS.find((d) => d.id === actionId);
+    return (def ? def.defaultKey : '').split('+');
+  };
+
+  const SHORTCUT_GROUPS = [
+    {
+      label: 'Navigation',
+      shortcuts: [
+        { keys: getKey('goBack'), description: 'Go back' },
+        { keys: getKey('goForward'), description: 'Go forward' },
+        { keys: getKey('reloadTab'), description: 'Reload page' },
+        { keys: getKey('hardReloadTab'), description: 'Hard reload (bypass cache)' },
+        { keys: getKey('focusOmnibar'), description: 'Focus address bar' },
+      ],
+    },
+    {
+      label: 'Tabs & Favorites',
+      shortcuts: [
+        { keys: getKey('newTab'), description: 'New tab' },
+        { keys: getKey('closeTab'), description: 'Close current tab' },
+        { keys: getKey('duplicateTab'), description: 'Duplicate current tab' },
+        { keys: getKey('toggleBookmark'), description: 'Bookmark active page' },
+        { keys: getKey('toggleBookmarksBar'), description: 'Toggle bookmarks bar' },
+        { keys: ['Ctrl', '1'], description: 'Switch to 1st tab' },
+        { keys: ['Ctrl', '2–8'], description: 'Switch to tab by position' },
+        { keys: ['Ctrl', '9'], description: 'Switch to last tab' },
+      ],
+    },
+    {
+      label: 'Tab Switcher HUD',
+      shortcuts: [
+        { keys: getKey('openSwitcher'), description: 'Open / cycle forwards' },
+        { keys: ['Ctrl', 'Shift', 'Tab'], description: 'Cycle backwards' },
+        { keys: ['← →'], description: 'Navigate cards while open' },
+        { keys: ['Enter'], description: 'Switch to selected tab' },
+        { keys: ['W'], description: 'Close selected tab' },
+        { keys: ['Esc'], description: 'Cancel and close' },
+      ],
+    },
+    {
+      label: 'Interface',
+      shortcuts: [
+        { keys: getKey('openSettings'), description: 'Open Settings' },
+        { keys: getKey('openShortcuts'), description: 'Show / hide this cheatsheet' },
+        { keys: getKey('toggleMaximize'), description: 'Toggle maximize window' },
+      ],
+    },
+  ];
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/40 animate-scale-up"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/40 animate-scale-up select-none"
       onClick={onClose}
     >
       <div
@@ -104,45 +109,47 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({ onClose, t
       >
         {/* Header */}
         <div
-          className="flex items-center justify-between px-5 py-3.5 border-b"
+          className="p-4 px-6 border-b flex items-center justify-between"
           style={{ borderColor: 'var(--border-subtle)' }}
         >
-          <div>
-            <h2 className="text-sm font-semibold text-[var(--text-main)]">Keyboard Shortcuts</h2>
-            <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-              Press <Kbd text="Ctrl" /> + <Kbd text="/" /> or <Kbd text="?" /> to show/hide
-            </p>
+          <div className="flex items-center space-x-2">
+            <Keyboard className="w-4 h-4 text-[var(--accent-primary)]" />
+            <h2 className="text-sm font-semibold tracking-tight text-[var(--text-main)]">
+              Keyboard Shortcuts
+            </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+            className="p-1 rounded-lg transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Grid of groups */}
-        <div className="p-5 grid grid-cols-2 gap-x-6 gap-y-5 max-h-[70vh] overflow-y-auto">
+        {/* Content */}
+        <div className="p-6 max-h-[70vh] overflow-y-auto space-y-6">
           {SHORTCUT_GROUPS.map((group) => (
-            <div key={group.label} className="space-y-2.5">
-              <h3
-                className="text-[10px] font-semibold uppercase tracking-wider"
-                style={{ color: 'var(--accent-primary)' }}
-              >
+            <div key={group.label} className="space-y-3">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
                 {group.label}
               </h3>
-              <div className="space-y-1.5">
-                {group.shortcuts.map((s, i) => (
-                  <div key={i} className="flex items-center justify-between">
-                    <span className="text-xs text-[var(--text-muted)]">{s.description}</span>
-                    <div className="flex items-center gap-1 ml-3 flex-shrink-0">
-                      {s.keys.map((k, ki) => (
-                        <React.Fragment key={ki}>
-                          <Kbd text={k} />
-                          {ki < s.keys.length - 1 && (
-                            <span className="text-[10px] text-[var(--text-muted)]">+</span>
-                          )}
-                        </React.Fragment>
+              <div
+                className="rounded-xl border overflow-hidden divide-y"
+                style={{
+                  backgroundColor: 'var(--bg-card)',
+                  borderColor: 'var(--border-card)',
+                }}
+              >
+                {group.shortcuts.map((shortcut, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-2.5 px-4 text-xs"
+                    style={{ borderColor: 'var(--border-subtle)' }}
+                  >
+                    <span className="text-[var(--text-main)]">{shortcut.description}</span>
+                    <div className="flex items-center space-x-1">
+                      {shortcut.keys.map((k, kIdx) => (
+                        <Kbd key={kIdx} text={k} />
                       ))}
                     </div>
                   </div>
@@ -154,15 +161,19 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({ onClose, t
 
         {/* Footer */}
         <div
-          className="px-5 py-2.5 border-t flex items-center justify-end"
+          className="p-3.5 px-6 border-t flex items-center justify-between text-[11px] text-[var(--text-muted)]"
           style={{
             borderColor: 'var(--border-subtle)',
             backgroundColor: 'rgba(128, 128, 128, 0.03)',
           }}
         >
-          <span className="text-[10px] text-[var(--text-muted)]">
-            Press <Kbd text="Esc" /> to close
-          </span>
+          <span>Shortcuts can be customized in Settings (Ctrl+,)</span>
+          <button
+            onClick={onClose}
+            className="px-3 py-1 rounded-lg text-xs font-medium border border-[var(--border-subtle)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-[var(--text-main)]"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>

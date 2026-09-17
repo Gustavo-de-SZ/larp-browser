@@ -5,7 +5,7 @@ import { NewTabPage } from './components/NewTabPage';
 import { SettingsModal } from './components/SettingsModal';
 import { KeyboardShortcuts } from './components/KeyboardShortcuts';
 import { getPalette, applyPalette } from './theme/palettes';
-import type { BrowserState, BrowserSettings } from '../shared/types';
+import type { BrowserState, BrowserSettings } from '@/shared/types';
 
 export type ThemeMode = 'dark' | 'light';
 
@@ -22,6 +22,7 @@ export const App: React.FC = () => {
     isSwitcherOpen: false,
     selectedSwitcherIndex: 0,
     mruTabIds: [],
+    bookmarks: [],
     settings: {
       theme: 'dark',
       darkPaletteId: 'graphite',
@@ -29,17 +30,20 @@ export const App: React.FC = () => {
       forcePageDarkMode: true,
       defaultSearchEngine: 'google',
       autoHibernateTabs: true,
+      showBookmarksBar: false,
     },
   });
 
   // Apply active palette whenever theme or palette ID changes
   useEffect(() => {
-    const paletteId = theme === 'dark'
-      ? (state.settings?.darkPaletteId || 'graphite')
-      : (state.settings?.lightPaletteId || 'paper');
-    const customAccent = theme === 'dark'
-      ? state.settings?.customDarkAccent
-      : state.settings?.customLightAccent;
+    const paletteId =
+      theme === 'dark'
+        ? state.settings?.darkPaletteId || 'graphite'
+        : state.settings?.lightPaletteId || 'paper';
+    const customAccent =
+      theme === 'dark'
+        ? state.settings?.customDarkAccent
+        : state.settings?.customLightAccent;
 
     const palette = getPalette(paletteId, theme);
     applyPalette(palette, customAccent);
@@ -51,7 +55,7 @@ export const App: React.FC = () => {
     state.settings?.customLightAccent,
   ]);
 
-  // Persist theme choice and sync Electron nativeTheme (for web-content dark mode)
+  // Persist theme choice and sync Electron nativeTheme
   useEffect(() => {
     localStorage.setItem('larp-theme', theme);
     if (window.browserApi) {
@@ -67,20 +71,22 @@ export const App: React.FC = () => {
       settings: { ...prev.settings, theme: nextTheme },
     }));
     if (window.browserApi) {
-      window.browserApi.updateSettings({ theme: nextTheme }).then((updated) => {
-        if (updated) {
-          setState((prev) => ({ ...prev, settings: updated }));
-        }
-      }).catch(console.error);
+      window.browserApi
+        .updateSettings({ theme: nextTheme })
+        .then((updated) => {
+          if (updated) {
+            setState((prev) => ({ ...prev, settings: updated }));
+          }
+        })
+        .catch(console.error);
     }
   };
 
   const handleUpdateSettings = (newSettings: Partial<BrowserSettings>) => {
-    // If theme is changing, update local state immediately so the palette effect fires right away
     if (newSettings.theme && newSettings.theme !== theme) {
       setTheme(newSettings.theme);
     }
-    // Optimistically update React state immediately: 0ms latency for all toggles, palettes, and options!
+    // Optimistically update React state immediately: 0ms latency!
     setState((prev) => {
       const updated = { ...prev.settings };
       for (const [key, value] of Object.entries(newSettings)) {
@@ -96,18 +102,33 @@ export const App: React.FC = () => {
       };
     });
     if (window.browserApi) {
-      window.browserApi.updateSettings(newSettings).then((updated) => {
-        if (updated) {
-          setState((prev) => ({ ...prev, settings: updated }));
-        }
-      }).catch(console.error);
+      window.browserApi
+        .updateSettings(newSettings)
+        .then((updated) => {
+          if (updated) {
+            setState((prev) => ({ ...prev, settings: updated }));
+          }
+        })
+        .catch(console.error);
     }
   };
 
-  // Global keyboard shortcuts: Ctrl+, → Settings, Ctrl+/ or ? → Shortcuts overlay
+  // Listen for toggle modal commands sent from Electron main process shortcuts
+  useEffect(() => {
+    if (window.browserApi?.onToggleModal) {
+      return window.browserApi.onToggleModal((modal) => {
+        if (modal === 'settings') {
+          setIsSettingsOpen((prev) => !prev);
+        } else if (modal === 'shortcuts') {
+          setIsShortcutsOpen((prev) => !prev);
+        }
+      });
+    }
+  }, []);
+
+  // Global renderer keyboard shortcuts when focused in shell
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't fire if user is typing in an input
       const tag = (e.target as HTMLElement)?.tagName;
       const typing = tag === 'INPUT' || tag === 'TEXTAREA';
 
@@ -121,7 +142,6 @@ export const App: React.FC = () => {
         setIsShortcutsOpen((prev) => !prev);
         return;
       }
-      // '?' without ctrl (Shift+/ on most layouts) when not typing
       if (!typing && !e.ctrlKey && !e.altKey && e.key === '?') {
         e.preventDefault();
         setIsShortcutsOpen((prev) => !prev);
@@ -133,7 +153,6 @@ export const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Fetch initial state
     if (window.browserApi) {
       window.browserApi.getState().then((initialState) => {
         if (initialState) {
@@ -144,7 +163,6 @@ export const App: React.FC = () => {
         }
       });
 
-      // Listen for updates from Electron main process
       const unsubscribe = window.browserApi.onStateUpdate((updatedState) => {
         setState(updatedState);
         if (updatedState.settings?.theme) {
@@ -156,7 +174,7 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  // Synchronize modal open state with Electron main process so native WebContentsView is detached when a modal is open
+  // Synchronize modal open state with Electron main process so native WebContentsView is detached
   useEffect(() => {
     const isAnyModalOpen = isSettingsOpen || isShortcutsOpen;
     if (window.browserApi?.setModalOpen) {
@@ -175,7 +193,7 @@ export const App: React.FC = () => {
         color: 'var(--text-main)',
       }}
     >
-      {/* Top Bar */}
+      {/* Top Bar with Omnibar, Star Bookmark, Controls, and optional Bookmarks Bar */}
       <TopBar
         state={state}
         theme={theme}
@@ -186,7 +204,7 @@ export const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main
-        className="flex-1 w-full h-[calc(100vh-44px)] relative overflow-hidden"
+        className="flex-1 w-full relative overflow-hidden"
         style={{ backgroundColor: 'var(--bg-app)' }}
       >
         {isNewTab ? (
@@ -210,6 +228,7 @@ export const App: React.FC = () => {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         settings={state.settings}
+        bookmarks={state.bookmarks}
         theme={theme}
         onUpdateSettings={handleUpdateSettings}
       />
@@ -219,6 +238,7 @@ export const App: React.FC = () => {
         <KeyboardShortcuts
           onClose={() => setIsShortcutsOpen(false)}
           theme={theme}
+          customShortcuts={state.settings?.customShortcuts}
         />
       )}
     </div>
