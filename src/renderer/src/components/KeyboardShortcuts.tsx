@@ -43,8 +43,8 @@ const SHORTCUT_GROUPS: Group[] = [
   {
     label: 'Tab Switcher',
     shortcuts: [
-      { keys: ['Ctrl', 'Shift', 'Tab'], description: 'Open / cycle backwards' },
       { keys: ['Ctrl', 'Tab'], description: 'Open / cycle forwards' },
+      { keys: ['Ctrl', 'Shift', 'Tab'], description: 'Cycle backwards' },
       { keys: ['← →'], description: 'Navigate cards while open' },
       { keys: ['Enter'], description: 'Switch to selected tab' },
       { keys: ['W'], description: 'Close selected tab' },
