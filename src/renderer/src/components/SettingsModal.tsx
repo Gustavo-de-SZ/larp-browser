@@ -9,8 +9,6 @@ import {
   Moon,
   Check,
   Globe,
-  Sparkles,
-  Zap,
   RotateCcw,
 } from 'lucide-react';
 import { DARK_PALETTES, LIGHT_PALETTES, ColorPalette } from '../theme/palettes';
@@ -35,7 +33,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onUpdateSettings,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('appearance');
-  // Sub-tab for appearance mode customization: dark or light
   const [paletteModeTab, setPaletteModeTab] = useState<ThemeMode>(theme);
   const isDark = theme === 'dark';
 
@@ -44,8 +41,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const currentPalettes = paletteModeTab === 'dark' ? DARK_PALETTES : LIGHT_PALETTES;
   const currentActivePaletteId =
     paletteModeTab === 'dark'
-      ? settings.darkPaletteId || 'obsidian-neon'
-      : settings.lightPaletteId || 'opal-frost';
+      ? settings.darkPaletteId || 'graphite'
+      : settings.lightPaletteId || 'paper';
 
   const currentCustomAccent =
     paletteModeTab === 'dark' ? settings.customDarkAccent : settings.customLightAccent;
@@ -76,266 +73,258 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-xl transition-all duration-200 select-none ${
-        isDark ? 'bg-black/75' : 'bg-slate-900/35'
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-all duration-150 select-none ${
+        isDark ? 'bg-black/60' : 'bg-slate-900/30'
       }`}
       onClick={onClose}
     >
       <div
-        className={`w-full max-w-3xl rounded-3xl border shadow-2xl overflow-hidden flex flex-col md:flex-row h-[580px] animate-scale-up ${
-          isDark
-            ? 'bg-[#0f111d]/95 border-purple-500/25 text-slate-100 shadow-[0_30px_70px_-15px_rgba(0,0,0,0.9),0_0_40px_rgba(168,85,247,0.18)]'
-            : 'bg-white/95 border-indigo-100 text-slate-800 shadow-2xl'
-        }`}
+        className="w-full max-w-3xl rounded-2xl border shadow-xl overflow-hidden flex flex-col md:flex-row h-[560px] animate-scale-up"
+        style={{
+          backgroundColor: 'var(--bg-app)',
+          borderColor: 'var(--border-subtle)',
+          color: 'var(--text-main)',
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Left Sidebar Navigation */}
+        {/* Left Sidebar */}
         <div
-          className={`w-full md:w-56 p-4 border-b md:border-b-0 md:border-r flex flex-col justify-between ${
-            isDark ? 'border-purple-500/15 bg-black/25' : 'border-slate-200 bg-slate-50/70'
-          }`}
+          className="w-full md:w-52 p-3 border-b md:border-b-0 md:border-r flex flex-col justify-between"
+          style={{
+            borderColor: 'var(--border-subtle)',
+            backgroundColor: 'rgba(128, 128, 128, 0.03)',
+          }}
         >
           <div className="space-y-1">
-            <div className="px-3 py-2 flex items-center space-x-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-tr from-violet-500 to-cyan-400" />
-              <span className="text-xs font-black tracking-widest bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-400 bg-clip-text text-transparent">
-                LARP SETTINGS
+            <div className="px-3 py-2 flex items-center space-x-2 mb-1">
+              <div
+                className="w-4 h-4 rounded-sm flex items-center justify-center text-[10px] font-bold text-white"
+                style={{ backgroundColor: 'var(--accent-primary)' }}
+              >
+                L
+              </div>
+              <span className="text-xs font-semibold tracking-tight text-[var(--text-main)]">
+                Settings
               </span>
             </div>
 
             <button
               onClick={() => setActiveTab('appearance')}
-              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                 activeTab === 'appearance'
-                  ? isDark
-                    ? 'bg-purple-900/40 text-purple-200 border border-purple-500/30'
-                    : 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm'
-                  : isDark
-                  ? 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
               }`}
             >
-              <Palette className="w-4 h-4 text-purple-400" />
-              <span>Appearance & Palettes</span>
+              <Palette className="w-4 h-4 text-[var(--text-muted)]" />
+              <span>Appearance</span>
             </button>
 
             <button
               onClick={() => setActiveTab('switcher')}
-              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                 activeTab === 'switcher'
-                  ? isDark
-                    ? 'bg-purple-900/40 text-purple-200 border border-purple-500/30'
-                    : 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm'
-                  : isDark
-                  ? 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
               }`}
             >
-              <Layers className="w-4 h-4 text-cyan-400" />
-              <span>Tab Switcher HUD</span>
+              <Layers className="w-4 h-4 text-[var(--text-muted)]" />
+              <span>Tab Switcher</span>
             </button>
 
             <button
               onClick={() => setActiveTab('search')}
-              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                 activeTab === 'search'
-                  ? isDark
-                    ? 'bg-purple-900/40 text-purple-200 border border-purple-500/30'
-                    : 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm'
-                  : isDark
-                  ? 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
               }`}
             >
-              <Search className="w-4 h-4 text-emerald-400" />
+              <Search className="w-4 h-4 text-[var(--text-muted)]" />
               <span>Search Engine</span>
             </button>
 
             <button
               onClick={() => setActiveTab('about')}
-              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                 activeTab === 'about'
-                  ? isDark
-                    ? 'bg-purple-900/40 text-purple-200 border border-purple-500/30'
-                    : 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm'
-                  : isDark
-                  ? 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
               }`}
             >
-              <Info className="w-4 h-4 text-amber-400" />
-              <span>About Larp</span>
+              <Info className="w-4 h-4 text-[var(--text-muted)]" />
+              <span>About</span>
             </button>
           </div>
 
-          <div className="text-[10px] text-slate-500 font-mono px-3 py-1">
-            Shortcut: <kbd className="font-semibold text-purple-400">Ctrl+,</kbd>
+          <div className="text-[10px] text-[var(--text-muted)] font-mono px-3 py-2">
+            Shortcut: <kbd className="px-1 py-0.2 rounded border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 font-semibold">Ctrl+,</kbd>
           </div>
         </div>
 
-        {/* Right Content Area */}
-        <div className="flex-1 flex flex-col justify-between overflow-y-auto">
-          {/* Top Bar inside modal */}
-          <div className={`p-4 border-b flex items-center justify-between ${
-            isDark ? 'border-purple-500/15' : 'border-slate-200'
-          }`}>
-            <h3 className="text-sm font-bold capitalize flex items-center space-x-2">
-              <span>{activeTab === 'appearance' ? 'Color Palettes & Web Theming' : activeTab}</span>
+        {/* Right Content */}
+        <div className="flex-1 flex flex-col justify-between overflow-hidden">
+          {/* Header */}
+          <div
+            className="p-3.5 px-5 border-b flex items-center justify-between"
+            style={{ borderColor: 'var(--border-subtle)' }}
+          >
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+              {activeTab === 'appearance' && 'Appearance & Colors'}
+              {activeTab === 'switcher' && 'Tab Switcher (Alt-Tab)'}
+              {activeTab === 'search' && 'Default Search Engine'}
+              {activeTab === 'about' && 'About Larp Browser'}
             </h3>
             <button
               onClick={onClose}
-              className={`p-1.5 rounded-lg transition-colors ${
-                isDark ? 'text-slate-400 hover:text-white hover:bg-white/[0.08]' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200'
-              }`}
+              className="p-1 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Section Bodies */}
-          <div className="p-6 flex-1 overflow-y-auto space-y-6">
-            {/* 1. Appearance & Palettes Tab */}
+          {/* Section Body */}
+          <div className="p-5 flex-1 overflow-y-auto space-y-5">
+            {/* 1. Appearance & Palettes */}
             {activeTab === 'appearance' && (
-              <div className="space-y-6">
+              <div className="space-y-5">
                 {/* Active Mode Selector */}
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs font-semibold text-slate-300">
-                      Active Theme Mode
-                    </label>
-                    <span className="text-[11px] text-slate-400">
-                      Currently using: <strong className="text-purple-400">{theme.toUpperCase()}</strong>
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
+                  <label className="text-xs font-medium block text-[var(--text-main)] mb-2">
+                    Active Theme Mode
+                  </label>
+                  <div className="grid grid-cols-2 gap-2.5">
                     <button
                       onClick={() => onUpdateSettings({ theme: 'dark' })}
-                      className={`p-3 rounded-2xl border flex items-center space-x-3 transition-all ${
-                        isDark
-                          ? 'border-purple-500 bg-[#171a2b] shadow-[0_0_15px_rgba(168,85,247,0.3)] ring-1 ring-purple-400'
-                          : 'border-slate-200 bg-slate-50 hover:bg-white'
-                      }`}
+                      className="p-3 rounded-xl border flex items-center space-x-3 transition-colors text-left"
+                      style={{
+                        backgroundColor: isDark ? 'var(--bg-card-selected)' : 'var(--bg-card)',
+                        borderColor: isDark ? 'var(--border-selected)' : 'var(--border-card)',
+                      }}
                     >
-                      <div className="p-2 rounded-xl bg-purple-900/40 text-purple-300">
+                      <div className="p-2 rounded-lg bg-black/20 text-slate-200">
                         <Moon className="w-4 h-4" />
                       </div>
-                      <div className="text-left">
-                        <div className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Dark Theme</div>
-                        <div className="text-[10px] text-slate-400">Deep obsidian tones</div>
+                      <div className="flex-1">
+                        <div className="text-xs font-medium text-[var(--text-main)]">Dark Mode</div>
+                        <div className="text-[10px] text-[var(--text-muted)]">Calm, subdued dark tones</div>
                       </div>
-                      {isDark && <Check className="w-4 h-4 text-purple-400 ml-auto" />}
+                      {isDark && <Check className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />}
                     </button>
 
                     <button
                       onClick={() => onUpdateSettings({ theme: 'light' })}
-                      className={`p-3 rounded-2xl border flex items-center space-x-3 transition-all ${
-                        !isDark
-                          ? 'border-indigo-500 bg-indigo-50/80 shadow-md ring-1 ring-indigo-400'
-                          : 'border-white/[0.08] bg-[#121422] hover:bg-[#181b2c]'
-                      }`}
+                      className="p-3 rounded-xl border flex items-center space-x-3 transition-colors text-left"
+                      style={{
+                        backgroundColor: !isDark ? 'var(--bg-card-selected)' : 'var(--bg-card)',
+                        borderColor: !isDark ? 'var(--border-selected)' : 'var(--border-card)',
+                      }}
                     >
-                      <div className="p-2 rounded-xl bg-amber-400/20 text-amber-500">
+                      <div className="p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
                         <Sun className="w-4 h-4" />
                       </div>
-                      <div className="text-left">
-                        <div className={`text-xs font-bold ${!isDark ? 'text-slate-900' : 'text-slate-200'}`}>
-                          Light Theme
-                        </div>
-                        <div className="text-[10px] text-slate-400">Frosted luminous tones</div>
+                      <div className="flex-1">
+                        <div className="text-xs font-medium text-[var(--text-main)]">Light Mode</div>
+                        <div className="text-[10px] text-[var(--text-muted)]">Clean, paper-like light tones</div>
                       </div>
-                      {!isDark && <Check className="w-4 h-4 text-indigo-600 ml-auto" />}
+                      {!isDark && <Check className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />}
                     </button>
                   </div>
                 </div>
 
-                {/* Customizable Color Palettes Section */}
-                <div className="space-y-3 pt-2 border-t border-white/[0.08]">
+                {/* Customizable Color Palettes */}
+                <div className="space-y-3 pt-3 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="text-xs font-bold text-slate-200 flex items-center space-x-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                        <span>Customize Color Palettes</span>
+                      <h4 className="text-xs font-medium text-[var(--text-main)]">
+                        Curated Palettes
                       </h4>
-                      <p className="text-[11px] text-slate-400">
-                        Choose a distinct palette for each mode or customize your accent color.
+                      <p className="text-[11px] text-[var(--text-muted)]">
+                        Select a humane, grounded colorway for {paletteModeTab} mode.
                       </p>
                     </div>
 
-                    {/* Mode selector tab for customizing */}
-                    <div className="flex items-center bg-black/30 p-1 rounded-xl border border-white/[0.08]">
+                    {/* Mode tab toggle */}
+                    <div
+                      className="flex items-center p-0.5 rounded-lg border"
+                      style={{
+                        backgroundColor: 'var(--bg-input)',
+                        borderColor: 'var(--border-subtle)',
+                      }}
+                    >
                       <button
                         onClick={() => setPaletteModeTab('dark')}
-                        className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
                           paletteModeTab === 'dark'
-                            ? 'bg-purple-600 text-white shadow-sm'
-                            : 'text-slate-400 hover:text-white'
+                            ? 'bg-black/20 dark:bg-white/20 text-[var(--text-main)]'
+                            : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
                         }`}
                       >
-                        Dark Palettes
+                        Dark
                       </button>
                       <button
                         onClick={() => setPaletteModeTab('light')}
-                        className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
                           paletteModeTab === 'light'
-                            ? 'bg-indigo-600 text-white shadow-sm'
-                            : 'text-slate-400 hover:text-white'
+                            ? 'bg-black/20 dark:bg-white/20 text-[var(--text-main)]'
+                            : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
                         }`}
                       >
-                        Light Palettes
+                        Light
                       </button>
                     </div>
                   </div>
 
                   {/* Palette Presets Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-56 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-52 overflow-y-auto pr-1">
                     {currentPalettes.map((p) => {
                       const isSelected = p.id === currentActivePaletteId;
                       return (
                         <div
                           key={p.id}
                           onClick={() => handleSelectPalette(p)}
-                          className={`p-3 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between group ${
-                            isSelected
-                              ? 'border-purple-500 bg-purple-950/20 ring-1 ring-purple-400 shadow-md'
-                              : isDark
-                              ? 'border-white/[0.06] bg-[#141624] hover:border-purple-400/40 hover:bg-[#191d30]'
-                              : 'border-slate-200 bg-slate-50 hover:border-indigo-300 hover:bg-white'
-                          }`}
+                          className="p-2.5 rounded-xl border cursor-pointer transition-all flex flex-col justify-between group"
+                          style={{
+                            backgroundColor: isSelected ? 'var(--bg-card-selected)' : 'var(--bg-card)',
+                            borderColor: isSelected ? 'var(--border-selected)' : 'var(--border-card)',
+                          }}
                         >
                           <div className="flex items-start justify-between">
                             <div>
-                              <div className="text-xs font-bold text-slate-200 group-hover:text-purple-300 transition-colors">
+                              <div className="text-xs font-semibold text-[var(--text-main)]">
                                 {p.name}
                               </div>
-                              <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
+                              <div className="text-[10px] text-[var(--text-muted)] line-clamp-1 mt-0.5">
                                 {p.description}
                               </div>
                             </div>
                             {isSelected && (
-                              <Check className="w-4 h-4 text-purple-400 flex-shrink-0 ml-2" />
+                              <Check className="w-3.5 h-3.5 flex-shrink-0 ml-1.5" style={{ color: 'var(--accent-primary)' }} />
                             )}
                           </div>
 
-                          {/* Color Swatch Preview Dots */}
-                          <div className="flex items-center space-x-1.5 mt-3 pt-2 border-t border-white/[0.06]">
+                          {/* Color Swatches */}
+                          <div
+                            className="flex items-center space-x-1.5 mt-2.5 pt-1.5 border-t"
+                            style={{ borderColor: 'var(--border-subtle)' }}
+                          >
                             <div
-                              className="w-4 h-4 rounded-full border border-black/20 shadow-sm"
+                              className="w-3.5 h-3.5 rounded-full border border-black/10 dark:border-white/10"
                               style={{ backgroundColor: p.colors.bgApp }}
                               title="Background"
                             />
                             <div
-                              className="w-4 h-4 rounded-full border border-black/20 shadow-sm"
+                              className="w-3.5 h-3.5 rounded-full border border-black/10 dark:border-white/10"
                               style={{ backgroundColor: p.colors.bgCardSelected }}
                               title="Surface"
                             />
                             <div
-                              className="w-4 h-4 rounded-full border border-black/20 shadow-sm"
+                              className="w-3.5 h-3.5 rounded-full border border-black/10 dark:border-white/10"
                               style={{ backgroundColor: p.colors.accentPrimary }}
                               title="Primary Accent"
                             />
                             <div
-                              className="w-4 h-4 rounded-full border border-black/20 shadow-sm"
+                              className="w-3.5 h-3.5 rounded-full border border-black/10 dark:border-white/10"
                               style={{ backgroundColor: p.colors.accentSecondary }}
                               title="Secondary Accent"
                             />
@@ -345,175 +334,202 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     })}
                   </div>
 
-                  {/* Custom Accent Color Picker */}
-                  <div className={`p-3.5 rounded-2xl border flex items-center justify-between mt-2 ${
-                    isDark ? 'bg-[#151829] border-purple-500/20' : 'bg-slate-50 border-slate-200'
-                  }`}>
-                    <div className="space-y-0.5">
-                      <div className="text-xs font-bold text-slate-200 flex items-center space-x-2">
-                        <span>Custom Accent Color ({paletteModeTab.toUpperCase()})</span>
+                  {/* Custom Accent Color */}
+                  <div
+                    className="p-3 rounded-xl border flex items-center justify-between mt-1"
+                    style={{
+                      backgroundColor: 'var(--bg-card)',
+                      borderColor: 'var(--border-card)',
+                    }}
+                  >
+                    <div>
+                      <div className="text-xs font-medium text-[var(--text-main)] flex items-center space-x-1.5">
+                        <span>Custom Accent Color ({paletteModeTab})</span>
                         {currentCustomAccent && (
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 font-mono">
+                          <span className="text-[10px] font-mono px-1 py-0.2 rounded border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10">
                             {currentCustomAccent}
                           </span>
                         )}
                       </div>
-                      <div className="text-[10px] text-slate-400">
-                        Overrides the primary neon highlight for the selected mode.
+                      <div className="text-[11px] text-[var(--text-muted)]">
+                        Overrides the primary highlight color for {paletteModeTab} mode.
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1.5">
                       <input
                         type="color"
-                        value={currentCustomAccent || (paletteModeTab === 'dark' ? '#a855f7' : '#7c3aed')}
+                        value={currentCustomAccent || (paletteModeTab === 'dark' ? '#3b82f6' : '#2563eb')}
                         onChange={(e) => handleCustomAccentChange(e.target.value)}
-                        className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0 p-0"
-                        title="Pick custom color"
+                        className="w-7 h-7 rounded-md cursor-pointer bg-transparent border-0 p-0"
+                        title="Pick custom accent color"
                       />
                       {currentCustomAccent && (
                         <button
                           onClick={handleResetAccent}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+                          className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                           title="Reset to palette default"
                         >
-                          <RotateCcw className="w-3.5 h-3.5" />
+                          <RotateCcw className="w-3 h-3" />
                         </button>
                       )}
                     </div>
                   </div>
                 </div>
 
-                {/* Force Web Page Dark Mode Option */}
-                <div className={`p-4 rounded-2xl border transition-all ${
-                  isDark ? 'bg-[#151829] border-purple-500/20' : 'bg-slate-50 border-slate-200'
-                }`}>
-                  <div className="flex items-start justify-between space-x-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2">
-                        <Sparkles className="w-4 h-4 text-purple-400" />
-                        <span className="text-xs font-bold">Follow Dark Theme on Webpages</span>
-                      </div>
-                      <p className={`text-[11px] leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                        Instructs websites (like Google, GitHub, YouTube, Wikipedia) to automatically display their dark mode, matching your Larp theme.
-                      </p>
+                {/* Dark Mode Sync with Web Pages */}
+                <div
+                  className="p-3 rounded-xl border flex items-center justify-between"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    borderColor: 'var(--border-card)',
+                  }}
+                >
+                  <div className="space-y-0.5 mr-3">
+                    <div className="text-xs font-medium text-[var(--text-main)]">
+                      Sync Webpage Theme
                     </div>
-
-                    <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
-                      <input
-                        type="checkbox"
-                        checked={settings.forcePageDarkMode}
-                        onChange={(e) => onUpdateSettings({ forcePageDarkMode: e.target.checked })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
-                    </label>
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      Websites (like Google, GitHub, YouTube) automatically match your Larp theme.
+                    </p>
                   </div>
+
+                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={settings.forcePageDarkMode}
+                      onChange={(e) => onUpdateSettings({ forcePageDarkMode: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
+                  </label>
                 </div>
               </div>
             )}
 
-            {/* 2. Switcher HUD Tab */}
+            {/* 2. Tab Switcher */}
             {activeTab === 'switcher' && (
-              <div className="space-y-4">
-                <div className={`p-4 rounded-2xl border space-y-2 ${
-                  isDark ? 'bg-[#151829] border-purple-500/20' : 'bg-slate-50 border-slate-200'
-                }`}>
-                  <div className="flex items-center space-x-2">
-                    <Zap className="w-4 h-4 text-cyan-400" />
-                    <span className="text-xs font-bold">Fast Live Snapshot Cards</span>
+              <div className="space-y-3">
+                <div
+                  className="p-3.5 rounded-xl border space-y-1"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    borderColor: 'var(--border-card)',
+                  }}
+                >
+                  <div className="text-xs font-medium text-[var(--text-main)]">
+                    Fast Live Snapshot Previews
                   </div>
-                  <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Captures 360px downscaled snapshots of tabs so cycling with <kbd className="font-mono text-purple-400">Ctrl+Shift+Tab</kbd> shows real-time previews with zero lag.
+                  <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+                    Tabs are captured as downscaled thumbnails with non-blocking snapshots, ensuring instantaneous cycling with zero latency when pressing <kbd className="font-mono px-1 py-0.2 rounded border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10">Ctrl+Shift+Tab</kbd>.
                   </p>
                 </div>
 
-                <div className={`p-4 rounded-2xl border flex items-center justify-between ${
-                  isDark ? 'bg-[#151829] border-purple-500/20' : 'bg-slate-50 border-slate-200'
-                }`}>
-                  <div className="space-y-0.5">
-                    <div className="text-xs font-bold">Auto-Hibernate Inactive Tabs</div>
-                    <div className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                      Frees up RAM when tabs have been idle for more than 30 minutes.
+                <div
+                  className="p-3.5 rounded-xl border flex items-center justify-between"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    borderColor: 'var(--border-card)',
+                  }}
+                >
+                  <div className="space-y-0.5 mr-3">
+                    <div className="text-xs font-medium text-[var(--text-main)]">
+                      Auto-Hibernate Idle Tabs
+                    </div>
+                    <div className="text-[11px] text-[var(--text-muted)]">
+                      Suspends heavy background processes on tabs idle for more than 30 minutes.
                     </div>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
+                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
                     <input
                       type="checkbox"
                       checked={settings.autoHibernateTabs}
                       onChange={(e) => onUpdateSettings({ autoHibernateTabs: e.target.checked })}
                       className="sr-only peer"
                     />
-                    <div className="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                    <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
                   </label>
                 </div>
               </div>
             )}
 
-            {/* 3. Search Engine Tab */}
+            {/* 3. Search Engine */}
             {activeTab === 'search' && (
-              <div className="space-y-4">
-                <label className="text-xs font-semibold block text-slate-300">
+              <div className="space-y-3">
+                <label className="text-xs font-medium block text-[var(--text-main)]">
                   Default Omnibar Search Engine
                 </label>
                 <div className="space-y-2">
                   {[
-                    { id: 'duckduckgo', name: 'DuckDuckGo', desc: 'Privacy-focused search engine' },
+                    { id: 'duckduckgo', name: 'DuckDuckGo', desc: 'Privacy-focused search without trackers' },
                     { id: 'google', name: 'Google', desc: 'Standard search results' },
                     { id: 'brave', name: 'Brave Search', desc: 'Independent search index' },
-                    { id: 'bing', name: 'Microsoft Bing', desc: 'Bing search engine' },
-                  ].map((engine) => (
-                    <button
-                      key={engine.id}
-                      onClick={() => onUpdateSettings({ defaultSearchEngine: engine.id as any })}
-                      className={`w-full p-3 rounded-2xl border flex items-center justify-between transition-all ${
-                        settings.defaultSearchEngine === engine.id
-                          ? isDark
-                            ? 'border-purple-500 bg-[#171a2b] shadow-[0_0_15px_rgba(168,85,247,0.2)]'
-                            : 'border-indigo-500 bg-indigo-50/70 shadow-sm'
-                          : isDark
-                          ? 'border-white/[0.06] bg-[#121422] hover:bg-[#17192a]'
-                          : 'border-slate-200 bg-white hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <Globe className="w-4 h-4 text-purple-400" />
-                        <div className="text-left">
-                          <div className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                            {engine.name}
+                    { id: 'bing', name: 'Microsoft Bing', desc: 'Bing web search' },
+                  ].map((engine) => {
+                    const isSelected = settings.defaultSearchEngine === engine.id;
+                    return (
+                      <button
+                        key={engine.id}
+                        onClick={() => onUpdateSettings({ defaultSearchEngine: engine.id as any })}
+                        className="w-full p-3 rounded-xl border flex items-center justify-between transition-colors text-left"
+                        style={{
+                          backgroundColor: isSelected ? 'var(--bg-card-selected)' : 'var(--bg-card)',
+                          borderColor: isSelected ? 'var(--border-selected)' : 'var(--border-card)',
+                        }}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <Globe className="w-4 h-4 text-[var(--text-muted)]" />
+                          <div>
+                            <div className="text-xs font-medium text-[var(--text-main)]">
+                              {engine.name}
+                            </div>
+                            <div className="text-[10px] text-[var(--text-muted)]">{engine.desc}</div>
                           </div>
-                          <div className="text-[10px] text-slate-400">{engine.desc}</div>
                         </div>
-                      </div>
-                      {settings.defaultSearchEngine === engine.id && (
-                        <Check className="w-4 h-4 text-purple-400" />
-                      )}
-                    </button>
-                  ))}
+                        {isSelected && (
+                          <Check className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
-            {/* 4. About Tab */}
+            {/* 4. About */}
             {activeTab === 'about' && (
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3 p-4 rounded-2xl bg-gradient-to-r from-violet-600/10 to-cyan-500/10 border border-purple-500/20">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-purple-500/30">
-                    <Sparkles className="w-5 h-5 text-white" />
+              <div className="space-y-3">
+                <div
+                  className="flex items-center space-x-3 p-4 rounded-xl border"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    borderColor: 'var(--border-card)',
+                  }}
+                >
+                  <div
+                    className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+                    style={{ backgroundColor: 'var(--accent-primary)' }}
+                  >
+                    L
                   </div>
                   <div>
-                    <h4 className="text-sm font-black text-white">Larp Browser</h4>
-                    <p className="text-[11px] text-purple-300">Version 1.0.0 (Chromium 130+)</p>
+                    <h4 className="text-xs font-semibold text-[var(--text-main)]">Larp Browser</h4>
+                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.0.0 (Chromium 130+)</p>
                   </div>
                 </div>
 
-                <div className={`p-4 rounded-2xl border space-y-2 text-xs leading-relaxed ${
-                  isDark ? 'border-white/[0.08] bg-[#121422] text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600'
-                }`}>
+                <div
+                  className="p-4 rounded-xl border space-y-2 text-xs leading-relaxed"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    borderColor: 'var(--border-card)',
+                    color: 'var(--text-muted)',
+                  }}
+                >
                   <p>
-                    A custom minimalist web browser that replaces standard top tab bars with a keyboard-driven visual Alt-Tab switcher HUD.
+                    A clean, distraction-free web browser built around a keyboard-driven visual Alt-Tab tab switcher HUD (<kbd className="font-mono px-1 py-0.2 rounded border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">Ctrl+Shift+Tab</kbd>).
                   </p>
-                  <p className="text-[11px] text-slate-400 pt-2 border-t border-white/[0.06]">
+                  <p className="text-[11px] pt-2 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
                     Built with Electron WebContentsView, React 19, and Tailwind CSS.
                   </p>
                 </div>
@@ -521,13 +537,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             )}
           </div>
 
-          {/* Modal Footer */}
-          <div className={`p-4 border-t flex items-center justify-end ${
-            isDark ? 'border-purple-500/15 bg-black/20' : 'border-slate-200 bg-slate-50'
-          }`}>
+          {/* Footer */}
+          <div
+            className="p-3 px-5 border-t flex items-center justify-end"
+            style={{
+              borderColor: 'var(--border-subtle)',
+              backgroundColor: 'rgba(128, 128, 128, 0.03)',
+            }}
+          >
             <button
               onClick={onClose}
-              className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-semibold shadow-md hover:brightness-110 transition-all"
+              className="px-3.5 py-1.5 rounded-lg text-white text-xs font-medium shadow-sm transition-opacity hover:opacity-90"
+              style={{ backgroundColor: 'var(--accent-primary)' }}
             >
               Done
             </button>

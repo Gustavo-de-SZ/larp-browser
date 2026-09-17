@@ -14,7 +14,6 @@ import {
   VolumeX,
   Sun,
   Moon,
-  Sparkles,
   Settings,
 } from 'lucide-react';
 import type { BrowserState } from '../../shared/types';
@@ -27,7 +26,12 @@ interface TopBarProps {
   onOpenSettings: () => void;
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ state, theme, onToggleTheme, onOpenSettings }) => {
+export const TopBar: React.FC<TopBarProps> = ({
+  state,
+  theme,
+  onToggleTheme,
+  onOpenSettings,
+}) => {
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
   const [urlInput, setUrlInput] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -57,24 +61,29 @@ export const TopBar: React.FC<TopBarProps> = ({ state, theme, onToggleTheme, onO
 
   return (
     <header
-      className={`h-11 w-full backdrop-blur-xl border-b flex items-center justify-between px-3 select-none z-40 transition-colors duration-200 ${
-        isDark
-          ? 'bg-[#0f111a]/90 border-purple-500/15 text-slate-100'
-          : 'bg-white/85 border-indigo-200/50 text-slate-800 shadow-sm'
-      }`}
-      style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      className="h-11 w-full flex items-center justify-between px-3 select-none z-40 transition-colors duration-150 border-b"
+      style={{
+        backgroundColor: 'var(--bg-topbar)',
+        borderColor: 'var(--border-subtle)',
+        color: 'var(--text-main)',
+        WebkitAppRegion: 'drag',
+      } as React.CSSProperties}
     >
       {/* Left controls: Brand & Navigation */}
-      <div className="flex items-center space-x-1.5" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-        {/* Logo / Brand */}
-        <div className={`flex items-center space-x-1.5 px-2.5 py-1 mr-1 rounded-lg border transition-all ${
-          isDark
-            ? 'bg-purple-950/40 border-purple-500/30 text-purple-200 shadow-[0_0_12px_rgba(168,85,247,0.2)]'
-            : 'bg-indigo-50/80 border-indigo-200 text-indigo-700 shadow-sm'
-        }`}>
-          <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-tr from-violet-500 via-fuchsia-500 to-cyan-400 animate-pulse" />
-          <span className="text-xs font-black tracking-widest bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-400 bg-clip-text text-transparent">
-            LARP
+      <div
+        className="flex items-center space-x-1"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      >
+        {/* Simple, understated brand mark */}
+        <div className="flex items-center space-x-1.5 px-2 py-1 mr-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-default">
+          <div
+            className="w-3.5 h-3.5 rounded-sm flex items-center justify-center font-bold text-[10px] text-white"
+            style={{ backgroundColor: 'var(--accent-primary)' }}
+          >
+            L
+          </div>
+          <span className="text-xs font-semibold tracking-tight text-[var(--text-main)]">
+            larp
           </span>
         </div>
 
@@ -82,52 +91,48 @@ export const TopBar: React.FC<TopBarProps> = ({ state, theme, onToggleTheme, onO
         <button
           onClick={() => activeTab && window.browserApi.goBack(activeTab.id)}
           disabled={!activeTab?.canGoBack}
-          className={`p-1.5 rounded-lg transition-all ${
-            isDark
-              ? 'text-slate-400 hover:text-white hover:bg-white/[0.08] disabled:opacity-25'
-              : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/70 disabled:opacity-25'
-          }`}
+          className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-25 disabled:hover:bg-transparent"
           title="Back (Alt+Left)"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-3.5 h-3.5" />
         </button>
 
         {/* Forward Button */}
         <button
           onClick={() => activeTab && window.browserApi.goForward(activeTab.id)}
           disabled={!activeTab?.canGoForward}
-          className={`p-1.5 rounded-lg transition-all ${
-            isDark
-              ? 'text-slate-400 hover:text-white hover:bg-white/[0.08] disabled:opacity-25'
-              : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/70 disabled:opacity-25'
-          }`}
+          className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-25 disabled:hover:bg-transparent"
           title="Forward (Alt+Right)"
         >
-          <ArrowRight className="w-4 h-4" />
+          <ArrowRight className="w-3.5 h-3.5" />
         </button>
 
         {/* Reload Button */}
         <button
           onClick={() => activeTab && window.browserApi.reloadTab(activeTab.id)}
-          className={`p-1.5 rounded-lg transition-all ${
-            isDark
-              ? 'text-slate-400 hover:text-white hover:bg-white/[0.08]'
-              : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/70'
-          } ${activeTab?.isLoading ? 'animate-spin text-purple-400' : ''}`}
+          className={`p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 ${
+            activeTab?.isLoading ? 'animate-spin' : ''
+          }`}
+          style={{
+            color: activeTab?.isLoading ? 'var(--accent-primary)' : undefined,
+          }}
           title="Reload (Ctrl+R)"
         >
-          <RotateCw className="w-4 h-4" />
+          <RotateCw className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      {/* Center: Unified Omnibar */}
-      <div className="flex-1 max-w-2xl mx-4" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+      {/* Center: Clean Omnibar */}
+      <div
+        className="flex-1 max-w-xl mx-3"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      >
         <form onSubmit={handleSubmit} className="relative flex items-center">
-          <div className="absolute left-3 flex items-center pointer-events-none text-slate-400">
+          <div className="absolute left-2.5 flex items-center pointer-events-none">
             {activeTab?.url.startsWith('https://') ? (
-              <Lock className="w-3.5 h-3.5 text-emerald-400" />
+              <Lock className="w-3 h-3 text-emerald-500/80 dark:text-emerald-400/80" />
             ) : (
-              <Search className="w-3.5 h-3.5 text-purple-400" />
+              <Search className="w-3 h-3 text-[var(--text-muted)]" />
             )}
           </div>
 
@@ -141,12 +146,14 @@ export const TopBar: React.FC<TopBarProps> = ({ state, theme, onToggleTheme, onO
               inputRef.current?.select();
             }}
             onBlur={() => setIsFocused(false)}
-            placeholder="Search or enter URL..."
-            className={`w-full h-8 pl-9 pr-20 rounded-xl text-xs transition-all shadow-inner border focus:outline-none ${
-              isDark
-                ? 'bg-[#151827]/90 border-purple-500/20 text-slate-100 placeholder-slate-500 focus:border-purple-400 focus:ring-1 focus:ring-purple-400/50'
-                : 'bg-slate-100/90 border-indigo-200 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-400/50'
-            }`}
+            placeholder="Search or enter web address..."
+            className="w-full h-7 pl-8 pr-16 rounded-md text-xs transition-all border focus:outline-none"
+            style={{
+              backgroundColor: 'var(--bg-input)',
+              borderColor: isFocused ? 'var(--border-selected)' : 'var(--border-subtle)',
+              color: 'var(--text-main)',
+              boxShadow: isFocused ? '0 0 0 1px var(--border-selected)' : 'none',
+            }}
           />
 
           {/* Right badges in Omnibar */}
@@ -155,76 +162,57 @@ export const TopBar: React.FC<TopBarProps> = ({ state, theme, onToggleTheme, onO
               <button
                 type="button"
                 onClick={handleToggleMute}
-                className="p-1 rounded text-purple-400 hover:bg-white/[0.08]"
+                className="p-0.5 rounded text-[var(--accent-primary)] hover:bg-black/5 dark:hover:bg-white/5"
                 title={activeTab.isMuted ? 'Unmute Tab' : 'Mute Tab'}
               >
                 {activeTab.isMuted ? (
-                  <VolumeX className="w-3.5 h-3.5 text-rose-400" />
+                  <VolumeX className="w-3 h-3 text-rose-400" />
                 ) : (
-                  <Volume2 className="w-3.5 h-3.5 animate-pulse text-cyan-400" />
+                  <Volume2 className="w-3 h-3" />
                 )}
               </button>
             )}
-            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
-              isDark
-                ? 'text-slate-400 bg-white/[0.04] border-white/[0.06]'
-                : 'text-slate-500 bg-slate-200/80 border-slate-300'
-            }`}>
+            <span
+              className="text-[9px] font-mono px-1 py-0.2 rounded border"
+              style={{
+                color: 'var(--text-muted)',
+                backgroundColor: 'rgba(128, 128, 128, 0.08)',
+                borderColor: 'var(--border-subtle)',
+              }}
+            >
               Ctrl+L
             </span>
           </div>
         </form>
       </div>
 
-      {/* Right controls: Theme Toggle, Tab Switcher Trigger, New Tab, Window Controls */}
-      <div className="flex items-center space-x-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-        {/* Theme Toggle Button */}
-        <button
-          onClick={onToggleTheme}
-          className={`p-1.5 rounded-xl border transition-all ${
-            isDark
-              ? 'bg-purple-950/30 border-purple-500/20 text-amber-300 hover:bg-purple-900/40 hover:text-amber-200 hover:shadow-[0_0_12px_rgba(251,191,36,0.3)]'
-              : 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 hover:shadow-sm'
-          }`}
-          title={isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
-        >
-          {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </button>
-
-        {/* Settings Button */}
-        <button
-          onClick={onOpenSettings}
-          className={`p-1.5 rounded-xl border transition-all ${
-            isDark
-              ? 'bg-purple-950/30 border-purple-500/20 text-slate-300 hover:text-white hover:bg-purple-900/40 hover:border-purple-400/40'
-              : 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 hover:shadow-sm'
-          }`}
-          title="Settings (Ctrl+,)"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
-
-        {/* Alt-Tab Switcher Trigger Button */}
+      {/* Right controls */}
+      <div
+        className="flex items-center space-x-1"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      >
+        {/* Tab Switcher Trigger Button */}
         <button
           onClick={() => window.browserApi.openSwitcher()}
-          className={`flex items-center space-x-1.5 px-2.5 py-1 border rounded-xl text-xs transition-all group ${
-            isDark
-              ? 'bg-[#181b2e] hover:bg-[#20243d] border-purple-500/25 hover:border-purple-400/60 text-slate-200 hover:shadow-[0_0_15px_rgba(168,85,247,0.3)]'
-              : 'bg-slate-100 hover:bg-slate-200/80 border-indigo-200 hover:border-indigo-400 text-slate-800 shadow-sm'
-          }`}
-          title="Open Tab Switcher HUD (Ctrl+Shift+Tab)"
+          className="flex items-center space-x-1.5 px-2 py-1 rounded-md text-xs border transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+          style={{
+            borderColor: 'var(--border-subtle)',
+            color: 'var(--text-main)',
+          }}
+          title="Switch Tabs (Ctrl+Shift+Tab)"
         >
-          <Layers className={`w-3.5 h-3.5 group-hover:scale-110 transition-transform ${
-            isDark ? 'text-cyan-400' : 'text-indigo-600'
-          }`} />
-          <span className="text-[11px] font-semibold">
-            {state.tabs.length} {state.tabs.length === 1 ? 'Tab' : 'Tabs'}
+          <Layers className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+          <span className="text-[11px] font-medium">
+            {state.tabs.length} {state.tabs.length === 1 ? 'tab' : 'tabs'}
           </span>
-          <span className={`text-[9px] font-mono px-1 py-0.2 rounded ml-1 ${
-            isDark
-              ? 'text-purple-300 bg-purple-900/40 border border-purple-500/30'
-              : 'text-indigo-600 bg-indigo-100 border border-indigo-200'
-          }`}>
+          <span
+            className="text-[9px] font-mono px-1 py-0.2 rounded border"
+            style={{
+              color: 'var(--text-muted)',
+              backgroundColor: 'rgba(128, 128, 128, 0.08)',
+              borderColor: 'var(--border-subtle)',
+            }}
+          >
             Ctrl+Shift+Tab
           </span>
         </button>
@@ -232,45 +220,52 @@ export const TopBar: React.FC<TopBarProps> = ({ state, theme, onToggleTheme, onO
         {/* New Tab Button */}
         <button
           onClick={() => window.browserApi.createTab()}
-          className={`p-1.5 rounded-lg transition-all ${
-            isDark
-              ? 'text-slate-400 hover:text-white hover:bg-white/[0.08]'
-              : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/70'
-          }`}
+          className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5"
           title="New Tab (Ctrl+T)"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-3.5 h-3.5" />
+        </button>
+
+        {/* Settings Button */}
+        <button
+          onClick={onOpenSettings}
+          className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5"
+          title="Settings (Ctrl+,)"
+        >
+          <Settings className="w-3.5 h-3.5" />
+        </button>
+
+        {/* Theme Toggle Button */}
+        <button
+          onClick={onToggleTheme}
+          className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5"
+          title={isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
+        >
+          {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
         </button>
 
         {/* Window Controls (Minimize, Maximize, Close) */}
-        <div className={`flex items-center ml-2 border-l pl-2 space-x-1 ${
-          isDark ? 'border-white/[0.08]' : 'border-slate-300'
-        }`}>
+        <div
+          className="flex items-center ml-1 pl-1 border-l space-x-0.5"
+          style={{ borderColor: 'var(--border-subtle)' }}
+        >
           <button
             onClick={() => window.browserApi.minimizeWindow()}
-            className={`p-1.5 rounded-lg transition-all ${
-              isDark
-                ? 'text-slate-400 hover:text-white hover:bg-white/[0.08]'
-                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/70'
-            }`}
+            className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5"
             title="Minimize"
           >
             <Minus className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => window.browserApi.maximizeWindow()}
-            className={`p-1.5 rounded-lg transition-all ${
-              isDark
-                ? 'text-slate-400 hover:text-white hover:bg-white/[0.08]'
-                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/70'
-            }`}
+            className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5"
             title="Maximize"
           >
-            <Square className="w-3.5 h-3.5" />
+            <Square className="w-3 h-3" />
           </button>
           <button
             onClick={() => window.browserApi.closeWindow()}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-all"
+            className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10"
             title="Close"
           >
             <X className="w-3.5 h-3.5" />

@@ -7,8 +7,8 @@ export const TOP_BAR_HEIGHT = 44;
 
 const DEFAULT_SETTINGS: BrowserSettings = {
   theme: 'dark',
-  darkPaletteId: 'obsidian-neon',
-  lightPaletteId: 'opal-frost',
+  darkPaletteId: 'graphite',
+  lightPaletteId: 'paper',
   forcePageDarkMode: true,
   defaultSearchEngine: 'duckduckgo',
   autoHibernateTabs: true,
@@ -20,7 +20,7 @@ const SMART_DARK_CSS = `
   }
   @media (prefers-color-scheme: dark) {
     html:not([data-theme="dark"]) {
-      background-color: #090a10 !important;
+      background-color: #121214 !important;
     }
   }
 `;

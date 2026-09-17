@@ -22,8 +22,8 @@ export const App: React.FC = () => {
     mruTabIds: [],
     settings: {
       theme: 'dark',
-      darkPaletteId: 'obsidian-neon',
-      lightPaletteId: 'opal-frost',
+      darkPaletteId: 'graphite',
+      lightPaletteId: 'paper',
       forcePageDarkMode: true,
       defaultSearchEngine: 'duckduckgo',
       autoHibernateTabs: true,
@@ -33,8 +33,8 @@ export const App: React.FC = () => {
   // Apply active palette and custom accent colors
   useEffect(() => {
     const paletteId = theme === 'dark' 
-      ? (state.settings?.darkPaletteId || 'obsidian-neon')
-      : (state.settings?.lightPaletteId || 'opal-frost');
+      ? (state.settings?.darkPaletteId || 'graphite')
+      : (state.settings?.lightPaletteId || 'paper');
     const customAccent = theme === 'dark'
       ? state.settings?.customDarkAccent
       : state.settings?.customLightAccent;
