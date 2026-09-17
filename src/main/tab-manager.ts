@@ -31,6 +31,7 @@ export class TabManager {
   private activeTabId: string | null = null;
   private mruTabIds: string[] = [];
   private isSwitcherOpen = false;
+  private isModalOpen = false;
   private selectedSwitcherIndex = 0;
   private settings: BrowserSettings = { ...DEFAULT_SETTINGS };
   private settingsPath: string;
@@ -211,7 +212,7 @@ export class TabManager {
         const tab = this.tabs.get(tabId);
         if (tab) {
           tab.info.url = url;
-          if (tabId === this.activeTabId && !this.isSwitcherOpen) {
+          if (tabId === this.activeTabId && !this.isSwitcherOpen && !this.isModalOpen) {
             if (url && url !== 'about:blank') {
               this.attachActiveTabView();
             } else {
@@ -229,7 +230,7 @@ export class TabManager {
         tab.info.url = url;
         tab.info.canGoBack = wc.navigationHistory ? wc.navigationHistory.canGoBack() : wc.canGoBack();
         tab.info.canGoForward = wc.navigationHistory ? wc.navigationHistory.canGoForward() : wc.canGoForward();
-        if (tabId === this.activeTabId && !this.isSwitcherOpen) {
+        if (tabId === this.activeTabId && !this.isSwitcherOpen && !this.isModalOpen) {
           if (url && url !== 'about:blank') {
             this.attachActiveTabView();
           } else {
@@ -359,8 +360,8 @@ export class TabManager {
     // Update MRU list: move tabId to the front
     this.mruTabIds = [tabId, ...this.mruTabIds.filter(id => id !== tabId)];
 
-    // If switcher is not open, mount and position the new active tab view
-    if (!this.isSwitcherOpen) {
+    // If switcher is not open and no modal is open, mount and position the new active tab view
+    if (!this.isSwitcherOpen && !this.isModalOpen) {
       this.attachActiveTabView();
     }
 
@@ -369,6 +370,7 @@ export class TabManager {
 
   public attachActiveTabView() {
     if (!this.activeTabId || !this.tabs.has(this.activeTabId)) return;
+    if (this.isSwitcherOpen || this.isModalOpen) return;
     const tab = this.tabs.get(this.activeTabId)!;
 
     // If active tab is about:blank, keep detached so the New Tab React dashboard is visible
@@ -409,7 +411,7 @@ export class TabManager {
   }
 
   public updateActiveViewBounds() {
-    if (!this.activeTabId || this.isSwitcherOpen) return;
+    if (!this.activeTabId || this.isSwitcherOpen || this.isModalOpen) return;
     const tab = this.tabs.get(this.activeTabId);
     if (!tab || !tab.info.url || tab.info.url === 'about:blank') return;
 
@@ -420,6 +422,21 @@ export class TabManager {
       width: width,
       height: Math.max(0, height - TOP_BAR_HEIGHT),
     });
+  }
+
+  public async setModalOpen(isOpen: boolean) {
+    this.isModalOpen = isOpen;
+    if (isOpen) {
+      if (this.activeTabId) {
+        await this.capturePreview(this.activeTabId);
+      }
+      this.detachActiveTabView();
+    } else {
+      if (!this.isSwitcherOpen) {
+        this.attachActiveTabView();
+      }
+    }
+    this.notifyStateChange();
   }
 
   public async closeTab(tabId: string) {

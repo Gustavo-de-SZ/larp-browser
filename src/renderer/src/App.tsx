@@ -132,6 +132,14 @@ export const App: React.FC = () => {
     }
   }, []);
 
+  // Synchronize modal open state with Electron main process so native WebContentsView is detached when a modal is open
+  useEffect(() => {
+    const isAnyModalOpen = isSettingsOpen || isShortcutsOpen;
+    if (window.browserApi?.setModalOpen) {
+      window.browserApi.setModalOpen(isAnyModalOpen);
+    }
+  }, [isSettingsOpen, isShortcutsOpen]);
+
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
   const isNewTab = !activeTab || !activeTab.url || activeTab.url === 'about:blank';
 
@@ -160,7 +168,7 @@ export const App: React.FC = () => {
         {isNewTab ? (
           <NewTabPage state={state} theme={theme} />
         ) : (
-          state.isSwitcherOpen && activeTab?.previewImage ? (
+          (state.isSwitcherOpen || isSettingsOpen || isShortcutsOpen) && activeTab?.previewImage ? (
             <img
               src={activeTab.previewImage}
               alt="Active tab preview"

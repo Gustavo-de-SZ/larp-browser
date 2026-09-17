@@ -41,16 +41,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setPaletteModeTab(theme);
   }, [theme]);
 
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
+
+  const safeSettings = settings || {
+    theme: 'dark',
+    darkPaletteId: 'graphite',
+    lightPaletteId: 'paper',
+    forcePageDarkMode: true,
+    defaultSearchEngine: 'google',
+    autoHibernateTabs: true,
+  };
 
   const currentPalettes = paletteModeTab === 'dark' ? DARK_PALETTES : LIGHT_PALETTES;
   const currentActivePaletteId =
     paletteModeTab === 'dark'
-      ? settings.darkPaletteId || 'graphite'
-      : settings.lightPaletteId || 'paper';
+      ? safeSettings.darkPaletteId || 'graphite'
+      : safeSettings.lightPaletteId || 'paper';
 
   const currentCustomAccent =
-    paletteModeTab === 'dark' ? settings.customDarkAccent : settings.customLightAccent;
+    paletteModeTab === 'dark' ? safeSettings.customDarkAccent : safeSettings.customLightAccent;
 
   const handleSelectPalette = (palette: ColorPalette) => {
     if (palette.mode === 'dark') {
@@ -402,7 +423,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
                     <input
                       type="checkbox"
-                      checked={settings.forcePageDarkMode}
+                      checked={safeSettings.forcePageDarkMode}
                       onChange={(e) => onUpdateSettings({ forcePageDarkMode: e.target.checked })}
                       className="sr-only peer"
                     />
@@ -448,7 +469,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
                     <input
                       type="checkbox"
-                      checked={settings.autoHibernateTabs}
+                      checked={safeSettings.autoHibernateTabs}
                       onChange={(e) => onUpdateSettings({ autoHibernateTabs: e.target.checked })}
                       className="sr-only peer"
                     />
@@ -471,7 +492,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     { id: 'brave', name: 'Brave Search', desc: 'Independent search index' },
                     { id: 'bing', name: 'Microsoft Bing', desc: 'Bing web search' },
                   ].map((engine) => {
-                    const isSelected = (settings.defaultSearchEngine || 'google') === engine.id;
+                    const isSelected = (safeSettings.defaultSearchEngine || 'google') === engine.id;
                     return (
                       <button
                         key={engine.id}
@@ -503,23 +524,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {/* 4. About */}
             {activeTab === 'about' && (
-              <div className="space-y-3">
-                <div
-                  className="flex items-center space-x-3 p-4 rounded-xl border"
-                  style={{
-                    backgroundColor: 'var(--bg-card)',
-                    borderColor: 'var(--border-card)',
-                  }}
-                >
-                  <div
-                    className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-                    style={{ backgroundColor: 'var(--accent-primary)' }}
-                  >
-                    L
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3 p-3.5 rounded-xl border" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-card)' }}>
+                  <div className="w-10 h-10 rounded-xl bg-[var(--accent-primary)]/10 flex items-center justify-center">
+                    <Info className="w-5 h-5 text-[var(--accent-primary)]" />
                   </div>
                   <div>
                     <h4 className="text-xs font-semibold text-[var(--text-main)]">Larp Browser</h4>
-                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.1.0</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.1.1</p>
                   </div>
                 </div>
 

@@ -73,6 +73,10 @@ export function registerIpcHandlers(window: BrowserWindow, tabManager: TabManage
     return tabManager.commitSwitcher();
   });
 
+  ipcMain.handle('browser:set-modal-open', (_event, isOpen: boolean) => {
+    return tabManager.setModalOpen(isOpen);
+  });
+
   // Window operations
   ipcMain.handle('window:minimize', () => {
     window.minimize();

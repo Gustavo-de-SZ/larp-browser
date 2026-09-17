@@ -32,6 +32,7 @@ const api: IpcRendererApi = {
   cycleSwitcher: (direction: SwitcherDirection) => ipcRenderer.invoke('browser:cycle-switcher', direction),
   selectSwitcherIndex: (index: number) => ipcRenderer.invoke('browser:select-switcher-index', index),
   commitSwitcher: () => ipcRenderer.invoke('browser:commit-switcher'),
+  setModalOpen: (isOpen: boolean) => ipcRenderer.invoke('browser:set-modal-open', isOpen),
 
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
   maximizeWindow: () => ipcRenderer.invoke('window:maximize'),

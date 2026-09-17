@@ -54,12 +54,13 @@ export interface IpcRendererApi {
   getSettings: () => Promise<BrowserSettings>;
   updateSettings: (settings: Partial<BrowserSettings>) => Promise<BrowserSettings>;
 
-  // Switcher HUD operations
+  // Switcher HUD & Modal operations
   openSwitcher: () => Promise<void>;
   closeSwitcher: () => Promise<void>;
   cycleSwitcher: (direction: SwitcherDirection) => Promise<void>;
   selectSwitcherIndex: (index: number) => Promise<void>;
   commitSwitcher: () => Promise<void>;
+  setModalOpen: (isOpen: boolean) => Promise<void>;
 
   // Window operations
   minimizeWindow: () => Promise<void>;
