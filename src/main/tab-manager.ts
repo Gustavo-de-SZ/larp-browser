@@ -105,6 +105,11 @@ export class TabManager {
     return { ...this.settings };
   }
 
+  public getTabView(tabId: string): { webContents: Electron.WebContents } | undefined {
+    const tab = this.tabs.get(tabId);
+    return tab ? tab.view : undefined;
+  }
+
   public async setTheme(theme: 'dark' | 'light') {
     this.settings.theme = theme;
     nativeTheme.themeSource = theme;

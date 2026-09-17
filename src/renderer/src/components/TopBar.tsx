@@ -15,6 +15,7 @@ import {
   Sun,
   Moon,
   Settings,
+  Keyboard,
 } from 'lucide-react';
 import type { BrowserState } from '../../shared/types';
 import type { ThemeMode } from '../App';
@@ -24,6 +25,7 @@ interface TopBarProps {
   theme: ThemeMode;
   onToggleTheme: () => void;
   onOpenSettings: () => void;
+  onOpenShortcuts: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -31,6 +33,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   theme,
   onToggleTheme,
   onOpenSettings,
+  onOpenShortcuts,
 }) => {
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
   const [urlInput, setUrlInput] = useState('');
@@ -233,6 +236,15 @@ export const TopBar: React.FC<TopBarProps> = ({
           title="Settings (Ctrl+,)"
         >
           <Settings className="w-3.5 h-3.5" />
+        </button>
+
+        {/* Keyboard Shortcuts Button */}
+        <button
+          onClick={onOpenShortcuts}
+          className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5"
+          title="Keyboard Shortcuts (Ctrl+/)"
+        >
+          <Keyboard className="w-3.5 h-3.5" />
         </button>
 
         {/* Theme Toggle Button */}

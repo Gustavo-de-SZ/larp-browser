@@ -3,6 +3,7 @@ import { TopBar } from './components/TopBar';
 import { TabSwitcher } from './components/TabSwitcher';
 import { NewTabPage } from './components/NewTabPage';
 import { SettingsModal } from './components/SettingsModal';
+import { KeyboardShortcuts } from './components/KeyboardShortcuts';
 import { getPalette, applyPalette } from './theme/palettes';
 import type { BrowserState, BrowserSettings } from '../shared/types';
 
@@ -13,6 +14,7 @@ export const App: React.FC = () => {
     return (localStorage.getItem('larp-theme') as ThemeMode) || 'dark';
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
 
   const [state, setState] = useState<BrowserState>({
     tabs: [],
@@ -83,12 +85,28 @@ export const App: React.FC = () => {
     }
   };
 
-  // Keyboard shortcut Ctrl+, for Settings
+  // Global keyboard shortcuts: Ctrl+, → Settings, Ctrl+/ or ? → Shortcuts overlay
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't fire if user is typing in an input
+      const tag = (e.target as HTMLElement)?.tagName;
+      const typing = tag === 'INPUT' || tag === 'TEXTAREA';
+
       if (e.ctrlKey && e.key === ',') {
         e.preventDefault();
         setIsSettingsOpen((prev) => !prev);
+        return;
+      }
+      if (e.ctrlKey && e.key === '/') {
+        e.preventDefault();
+        setIsShortcutsOpen((prev) => !prev);
+        return;
+      }
+      // '?' without ctrl (Shift+/ on most layouts) when not typing
+      if (!typing && !e.ctrlKey && !e.altKey && e.key === '?') {
+        e.preventDefault();
+        setIsShortcutsOpen((prev) => !prev);
+        return;
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -130,20 +148,16 @@ export const App: React.FC = () => {
         color: 'var(--text-main)',
       }}
     >
-      {/* Top Floating / Minimal Bar */}
+      {/* Top Bar */}
       <TopBar
         state={state}
         theme={theme}
         onToggleTheme={toggleTheme}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenShortcuts={() => setIsShortcutsOpen(true)}
       />
 
-      {/* Main Content Area:
-          When active tab is about:blank or empty, render the native React New Tab dashboard.
-          When active tab has a real web URL:
-            - While browsing, WebContentsView is attached directly below TopBar.
-            - When TabSwitcher HUD is open, activeTab's snapshot preview is rendered here so the background never goes black!
-      */}
+      {/* Main Content Area */}
       <main
         className="flex-1 w-full h-[calc(100vh-44px)] relative overflow-hidden"
         style={{ backgroundColor: 'var(--bg-app)' }}
@@ -161,7 +175,7 @@ export const App: React.FC = () => {
         )}
       </main>
 
-      {/* Alt-Tab / Ctrl-Shift-Tab Switcher HUD Modal */}
+      {/* Alt-Tab / Ctrl-Shift-Tab Switcher HUD */}
       {state.isSwitcherOpen && <TabSwitcher state={state} theme={theme} />}
 
       {/* Settings Modal */}
@@ -172,6 +186,14 @@ export const App: React.FC = () => {
         theme={theme}
         onUpdateSettings={handleUpdateSettings}
       />
+
+      {/* Keyboard Shortcuts Cheatsheet */}
+      {isShortcutsOpen && (
+        <KeyboardShortcuts
+          onClose={() => setIsShortcutsOpen(false)}
+          theme={theme}
+        />
+      )}
     </div>
   );
 };
