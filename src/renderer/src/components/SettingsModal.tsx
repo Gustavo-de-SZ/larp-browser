@@ -519,7 +519,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                   <div>
                     <h4 className="text-xs font-semibold text-[var(--text-main)]">Larp Browser</h4>
-                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.0.0 (Chromium 130+)</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.1.0</p>
                   </div>
                 </div>
 
