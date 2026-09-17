@@ -6,13 +6,8 @@ import { registerShortcuts } from './shortcuts';
 
 // Linux performance, display backend, and hardware GPU acceleration flags
 if (process.platform === 'linux') {
-  // Use X11 / Xwayland backend and disable GPU sandbox to ensure crash-free rendering
-  app.commandLine.appendSwitch('ozone-platform', 'x11');
-  app.commandLine.appendSwitch('disable-gpu-sandbox');
-  app.commandLine.appendSwitch('disable-dev-shm-usage');
-  app.commandLine.appendSwitch('enable-gpu-rasterization');
-  app.commandLine.appendSwitch('enable-zero-copy');
-  app.commandLine.appendSwitch('no-sandbox');
+  // Prevent multithreaded Mesa driver sandbox crash on Intel Iris Xe / Linux
+  app.commandLine.appendSwitch('in-process-gpu');
 }
 
 let mainWindow: BrowserWindow | null = null;

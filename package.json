@@ -7,9 +7,9 @@
     "build:main": "node scripts/build.js",
     "build:renderer": "vite build",
     "build": "npm run build:renderer && npm run build:main",
-    "start": "cross-env NODE_ENV=production electron dist/main/index.cjs",
+    "start": "cross-env NODE_ENV=production electron dist/main/index.cjs --in-process-gpu",
     "dev:renderer": "vite",
-    "dev:electron": "wait-on tcp:5173 && electron dist/main/index.cjs",
+    "dev:electron": "wait-on tcp:5173 && electron dist/main/index.cjs --in-process-gpu",
     "dev": "cross-env NODE_ENV=development concurrently -k \"npm run dev:renderer\" \"npm run build:main && npm run dev:electron\""
   },
   "keywords": [
