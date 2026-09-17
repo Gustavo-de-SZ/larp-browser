@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, session } from 'electron';
 import path from 'path';
 import { TabManager } from './tab-manager';
 import { registerIpcHandlers } from './ipc-handlers';
@@ -15,6 +15,57 @@ let tabManager: TabManager | null = null;
 
 const isDev = process.env.NODE_ENV === 'development';
 
+function setupSecurityDefaults() {
+  // Security: Block high-risk peripheral device access and OS-level execution
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    const dangerousPermissions = [
+      'usb',
+      'serial',
+      'bluetooth',
+      'hid',
+      'midi',
+      'midiSysex',
+      'openExternal',
+      'system-audio',
+    ];
+    if (dangerousPermissions.includes(permission)) {
+      console.warn(`[Security] Blocked dangerous permission request: ${permission}`);
+      return callback(false);
+    }
+
+    // Allow safe display features
+    if (permission === 'fullscreen' || permission === 'pointerLock') {
+      return callback(true);
+    }
+
+    // Default deny sensitive hardware (camera, mic, geolocation) until explicit user permission UI
+    callback(false);
+  });
+
+  session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
+    const dangerousPermissions = ['usb', 'serial', 'bluetooth', 'hid', 'midi', 'midiSysex', 'openExternal'];
+    if (dangerousPermissions.includes(permission)) {
+      return false;
+    }
+    if (permission === 'fullscreen' || permission === 'pointerLock') {
+      return true;
+    }
+    return false;
+  });
+
+  // Security: Log and track downloads cleanly
+  session.defaultSession.on('will-download', (_event, item) => {
+    console.log(`[Security] Download started: ${item.getFilename()} (${item.getTotalBytes()} bytes)`);
+    item.once('done', (_e, state) => {
+      if (state === 'completed') {
+        console.log(`[Security] Download completed: ${item.getSavePath()}`);
+      } else {
+        console.warn(`[Security] Download ${state}: ${item.getFilename()}`);
+      }
+    });
+  });
+}
+
 async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -27,9 +78,20 @@ async function createWindow() {
       preload: path.join(__dirname, '../preload/index.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false, // Preload needs to expose contextBridge
+      sandbox: true, // Sandboxed renderer for browser shell
     },
   });
+
+  // Security: Lock down mainWindow navigation so the shell can never load untrusted content
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!url.startsWith('file://') && !url.startsWith('http://localhost:5173')) {
+      console.warn(`[Security] Blocked main window navigation to: ${url}`);
+      event.preventDefault();
+    }
+  });
+
+  // Security: Prevent window.open from the shell UI
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
   tabManager = new TabManager(mainWindow);
 
@@ -80,6 +142,7 @@ async function createWindow() {
 }
 
 app.whenReady().then(() => {
+  setupSecurityDefaults();
   createWindow();
 
   app.on('activate', () => {

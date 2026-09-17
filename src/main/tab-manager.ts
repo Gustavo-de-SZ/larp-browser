@@ -210,6 +210,19 @@ export class TabManager {
   private setupTabEvents(tabId: string, view: WebContentsView) {
     const wc = view.webContents;
 
+    // Security: Validate navigation protocol before allowing tabs to navigate
+    wc.on('will-navigate', (event, url) => {
+      try {
+        const parsed = new URL(url);
+        if (!['http:', 'https:', 'about:'].includes(parsed.protocol)) {
+          console.warn(`[Security] Blocked unsafe navigation in tab ${tabId} to: ${url}`);
+          event.preventDefault();
+        }
+      } catch {
+        event.preventDefault();
+      }
+    });
+
     wc.on('did-start-loading', () => {
       const tab = this.tabs.get(tabId);
       if (tab) {
@@ -323,7 +336,16 @@ export class TabManager {
 
     // Intercept window.open or links with target="_blank"
     wc.setWindowOpenHandler((details) => {
-      this.createTab(details.url);
+      try {
+        const parsed = new URL(details.url);
+        if (['http:', 'https:', 'about:'].includes(parsed.protocol)) {
+          this.createTab(details.url);
+        } else {
+          console.warn(`[Security] Blocked popup request to unsafe protocol: ${details.url}`);
+        }
+      } catch {
+        // Ignore invalid URL
+      }
       return { action: 'deny' };
     });
   }
@@ -483,8 +505,19 @@ export class TabManager {
     if (!tab) return;
 
     let targetUrl = input.trim();
-    // Check if it's a URL or search query
-    if (!/^https?:\/\//i.test(targetUrl) && !/^about:/i.test(targetUrl)) {
+    // Security: Disallow dangerous schemes (javascript:, data:, file:, shell:) from direct Omnibar entry
+    // If entered, treat them safely as a web search query
+    const isDangerousScheme = /^(javascript|data|file|vbscript|shell):/i.test(targetUrl);
+    if (isDangerousScheme) {
+      const engines = {
+        google: 'https://www.google.com/search?q=',
+        duckduckgo: 'https://duckduckgo.com/?q=',
+        brave: 'https://search.brave.com/search?q=',
+        bing: 'https://www.bing.com/search?q=',
+      };
+      const base = engines[this.settings.defaultSearchEngine] || engines.google;
+      targetUrl = `${base}${encodeURIComponent(targetUrl)}`;
+    } else if (!/^https?:\/\//i.test(targetUrl) && !/^about:/i.test(targetUrl)) {
       if (targetUrl.includes('.') && !targetUrl.includes(' ')) {
         targetUrl = 'https://' + targetUrl;
       } else {
