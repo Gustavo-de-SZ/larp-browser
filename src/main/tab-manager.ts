@@ -694,9 +694,10 @@ export class TabManager {
   // --- Active Tab Hibernation ---
 
   private startHibernateTimer() {
-    setInterval(() => {
+    const timer = setInterval(() => {
       this.checkTabHibernation();
     }, 60000);
+    timer.unref?.();
   }
 
   private checkTabHibernation() {
@@ -725,6 +726,26 @@ export class TabManager {
     }
     if (changed) {
       this.notifyStateChange();
+    }
+  }
+
+  public hibernateTab(tabId: string) {
+    const tab = this.tabs.get(tabId);
+    if (!tab || tabId === this.activeTabId || tab.info.isHibernated) return;
+    tab.info.isHibernated = true;
+    try {
+      tab.view.webContents.setBackgroundThrottling(true);
+    } catch {
+      // Ignore
+    }
+    this.notifyStateChange();
+  }
+
+  public hibernateAllInactive() {
+    for (const [tabId] of this.tabs.entries()) {
+      if (tabId !== this.activeTabId) {
+        this.hibernateTab(tabId);
+      }
     }
   }
 
@@ -1097,10 +1118,13 @@ export class TabManager {
     if (!tab) return undefined;
     try {
       if (tab.view.webContents.isDestroyed() || !tab.info.url || tab.info.url === 'about:blank') return undefined;
-      const image = await tab.view.webContents.capturePage();
-      if (image.isEmpty()) return undefined;
+      // Race capturePage with a 400ms timeout guard in case view is detached or compositor unpainted
+      const capturePromise = tab.view.webContents.capturePage();
+      const timeoutPromise = new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), 400));
+      const image = await Promise.race([capturePromise, timeoutPromise]);
+      if (!image || (image as any).isEmpty?.()) return undefined;
       // High-performance downscale for thumbnail card: drops payload and encoding time by 99%
-      const thumbnail = image.resize({ width: 360, quality: 'good' });
+      const thumbnail = (image as any).resize({ width: 360, quality: 'good' });
       const preview = thumbnail.toDataURL();
       tab.info.previewImage = preview;
       return preview;

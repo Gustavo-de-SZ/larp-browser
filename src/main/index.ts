@@ -11,6 +11,7 @@ if (process.platform === 'linux') {
   app.commandLine.appendSwitch('in-process-gpu');
 }
 
+const appStartTime = performance.now();
 let mainWindow: BrowserWindow | null = null;
 let tabManager: TabManager | null = null;
 let downloadManager: DownloadManager | null = null;
@@ -126,6 +127,14 @@ async function createWindow() {
 
   // Initialize session based on user's startup preferences (new tab, restore previous session, or custom URL)
   await tabManager.initializeSession();
+
+  // Developer automated benchmark harness
+  const isBenchmark = process.argv.includes('--benchmark') || process.env.LARP_BENCHMARK === '1';
+  if (isBenchmark) {
+    const startupTimeMs = performance.now() - appStartTime;
+    const { runBenchmark } = await import('./benchmark');
+    runBenchmark(mainWindow, tabManager, startupTimeMs);
+  }
 
   mainWindow.on('close', () => {
     tabManager?.saveSession();
