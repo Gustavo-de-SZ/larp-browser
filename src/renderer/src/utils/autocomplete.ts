@@ -168,12 +168,6 @@ export function computeUrlSuggestions(
   // Sort by score descending
   candidates.sort((a, b) => b.score - a.score);
 
-  // Take top candidates (up to 5)
-  for (const c of candidates.slice(0, 5)) {
-    results.push(c.suggestion);
-  }
-
-  // Always add search fallback at the end
   const engines: Record<string, string> = {
     google: 'Google',
     duckduckgo: 'DuckDuckGo',
@@ -182,14 +176,29 @@ export function computeUrlSuggestions(
   };
   const engineName = engines[defaultSearchEngine] || 'Google';
 
-  results.push({
+  const searchSuggestion: UrlSuggestion = {
     id: 'search-fallback',
     type: 'search',
     title: `Search ${engineName} for "${query}"`,
     url: query,
     displayUrl: query,
     cleanDomain: '',
-  });
+  };
+
+  const hasTopHit = candidates.length > 0 && candidates[0].suggestion.type === 'top-hit';
+
+  if (hasTopHit) {
+    results.push(candidates[0].suggestion);
+    results.push(searchSuggestion);
+    for (const c of candidates.slice(1, 5)) {
+      results.push(c.suggestion);
+    }
+  } else {
+    results.push(searchSuggestion);
+    for (const c of candidates.slice(0, 5)) {
+      results.push(c.suggestion);
+    }
+  }
 
   return results;
 }

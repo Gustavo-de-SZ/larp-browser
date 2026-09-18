@@ -184,26 +184,30 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
       safeSettings.defaultSearchEngine || 'google'
     );
     setSuggestions(computed);
-    setSelectedIndex(computed.length > 0 ? 0 : -1);
     setIsDropdownOpen(computed.length > 0);
 
     if (skipNextAutocompleteRef.current) {
       skipNextAutocompleteRef.current = false;
+      setSelectedIndex(-1);
       return;
     }
 
-    if (computed.length > 0) {
+    if (computed.length > 0 && computed[0].type === 'top-hit') {
       const top = computed[0];
       const inline = computeInlineAutocomplete(rawVal, top);
       if (inline && searchInputRef.current) {
+        setSelectedIndex(0);
         setQuery(inline.fullCompletedText);
         const typedLen = rawVal.length;
         const totalLen = inline.fullCompletedText.length;
         requestAnimationFrame(() => {
           searchInputRef.current?.setSelectionRange(typedLen, totalLen);
         });
+        return;
       }
     }
+
+    setSelectedIndex(-1);
   };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -285,19 +289,6 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
     if (isDropdownOpen && selectedIndex >= 0 && selectedIndex < suggestions.length) {
       const selected = suggestions[selectedIndex];
       targetUrl = selected.url;
-    } else if (isDropdownOpen && suggestions.length > 0) {
-      const top = suggestions[0];
-      if (top.type !== 'search') {
-        const { cleanUrl, cleanDomain } = cleanUrlForMatching(top.url);
-        const inputLower = query.toLowerCase();
-        if (
-          inputLower === cleanDomain.toLowerCase() ||
-          inputLower === cleanUrl.toLowerCase() ||
-          top.url.toLowerCase().startsWith(inputLower)
-        ) {
-          targetUrl = top.url;
-        }
-      }
     }
 
     if (!targetUrl) return;
