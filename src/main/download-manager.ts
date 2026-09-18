@@ -44,12 +44,18 @@ export class DownloadManager {
 
   private async saveHistory() {
     try {
-      // Keep up to 500 records
-      const trimmed = this.downloads.slice(0, 500);
+      // Keep up to 500 records, never save private downloads to disk
+      const nonPrivate = this.downloads.filter((d) => !d.isPrivate);
+      const trimmed = nonPrivate.slice(0, 500);
       await fs.promises.writeFile(this.historyPath, JSON.stringify(trimmed, null, 2), 'utf8');
     } catch (err) {
       console.error('Failed to save downloads history:', err);
     }
+  }
+
+  public clearPrivateDownloads() {
+    this.downloads = this.downloads.filter((d) => !d.isPrivate);
+    this.broadcast('browser:downloads-cleared', null);
   }
 
   private getDownloadsDirectory(): string {
@@ -61,7 +67,16 @@ export class DownloadManager {
   }
 
   private initDownloadListener() {
-    session.defaultSession.on('will-download', (_event, item) => {
+    this.setupSessionDownload(session.defaultSession, false);
+    try {
+      this.setupSessionDownload(session.fromPartition('incognito'), true);
+    } catch (err) {
+      console.error('Failed to attach incognito download listener:', err);
+    }
+  }
+
+  private setupSessionDownload(targetSession: Electron.Session, isPrivate: boolean) {
+    targetSession.on('will-download', (_event, item) => {
       const id = 'dl-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
       const settings = this.getSettings();
 
@@ -102,6 +117,7 @@ export class DownloadManager {
         startTime: Date.now(),
         paused: item.isPaused(),
         canResume: item.canResume(),
+        isPrivate,
       };
 
       this.activeItems.set(id, item);

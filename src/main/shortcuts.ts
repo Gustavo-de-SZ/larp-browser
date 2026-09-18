@@ -152,6 +152,13 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
       return;
     }
 
+    // 2b. New Private Tab
+    if (isTriggered('newPrivateTab', input)) {
+      event.preventDefault();
+      tabManager.createTab('about:blank', true);
+      return;
+    }
+
     // 3. Close Tab
     if (isTriggered('closeTab', input)) {
       event.preventDefault();
@@ -165,10 +172,11 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
       event.preventDefault();
       const { activeTabId, tabs } = tabManager.getState();
       const current = tabs.find((t) => t.id === activeTabId);
+      const isPrivate = current?.isPrivate || false;
       if (current && current.url && current.url !== 'about:blank') {
-        tabManager.createTab(current.url);
+        tabManager.createTab(current.url, isPrivate);
       } else {
-        tabManager.createTab();
+        tabManager.createTab('about:blank', isPrivate);
       }
       return;
     }

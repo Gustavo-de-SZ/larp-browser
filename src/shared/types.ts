@@ -12,6 +12,7 @@ export interface TabInfo {
   isMuted?: boolean;
   zoomFactor?: number;
   isHibernated?: boolean;
+  isPrivate?: boolean;
 }
 
 export interface BookmarkItem {
@@ -65,6 +66,7 @@ export interface DownloadItemInfo {
   endTime?: number;
   paused?: boolean;
   canResume?: boolean;
+  isPrivate?: boolean;
 }
 
 export interface FindResult {
@@ -75,6 +77,7 @@ export interface FindResult {
 
 export type ShortcutActionId =
   | 'newTab'
+  | 'newPrivateTab'
   | 'closeTab'
   | 'duplicateTab'
   | 'reloadTab'
@@ -106,6 +109,7 @@ export interface ShortcutDefinition {
 
 export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
   { id: 'newTab', label: 'New Tab', category: 'Tabs', defaultKey: 'Ctrl+T', description: 'Open a new blank tab' },
+  { id: 'newPrivateTab', label: 'New Private Tab', category: 'Tabs', defaultKey: 'Ctrl+Shift+N', description: 'Open a new private browsing tab' },
   { id: 'closeTab', label: 'Close Tab', category: 'Tabs', defaultKey: 'Ctrl+W', description: 'Close active tab' },
   { id: 'duplicateTab', label: 'Duplicate Tab', category: 'Tabs', defaultKey: 'Ctrl+Shift+D', description: 'Duplicate active tab URL' },
   { id: 'reloadTab', label: 'Reload Tab', category: 'Navigation', defaultKey: 'Ctrl+R', description: 'Reload active page' },
@@ -178,7 +182,7 @@ export interface IpcRendererApi {
   getState: () => Promise<BrowserState>;
 
   // Tab Operations
-  createTab: (url?: string) => Promise<string>;
+  createTab: (url?: string, isPrivate?: boolean) => Promise<string>;
   closeTab: (tabId: string) => Promise<void>;
   switchTab: (tabId: string) => Promise<void>;
   navigateTab: (tabId: string, url: string) => Promise<void>;

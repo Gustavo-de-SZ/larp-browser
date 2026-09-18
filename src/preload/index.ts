@@ -73,7 +73,7 @@ const api: IpcRendererApi = {
 
   getState: () => ipcRenderer.invoke('browser:get-state'),
 
-  createTab: (url?: string) => ipcRenderer.invoke('browser:create-tab', url),
+  createTab: (url?: string, isPrivate?: boolean) => ipcRenderer.invoke('browser:create-tab', url, isPrivate),
   closeTab: (tabId: string) => ipcRenderer.invoke('browser:close-tab', tabId),
   switchTab: (tabId: string) => ipcRenderer.invoke('browser:switch-tab', tabId),
   navigateTab: (tabId: string, url: string) => ipcRenderer.invoke('browser:navigate-tab', tabId, url),

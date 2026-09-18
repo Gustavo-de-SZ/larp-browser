@@ -13,6 +13,7 @@ import type {
   ClearBrowsingDataOptions,
   WeatherData,
 } from '../shared/types';
+import type { DownloadManager } from './download-manager';
 
 export const TOP_BAR_HEIGHT = 44;
 export const BOOKMARKS_BAR_HEIGHT = 28;
@@ -84,7 +85,12 @@ export class TabManager {
   private passwordsPath: string;
   private sessionPath: string;
   private cachedWeather: { data: WeatherData; timestamp: number } | null = null;
+  private downloadManager?: DownloadManager;
   private onStateChangeCallback?: (state: BrowserState) => void;
+
+  public setDownloadManager(dm: DownloadManager) {
+    this.downloadManager = dm;
+  }
 
   constructor(window: BrowserWindow) {
     this.window = window;
@@ -250,7 +256,8 @@ export class TabManager {
     });
   }
 
-  public addHistory(title: string, url: string) {
+  public addHistory(title: string, url: string, isPrivate = false) {
+    if (isPrivate) return;
     if (!url || url.startsWith('about:') || url.startsWith('data:') || url.startsWith('chrome:')) return;
     if (
       this.history.length > 0 &&
@@ -726,10 +733,12 @@ export class TabManager {
   public saveSession() {
     try {
       const tabsList = Array.from(this.tabs.values())
+        .filter((t) => !t.info.isPrivate)
         .map((t) => ({ url: t.info.url, title: t.info.title }))
         .filter((t) => t.url && t.url !== 'about:blank');
 
-      const activeUrl = this.activeTabId ? this.tabs.get(this.activeTabId)?.info.url : undefined;
+      const activeTab = this.activeTabId ? this.tabs.get(this.activeTabId) : null;
+      const activeUrl = activeTab && !activeTab.info.isPrivate ? activeTab.info.url : undefined;
       const sessionData = {
         tabs: tabsList,
         activeTabUrl: activeUrl,
@@ -879,7 +888,7 @@ export class TabManager {
     await Promise.all(promises);
   }
 
-  public async createTab(initialUrl = 'about:blank'): Promise<string> {
+  public async createTab(initialUrl = 'about:blank', isPrivate = false): Promise<string> {
     const id = 'tab-' + Math.random().toString(36).substring(2, 9);
     const view = new WebContentsView({
       webPreferences: {
@@ -887,13 +896,14 @@ export class TabManager {
         contextIsolation: true,
         sandbox: true,
         spellcheck: true,
+        partition: isPrivate ? 'incognito' : undefined,
       },
     });
 
     const info: TabInfo = {
       id,
       url: initialUrl,
-      title: initialUrl === 'about:blank' ? 'New Tab' : initialUrl,
+      title: initialUrl === 'about:blank' ? (isPrivate ? 'Private Tab' : 'New Tab') : initialUrl,
       isLoading: false,
       canGoBack: false,
       canGoForward: false,
@@ -901,6 +911,7 @@ export class TabManager {
       audioPlaying: false,
       isMuted: false,
       zoomFactor: 1.0,
+      isPrivate,
     };
 
     this.tabs.set(id, { info, view });
@@ -987,7 +998,7 @@ export class TabManager {
             this.detachActiveTabView();
           }
         }
-        this.addHistory(tab.info.title, url);
+        this.addHistory(tab.info.title, url, tab.info.isPrivate);
         this.saveSession();
         this.notifyStateChange();
       }
@@ -999,7 +1010,7 @@ export class TabManager {
         tab.info.isLoading = false;
         tab.info.url = wc.getURL();
         tab.info.title = wc.getTitle() || tab.info.url || 'New Tab';
-        tab.info.canGoBack = wc.navigationHistory ? wc.navigationHistory.canGoBack() : wc.canGoBack();
+        tab.info.canGoBack = wc.navigationHistory ? wc.navigationHistory.canGoBack() : wc.canGoForward();
         tab.info.canGoForward = wc.navigationHistory ? wc.navigationHistory.canGoForward() : wc.canGoForward();
 
         // Ensure active tab view is attached when page finishes loading
@@ -1011,7 +1022,7 @@ export class TabManager {
           }
         }
 
-        this.addHistory(tab.info.title, tab.info.url);
+        this.addHistory(tab.info.title, tab.info.url, tab.info.isPrivate);
         this.saveSession();
         this.notifyStateChange();
         
@@ -1069,7 +1080,8 @@ export class TabManager {
       try {
         const parsed = new URL(details.url);
         if (['http:', 'https:', 'about:'].includes(parsed.protocol)) {
-          this.createTab(details.url);
+          const currentTab = this.tabs.get(tabId);
+          this.createTab(details.url, currentTab?.info.isPrivate || false);
         } else {
           console.warn(`[Security] Blocked popup request to unsafe protocol: ${details.url}`);
         }
@@ -1242,6 +1254,24 @@ export class TabManager {
     (tab.view.webContents as any).destroy?.();
     this.tabs.delete(tabId);
     this.mruTabIds = this.mruTabIds.filter(id => id !== tabId);
+
+    // If closed tab was private, purge ephemeral data if no private tabs remain
+    if (tab.info.isPrivate) {
+      const remainingPrivate = Array.from(this.tabs.values()).filter((t) => t.info.isPrivate);
+      if (remainingPrivate.length === 0) {
+        try {
+          const { session } = await import('electron');
+          const incognitoSession = session.fromPartition('incognito');
+          await incognitoSession.clearStorageData();
+          await incognitoSession.clearCache();
+        } catch (err) {
+          console.error('Failed to clear incognito session data:', err);
+        }
+        this.downloadManager?.clearPrivateDownloads();
+      }
+    }
+
+    this.saveSession();
 
     // If we closed the active tab, switch to next in MRU
     if (this.activeTabId === tabId) {

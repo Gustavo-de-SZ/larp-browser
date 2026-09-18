@@ -21,6 +21,7 @@ import {
   Bookmark,
   Clock,
   Download,
+  VenetianMask,
 } from 'lucide-react';
 import type { BrowserState, HistoryItem } from '@/shared/types';
 import type { ThemeMode } from '../App';
@@ -341,6 +342,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   const focusKey = state.settings?.customShortcuts?.focusOmnibar || 'Ctrl+L';
   const bookmarkKey = state.settings?.customShortcuts?.toggleBookmark || 'Ctrl+D';
   const favoritesKey = state.settings?.customShortcuts?.openFavorites || 'Ctrl+B';
+  const privateKey = state.settings?.customShortcuts?.newPrivateTab || 'Ctrl+Shift+N';
 
   const zoomPercent = activeTab?.zoomFactor ? Math.round(activeTab.zoomFactor * 100) : 100;
 
@@ -416,7 +418,9 @@ export const TopBar: React.FC<TopBarProps> = ({
         >
           <form onSubmit={handleSubmit} className="relative flex items-center">
             <div className="absolute left-2.5 flex items-center pointer-events-none">
-              {activeTab?.url.startsWith('https://') ? (
+              {activeTab?.isPrivate ? (
+                <VenetianMask className="w-3.5 h-3.5 text-purple-400" />
+              ) : activeTab?.url.startsWith('https://') ? (
                 <Lock className="w-3 h-3 text-emerald-500/80 dark:text-emerald-400/80" />
               ) : (
                 <Search className="w-3 h-3 text-[var(--text-muted)]" />
@@ -431,18 +435,32 @@ export const TopBar: React.FC<TopBarProps> = ({
               onKeyDown={handleKeyDown}
               onFocus={handleFocus}
               onBlur={handleBlur}
-              placeholder="Search or enter web address..."
-              className="w-full h-7 pl-8 pr-24 rounded-md text-xs transition-all border focus:outline-none"
+              placeholder={activeTab?.isPrivate ? "Search privately or enter address..." : "Search or enter web address..."}
+              className={`w-full h-7 pl-8 ${activeTab?.isPrivate ? 'pr-36' : 'pr-24'} rounded-md text-xs transition-all border focus:outline-none`}
               style={{
                 backgroundColor: 'var(--bg-input)',
-                borderColor: isFocused ? 'var(--border-selected)' : 'var(--border-subtle)',
+                borderColor: activeTab?.isPrivate
+                  ? (isFocused ? 'rgba(168, 85, 247, 0.7)' : 'rgba(168, 85, 247, 0.4)')
+                  : (isFocused ? 'var(--border-selected)' : 'var(--border-subtle)'),
                 color: 'var(--text-main)',
-                boxShadow: isFocused ? '0 0 0 1px var(--border-selected)' : 'none',
+                boxShadow: isFocused
+                  ? (activeTab?.isPrivate ? '0 0 0 1px rgba(168, 85, 247, 0.5)' : '0 0 0 1px var(--border-selected)')
+                  : 'none',
               }}
             />
 
-            {/* Right badges in Omnibar (Audio, Zoom, Star, Shortcut) */}
+            {/* Right badges in Omnibar (Audio, Zoom, Star, Private, Shortcut) */}
             <div className="absolute right-2 flex items-center space-x-1">
+              {/* Private Mode Badge */}
+              {activeTab?.isPrivate && (
+                <span
+                  className="flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-purple-500/15 text-purple-400 border border-purple-500/25"
+                  title="Private Browsing: History, cookies and site data are not saved"
+                >
+                  <VenetianMask className="w-2.5 h-2.5" />
+                  <span className="hidden sm:inline">Private</span>
+                </span>
+              )}
               {/* Zoom badge when not 100% */}
               {zoomPercent !== 100 && (
                 <button
@@ -667,6 +685,15 @@ export const TopBar: React.FC<TopBarProps> = ({
             title="New Tab (Ctrl+T)"
           >
             <Plus className="w-3.5 h-3.5" />
+          </button>
+
+          {/* New Private Tab Button */}
+          <button
+            onClick={() => window.browserApi.createTab('about:blank', true)}
+            className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-purple-400 hover:bg-purple-500/10 cursor-pointer"
+            title={`New Private Tab (${privateKey})`}
+          >
+            <VenetianMask className="w-3.5 h-3.5" />
           </button>
 
           {/* Settings Button */}

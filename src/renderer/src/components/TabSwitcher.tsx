@@ -7,6 +7,7 @@ import {
   VolumeX,
   ArrowLeftRight,
   Moon,
+  VenetianMask,
 } from 'lucide-react';
 import type { BrowserState, TabInfo } from '@/shared/types';
 import type { ThemeMode } from '../App';
@@ -309,6 +310,12 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                   </div>
 
                   <div className="flex items-center space-x-2 flex-shrink-0">
+                    {tab.isPrivate && (
+                      <span className="flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-500/15 text-purple-400 border border-purple-500/20">
+                        <VenetianMask className="w-2.5 h-2.5" />
+                        <span>Private</span>
+                      </span>
+                    )}
                     {tab.isHibernated && (
                       <span className="flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/20">
                         <Moon className="w-2.5 h-2.5" />
@@ -391,8 +398,13 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                       </div>
                     </div>
 
-                    {/* Audio / Sleeping / Close */}
+                    {/* Audio / Sleeping / Private / Close */}
                     <div className="flex items-center space-x-1">
+                      {tab.isPrivate && (
+                        <span title="Private Tab" className="p-0.5 rounded text-purple-400 bg-purple-500/15 border border-purple-500/25">
+                          <VenetianMask className="w-3 h-3" />
+                        </span>
+                      )}
                       {tab.isHibernated && (
                         <span title="Tab is sleeping to save memory">
                           <Moon className="w-3 h-3 text-sky-400" />
@@ -425,9 +437,13 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                         />
                       ) : (
                         <div className="flex flex-col items-center justify-center p-3 text-center space-y-1 text-[var(--text-muted)]">
-                          <Globe className="w-6 h-6 opacity-40" />
+                          {tab.isPrivate ? (
+                            <VenetianMask className="w-7 h-7 text-purple-400/60" />
+                          ) : (
+                            <Globe className="w-6 h-6 opacity-40" />
+                          )}
                           <span className="text-[10px] font-mono opacity-70">
-                            {formatUrlHost(tab.url)}
+                            {tab.isPrivate ? 'Private Tab' : formatUrlHost(tab.url)}
                           </span>
                         </div>
                       )}
@@ -453,6 +469,12 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                       #{index + 1}
                     </span>
                     <div className="flex items-center space-x-1.5">
+                      {tab.isPrivate && (
+                        <span className="flex items-center space-x-1 text-[9px] text-purple-400 font-semibold">
+                          <VenetianMask className="w-2.5 h-2.5" />
+                          <span>Private</span>
+                        </span>
+                      )}
                       {tab.isHibernated && (
                         <span className="text-[9px] text-sky-400 font-medium">Sleeping</span>
                       )}

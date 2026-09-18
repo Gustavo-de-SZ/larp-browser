@@ -18,6 +18,9 @@ import {
   CloudFog,
   Sliders,
   X,
+  VenetianMask,
+  ShieldCheck,
+  Eye,
 } from 'lucide-react';
 import type { BrowserState, WeatherData, HistoryItem } from '@/shared/types';
 import type { ThemeMode } from '../App';
@@ -364,6 +367,176 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
   // Combine user bookmarks with default shortcuts
   const userBookmarks = state.bookmarks || [];
   const hasUserBookmarks = userBookmarks.length > 0;
+
+  if (activeTab?.isPrivate) {
+    return (
+      <div
+        className="w-full h-full flex flex-col items-center justify-center p-6 select-none relative overflow-y-auto no-scrollbar transition-colors duration-150"
+        style={{
+          backgroundColor: 'var(--bg-app)',
+          color: 'var(--text-main)',
+        }}
+      >
+        <div className="w-full max-w-xl flex flex-col items-center space-y-6 z-10 animate-in fade-in duration-200 my-auto">
+          {/* Incognito Icon & Title */}
+          <div className="flex flex-col items-center space-y-2 text-center">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-purple-500/15 border border-purple-500/25 text-purple-400 shadow-md mb-1">
+              <VenetianMask className="w-8 h-8" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-[var(--text-main)]">
+              You've gone Private
+            </h1>
+            <p className="text-xs sm:text-sm text-[var(--text-muted)] max-w-md">
+              Larp Browser won't save your browsing history, cookies, site data, or form information on this device.
+            </p>
+          </div>
+
+          {/* Private Search Bar */}
+          <form onSubmit={handleSearch} className="w-full relative">
+            <div className="absolute left-3.5 top-3.5 flex items-center pointer-events-none text-purple-400">
+              <VenetianMask className="w-4 h-4" />
+            </div>
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={query}
+              onChange={handleQueryChange}
+              onKeyDown={handleSearchKeyDown}
+              onFocus={handleSearchFocus}
+              onBlur={handleSearchBlur}
+              placeholder="Search privately or enter web address..."
+              autoFocus
+              className="w-full h-11 pl-10 pr-4 rounded-xl text-xs sm:text-sm transition-all border focus:outline-none shadow-sm"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: isDropdownOpen ? 'rgba(168, 85, 247, 0.6)' : 'rgba(168, 85, 247, 0.3)',
+                color: 'var(--text-main)',
+                boxShadow: isDropdownOpen ? '0 0 0 1px rgba(168, 85, 247, 0.4)' : 'none',
+              }}
+            />
+
+            {/* Dropdown for autocomplete */}
+            {isDropdownOpen && suggestions.length > 0 && (
+              <div
+                ref={searchDropdownRef}
+                onMouseDown={(e) => e.preventDefault()}
+                className="absolute left-0 right-0 top-full mt-2 rounded-xl border shadow-2xl overflow-hidden z-30 animate-in fade-in slide-in-from-top-1 duration-150 py-1"
+                style={{
+                  backgroundColor: 'var(--bg-card)',
+                  borderColor: 'var(--border-card)',
+                  boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.35), 0 6px 16px -2px rgba(0, 0, 0, 0.2)',
+                }}
+              >
+                {suggestions.map((item, idx) => {
+                  const isSelected = idx === selectedIndex;
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => handleSelectSuggestion(item)}
+                      onMouseEnter={() => setSelectedIndex(idx)}
+                      className={`px-3.5 py-2.5 flex items-center justify-between cursor-pointer transition-colors ${
+                        isSelected
+                          ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)]'
+                          : 'hover:bg-black/5 dark:hover:bg-white/5 text-[var(--text-main)]'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3 min-w-0 flex-1 mr-2">
+                        <div className="shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-[var(--text-muted)]">
+                          {item.type === 'bookmark' ? (
+                            <Star className="w-4 h-4 text-amber-400 fill-amber-400/20" />
+                          ) : item.type === 'search' ? (
+                            <Search className="w-4 h-4 text-purple-400" />
+                          ) : (
+                            <Globe className="w-4 h-4 text-purple-400" />
+                          )}
+                        </div>
+                        <div className="flex items-baseline space-x-2 min-w-0 flex-1 truncate">
+                          <span className="text-xs font-medium truncate">{item.title}</span>
+                          {item.type !== 'search' && (
+                            <span className="text-[11px] font-mono text-[var(--text-muted)] truncate opacity-80">
+                              {item.displayUrl}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-[9px] font-mono text-[var(--text-muted)]">↵ Open</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </form>
+
+          {/* Privacy Information Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full text-left">
+            {/* What won't be saved */}
+            <div
+              className="p-4 rounded-xl border space-y-2.5"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--border-card)',
+              }}
+            >
+              <div className="flex items-center space-x-2 text-xs font-semibold text-purple-400">
+                <ShieldCheck className="w-4 h-4 text-purple-400" />
+                <span>What Larp won't save</span>
+              </div>
+              <ul className="text-[11px] text-[var(--text-muted)] space-y-1.5">
+                <li className="flex items-start space-x-1.5">
+                  <span className="text-purple-400 font-bold">•</span>
+                  <span>Your browsing history</span>
+                </li>
+                <li className="flex items-start space-x-1.5">
+                  <span className="text-purple-400 font-bold">•</span>
+                  <span>Cookies and site data (cleared on exit)</span>
+                </li>
+                <li className="flex items-start space-x-1.5">
+                  <span className="text-purple-400 font-bold">•</span>
+                  <span>Information entered into forms</span>
+                </li>
+                <li className="flex items-start space-x-1.5">
+                  <span className="text-purple-400 font-bold">•</span>
+                  <span>Tabs are not saved to session restore</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* What might still be visible */}
+            <div
+              className="p-4 rounded-xl border space-y-2.5"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--border-card)',
+              }}
+            >
+              <div className="flex items-center space-x-2 text-xs font-semibold text-[var(--text-muted)]">
+                <Eye className="w-4 h-4 text-[var(--text-muted)]" />
+                <span>Your activity might still be visible to</span>
+              </div>
+              <ul className="text-[11px] text-[var(--text-muted)] space-y-1.5">
+                <li className="flex items-start space-x-1.5">
+                  <span className="text-[var(--text-muted)] font-bold">•</span>
+                  <span>Websites that you visit</span>
+                </li>
+                <li className="flex items-start space-x-1.5">
+                  <span className="text-[var(--text-muted)] font-bold">•</span>
+                  <span>Your school or employer network admin</span>
+                </li>
+                <li className="flex items-start space-x-1.5">
+                  <span className="text-[var(--text-muted)] font-bold">•</span>
+                  <span>Your Internet Service Provider (ISP)</span>
+                </li>
+                <li className="flex items-start space-x-1.5">
+                  <span className="text-[var(--text-muted)] font-bold">•</span>
+                  <span>Downloaded files remain on your disk</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

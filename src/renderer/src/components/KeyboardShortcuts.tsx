@@ -65,6 +65,7 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
       label: 'Tabs & Favorites',
       shortcuts: [
         { keys: getKey('newTab'), description: 'New tab' },
+        { keys: getKey('newPrivateTab'), description: 'New private tab' },
         { keys: getKey('closeTab'), description: 'Close current tab' },
         { keys: getKey('duplicateTab'), description: 'Duplicate current tab' },
         { keys: getKey('toggleBookmark'), description: 'Bookmark active page' },

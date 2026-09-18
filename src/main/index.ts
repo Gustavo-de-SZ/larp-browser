@@ -85,6 +85,7 @@ async function createWindow() {
 
   tabManager = new TabManager(mainWindow);
   downloadManager = new DownloadManager(mainWindow, () => tabManager!.getSettings());
+  tabManager.setDownloadManager(downloadManager);
 
   // Send state updates to renderer
   tabManager.setOnStateChange((state) => {

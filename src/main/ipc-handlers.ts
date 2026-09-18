@@ -12,8 +12,8 @@ export function registerIpcHandlers(
     return tabManager.getState();
   });
 
-  ipcMain.handle('browser:create-tab', (_event, url?: string) => {
-    return tabManager.createTab(url);
+  ipcMain.handle('browser:create-tab', (_event, url?: string, isPrivate?: boolean) => {
+    return tabManager.createTab(url, isPrivate);
   });
 
   ipcMain.handle('browser:close-tab', (_event, tabId: string) => {
