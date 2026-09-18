@@ -59,15 +59,17 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
         { keys: getKey('reloadTab'), description: 'Reload page' },
         { keys: getKey('hardReloadTab'), description: 'Hard reload (bypass cache)' },
         { keys: getKey('focusOmnibar'), description: 'Focus address bar' },
+        { keys: getKey('findInPage'), description: 'Find text in page' },
       ],
     },
     {
-      label: 'Tabs & Favorites',
+      label: 'Tabs & Bookmarks',
       shortcuts: [
         { keys: getKey('newTab'), description: 'New tab' },
         { keys: getKey('newPrivateTab'), description: 'New private tab' },
         { keys: getKey('closeTab'), description: 'Close current tab' },
         { keys: getKey('duplicateTab'), description: 'Duplicate current tab' },
+        { keys: getKey('openFavorites'), description: 'Quick favorites popover' },
         { keys: getKey('toggleBookmark'), description: 'Bookmark active page' },
         { keys: getKey('toggleBookmarksBar'), description: 'Toggle bookmarks bar' },
         { keys: ['Ctrl', '1'], description: 'Switch to 1st tab' },
@@ -87,8 +89,13 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
       ],
     },
     {
-      label: 'Interface',
+      label: 'Interface & View',
       shortcuts: [
+        { keys: getKey('openHistory'), description: 'Browsing history' },
+        { keys: getKey('openDownloads'), description: 'Downloads tray & history' },
+        { keys: getKey('zoomIn'), description: 'Zoom in' },
+        { keys: getKey('zoomOut'), description: 'Zoom out' },
+        { keys: getKey('zoomReset'), description: 'Reset zoom (100%)' },
         { keys: getKey('openSettings'), description: 'Open Settings' },
         { keys: getKey('openShortcuts'), description: 'Show / hide this cheatsheet' },
         { keys: getKey('toggleMaximize'), description: 'Toggle maximize window' },
