@@ -63,7 +63,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         return 'bg-amber-500 hover:bg-amber-600 text-white shadow-xs';
       case 'primary':
       default:
-        return 'text-white shadow-xs hover:opacity-90';
+        return 'text-[var(--text-on-accent)] shadow-xs hover:opacity-90';
     }
   };
 
@@ -108,7 +108,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             type="button"
             onClick={onConfirm}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${getConfirmButtonClasses()}`}
-            style={variant === 'primary' ? { backgroundColor: 'var(--accent-primary)' } : undefined}
+            style={variant === 'primary' ? { backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' } : undefined}
           >
             {confirmLabel}
           </button>

@@ -737,8 +737,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
         {/* Warm greeting & Brand Icon */}
         <div className="flex flex-col items-center space-y-1.5 text-center">
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-sm mb-1"
-            style={{ backgroundColor: 'var(--accent-primary)' }}
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-[var(--text-on-accent)] text-sm font-bold shadow-sm mb-1"
+            style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' }}
           >
             L
           </div>

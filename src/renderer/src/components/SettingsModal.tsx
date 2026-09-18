@@ -733,8 +733,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="space-y-1">
             <div className="px-3 py-2 flex items-center space-x-2 mb-1">
               <div
-                className="w-4 h-4 rounded-sm flex items-center justify-center text-[10px] font-bold text-white"
-                style={{ backgroundColor: 'var(--accent-primary)' }}
+                className="w-4 h-4 rounded-sm flex items-center justify-center text-[10px] font-bold text-[var(--text-on-accent)]"
+                style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' }}
               >
                 L
               </div>
@@ -1012,8 +1012,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             </div>
                             {isSelected && (
                               <div
-                                className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] font-bold shadow-xs"
-                                style={{ backgroundColor: palette.colors.accentPrimary }}
+                                className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shadow-xs"
+                                style={{
+                                  backgroundColor: palette.colors.accentPrimary,
+                                  color: palette.colors.textOnAccent || (palette.id === 'pitch-black' ? '#000000' : '#ffffff'),
+                                }}
                               >
                                 ✓
                               </div>
@@ -1110,7 +1113,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       checked={safeSettings.forcePageDarkMode}
                       className="sr-only peer"
                     />
-                    <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
+                    <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white peer-checked:after:bg-[var(--text-on-accent)] after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
                   </div>
                 </div>
 
@@ -1143,7 +1146,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         checked={safeSettings.newTabShowClock !== false}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
+                      <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white peer-checked:after:bg-[var(--text-on-accent)] after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
                     </div>
                   </div>
 
@@ -1160,12 +1163,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           onClick={() => onUpdateSettings({ newTabClockFormat: '12h' })}
                           className={`px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer transition-all ${
                             (safeSettings.newTabClockFormat || '12h') === '12h'
-                              ? 'text-white shadow-xs font-semibold'
+                              ? 'text-[var(--text-on-accent)] shadow-xs font-semibold'
                               : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
                           }`}
                           style={
                             (safeSettings.newTabClockFormat || '12h') === '12h'
-                              ? { backgroundColor: 'var(--accent-primary)' }
+                              ? { backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' }
                               : undefined
                           }
                         >
@@ -1176,12 +1179,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           onClick={() => onUpdateSettings({ newTabClockFormat: '24h' })}
                           className={`px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer transition-all ${
                             safeSettings.newTabClockFormat === '24h'
-                              ? 'text-white shadow-xs font-semibold'
+                              ? 'text-[var(--text-on-accent)] shadow-xs font-semibold'
                               : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
                           }`}
                           style={
                             safeSettings.newTabClockFormat === '24h'
-                              ? { backgroundColor: 'var(--accent-primary)' }
+                              ? { backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' }
                               : undefined
                           }
                         >
@@ -1213,7 +1216,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         checked={safeSettings.newTabShowWeather !== false}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
+                      <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white peer-checked:after:bg-[var(--text-on-accent)] after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
                     </div>
                   </div>
                 </div>
@@ -1319,9 +1322,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             onClick={() => setRecordingActionId(isRecording ? null : def.id)}
                             className={`px-2.5 py-1 rounded-lg text-xs font-mono font-medium border transition-all cursor-pointer ${
                               isRecording
-                                ? 'bg-[var(--accent-primary)] text-white border-transparent'
+                                ? 'bg-[var(--accent-primary)] text-[var(--text-on-accent)] border-transparent'
                                 : 'bg-black/5 dark:bg-white/5 border-[var(--border-subtle)] text-[var(--text-main)] hover:border-[var(--accent-primary)]/60'
                             }`}
+                            style={isRecording ? { color: 'var(--text-on-accent)' } : undefined}
                           >
                             {isRecording ? 'Press keys...' : currentCombo}
                           </button>
@@ -1367,7 +1371,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         checked={safeSettings.showBookmarksBar}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
+                      <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white peer-checked:after:bg-[var(--text-on-accent)] after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
                     </div>
                   </div>
 
@@ -1396,7 +1400,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         checked={safeSettings.showFavoritesOnNewTab}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
+                      <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white peer-checked:after:bg-[var(--text-on-accent)] after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
                     </div>
                   </div>
                 </div>
@@ -1576,8 +1580,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 onUpdateSettings({ startupCustomUrl: customStartupInput.trim() });
                               }
                             }}
-                            className="px-3 py-1 text-xs rounded-lg text-white font-medium shadow-xs hover:opacity-90 cursor-pointer"
-                            style={{ backgroundColor: 'var(--accent-primary)' }}
+                            className="px-3 py-1 text-xs rounded-lg text-[var(--text-on-accent)] font-medium shadow-xs hover:opacity-90 cursor-pointer"
+                            style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' }}
                           >
                             Save
                           </button>
@@ -1685,9 +1689,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       onClick={() => setHistoryTimeRange(range.id as any)}
                       className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors cursor-pointer ${
                         historyTimeRange === range.id
-                          ? 'bg-[var(--accent-primary)] text-white shadow-xs'
+                          ? 'bg-[var(--accent-primary)] text-[var(--text-on-accent)] shadow-xs'
                           : 'text-[var(--text-muted)] hover:text-[var(--text-main)] bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10'
                       }`}
+                      style={historyTimeRange === range.id ? { color: 'var(--text-on-accent)' } : undefined}
                     >
                       {range.label}
                     </button>
@@ -1822,8 +1827,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       }`}
                     >
                       <span
-                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                          settings.askDownloadLocation ? 'translate-x-4.5' : 'translate-x-1'
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full transition-transform ${
+                          settings.askDownloadLocation
+                            ? 'translate-x-4.5 bg-[var(--text-on-accent)]'
+                            : 'translate-x-1 bg-white'
                         }`}
                       />
                     </button>
@@ -2078,8 +2085,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         setPasswordForm({ site: '', username: '', password: '' });
                         setIsAddPasswordOpen(true);
                       }}
-                      className="px-3 py-1.5 rounded-lg text-white text-xs font-medium shadow-xs flex items-center space-x-1.5 cursor-pointer hover:opacity-90 transition-opacity"
-                      style={{ backgroundColor: 'var(--accent-primary)' }}
+                      className="px-3 py-1.5 rounded-lg text-[var(--text-on-accent)] text-xs font-medium shadow-xs flex items-center space-x-1.5 cursor-pointer hover:opacity-90 transition-opacity"
+                      style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' }}
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add Password</span>
@@ -2225,7 +2232,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       checked={safeSettings.autoHibernateTabs}
                       className="sr-only peer"
                     />
-                    <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
+                    <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white peer-checked:after:bg-[var(--text-on-accent)] after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
                   </div>
                 </div>
 
@@ -2255,11 +2262,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             onClick={() => onUpdateSettings({ idleHibernateMinutes: item.val })}
                             className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
                               isSelected
-                                ? 'text-white shadow-xs font-semibold'
+                                ? 'text-[var(--text-on-accent)] shadow-xs font-semibold'
                                 : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
                             }`}
                             style={
-                              isSelected ? { backgroundColor: 'var(--accent-primary)' } : undefined
+                              isSelected ? { backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' } : undefined
                             }
                           >
                             {item.label}
@@ -2332,7 +2339,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         checked={safeSettings.switcherShowPreviews !== false}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
+                      <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white peer-checked:after:bg-[var(--text-on-accent)] after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
                     </div>
                   </div>
 
@@ -2360,7 +2367,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         checked={safeSettings.switcherShowUrls !== false}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
+                      <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white peer-checked:after:bg-[var(--text-on-accent)] after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
                     </div>
                   </div>
 
@@ -2385,11 +2392,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             onClick={() => onUpdateSettings({ switcherSortOrder: item.id as any })}
                             className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
                               isSelected
-                                ? 'text-white shadow-xs font-semibold'
+                                ? 'text-[var(--text-on-accent)] shadow-xs font-semibold'
                                 : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
                             }`}
                             style={
-                              isSelected ? { backgroundColor: 'var(--accent-primary)' } : undefined
+                              isSelected ? { backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' } : undefined
                             }
                           >
                             {item.label}
@@ -2503,8 +2510,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             <button
               onClick={onClose}
-              className="px-3.5 py-1.5 rounded-lg text-white text-xs font-medium shadow-sm transition-all hover:opacity-90 active:scale-95 cursor-pointer"
-              style={{ backgroundColor: 'var(--accent-primary)' }}
+              className="px-3.5 py-1.5 rounded-lg text-[var(--text-on-accent)] text-xs font-medium shadow-sm transition-all hover:opacity-90 active:scale-95 cursor-pointer"
+              style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' }}
             >
               Done
             </button>
@@ -2563,12 +2570,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         }
                         className={`flex-1 min-w-[65px] px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all text-center cursor-pointer ${
                           isSelected
-                            ? 'text-white shadow-xs font-semibold'
+                            ? 'text-[var(--text-on-accent)] shadow-xs font-semibold'
                             : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
                         }`}
                         style={
                           isSelected
-                            ? { backgroundColor: 'var(--accent-primary)' }
+                            ? { backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' }
                             : undefined
                         }
                       >
@@ -2728,8 +2735,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </button>
                   <button
                     type="submit"
-                    className="px-3.5 py-1.5 rounded-lg text-white text-xs font-medium shadow-xs hover:opacity-90 cursor-pointer"
-                    style={{ backgroundColor: 'var(--accent-primary)' }}
+                    className="px-3.5 py-1.5 rounded-lg text-[var(--text-on-accent)] text-xs font-medium shadow-xs hover:opacity-90 cursor-pointer"
+                    style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' }}
                   >
                     Save Password
                   </button>

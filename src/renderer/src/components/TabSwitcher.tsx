@@ -200,8 +200,8 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
         >
           <div className="flex items-center space-x-2.5">
             <div
-              className="p-1.5 rounded-lg text-white"
-              style={{ backgroundColor: 'var(--accent-primary)' }}
+              className="p-1.5 rounded-lg text-[var(--text-on-accent)]"
+              style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' }}
             >
               <ArrowLeftRight className="w-4 h-4" />
             </div>

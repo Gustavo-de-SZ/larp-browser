@@ -17,6 +17,7 @@ export interface ColorPalette {
     accentPrimary: string;
     accentSecondary: string;
     glowColor: string;
+    textOnAccent?: string;
   };
 }
 
@@ -124,6 +125,7 @@ export const DARK_PALETTES: ColorPalette[] = [
       accentPrimary: '#ffffff',
       accentSecondary: '#d4d4d8',
       glowColor: 'rgba(255, 255, 255, 0.1)',
+      textOnAccent: '#000000',
     },
   },
 ];
@@ -220,10 +222,32 @@ export function getPalette(id: string, mode: 'dark' | 'light'): ColorPalette {
   return list.find((p) => p.id === id) || list[0];
 }
 
+export function getContrastTextColor(hexColor: string): string {
+  const hex = hexColor.replace('#', '').trim();
+  let r = 255;
+  let g = 255;
+  let b = 255;
+  if (hex.length === 3) {
+    r = parseInt(hex[0] + hex[0], 16);
+    g = parseInt(hex[1] + hex[1], 16);
+    b = parseInt(hex[2] + hex[2], 16);
+  } else if (hex.length === 6) {
+    r = parseInt(hex.substring(0, 2), 16);
+    g = parseInt(hex.substring(2, 4), 16);
+    b = parseInt(hex.substring(4, 6), 16);
+  }
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 150 ? '#000000' : '#ffffff';
+}
+
 export function applyPalette(palette: ColorPalette, customAccent?: string | null) {
   const root = document.documentElement;
   const colors = palette.colors;
   const primaryAccent = (customAccent && customAccent.trim()) || colors.accentPrimary;
+  const textOnAccent =
+    customAccent && customAccent.trim()
+      ? getContrastTextColor(primaryAccent)
+      : colors.textOnAccent || (palette.id === 'pitch-black' ? '#000000' : '#ffffff');
 
   // Keep html.dark class and color-scheme in sync with palette mode
   if (palette.mode === 'dark') {
@@ -249,4 +273,5 @@ export function applyPalette(palette: ColorPalette, customAccent?: string | null
   root.style.setProperty('--accent-primary', primaryAccent);
   root.style.setProperty('--accent-secondary', colors.accentSecondary);
   root.style.setProperty('--glow-color', (customAccent && customAccent.trim()) ? `${customAccent}25` : colors.glowColor);
+  root.style.setProperty('--text-on-accent', textOnAccent);
 }

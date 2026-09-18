@@ -161,10 +161,11 @@ export const QuickFavoritesPopover: React.FC<QuickFavoritesPopoverProps> = ({
             className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all flex items-center space-x-1 flex-shrink-0 cursor-pointer ${
               isCurrentPageBookmarked
                 ? 'border border-[var(--border-subtle)] text-rose-400 hover:bg-rose-500/10'
-                : 'text-white shadow-xs hover:opacity-90 active:scale-95'
+                : 'text-[var(--text-on-accent)] shadow-xs hover:opacity-90 active:scale-95'
             }`}
             style={{
               backgroundColor: isCurrentPageBookmarked ? 'transparent' : 'var(--accent-primary)',
+              color: isCurrentPageBookmarked ? undefined : 'var(--text-on-accent)',
             }}
           >
             <Star

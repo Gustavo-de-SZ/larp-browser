@@ -225,7 +225,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
               className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold animate-pulse"
               style={{
                 backgroundColor: 'var(--accent-primary)',
-                color: 'white',
+                color: 'var(--text-on-accent)',
               }}
             >
               {activeDownloads.length} active

@@ -14,6 +14,7 @@
   --text-muted: #71717a;
   --accent-primary: #2563eb;
   --accent-secondary: #3b82f6;
+  --text-on-accent: #ffffff;
   --shadow-hud: 0 20px 40px -15px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.1);
   --shadow-selected: 0 0 0 2px var(--border-selected), 0 8px 20px -4px rgba(0, 0, 0, 0.08);
   color-scheme: light;
@@ -33,6 +34,7 @@ html.dark {
   --text-muted: #a1a1aa;
   --accent-primary: #3b82f6;
   --accent-secondary: #60a5fa;
+  --text-on-accent: #ffffff;
   --shadow-hud: 0 25px 50px -15px rgba(0, 0, 0, 0.7), 0 0 1px rgba(255, 255, 255, 0.1);
   --shadow-selected: 0 0 0 2px var(--border-selected), 0 8px 24px -4px rgba(0, 0, 0, 0.5);
   color-scheme: dark;

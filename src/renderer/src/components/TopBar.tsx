@@ -374,8 +374,8 @@ export const TopBar: React.FC<TopBarProps> = ({
           {/* Simple, understated brand mark */}
           <div className="flex items-center space-x-1.5 px-2 py-1 mr-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-default">
             <div
-              className="w-3.5 h-3.5 rounded-sm flex items-center justify-center font-bold text-[10px] text-white"
-              style={{ backgroundColor: 'var(--accent-primary)' }}
+              className="w-3.5 h-3.5 rounded-sm flex items-center justify-center font-bold text-[10px] text-[var(--text-on-accent)]"
+              style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' }}
             >
               L
             </div>
@@ -652,8 +652,8 @@ export const TopBar: React.FC<TopBarProps> = ({
             <Download className="w-3.5 h-3.5" />
             {activeDownloadCount > 0 && (
               <span
-                className="absolute -top-1 -right-1 min-w-3.5 h-3.5 px-0.5 rounded-full text-[9px] font-bold flex items-center justify-center text-white animate-pulse"
-                style={{ backgroundColor: 'var(--accent-primary)' }}
+                className="absolute -top-1 -right-1 min-w-3.5 h-3.5 px-0.5 rounded-full text-[9px] font-bold flex items-center justify-center text-[var(--text-on-accent)] animate-pulse"
+                style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' }}
               >
                 {activeDownloadCount}
               </span>
