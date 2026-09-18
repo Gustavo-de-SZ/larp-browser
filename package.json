@@ -14,7 +14,9 @@
     "dist": "npm run build && electron-builder --linux",
     "dist:dir": "npm run build && electron-builder --linux --dir",
     "dist:appimage": "npm run build && electron-builder --linux AppImage",
-    "dist:pacman": "npm run build && electron-builder --linux pacman"
+    "dist:pacman": "npm run build && electron-builder --linux pacman",
+    "dist:win": "npm run build && electron-builder --win nsis zip",
+    "dist:all": "npm run build && electron-builder --linux pacman AppImage --win nsis zip"
   },
   "keywords": [
     "browser",
@@ -87,6 +89,20 @@
         "libnotify",
         "libxss"
       ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Larp Browser"
     }
   },
   "desktopName": "larp-browser"
