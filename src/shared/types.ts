@@ -10,6 +10,7 @@ export interface TabInfo {
   lastAccessed: number;
   audioPlaying?: boolean;
   isMuted?: boolean;
+  zoomFactor?: number;
 }
 
 export interface BookmarkItem {
@@ -18,6 +19,19 @@ export interface BookmarkItem {
   url: string;
   favicon?: string;
   createdAt: number;
+}
+
+export interface HistoryItem {
+  id: string;
+  url: string;
+  title: string;
+  visitedAt: number;
+}
+
+export interface FindResult {
+  activeMatchOrdinal: number;
+  numberOfMatches: number;
+  finalUpdate?: boolean;
 }
 
 export type ShortcutActionId =
@@ -34,6 +48,12 @@ export type ShortcutActionId =
   | 'openShortcuts'
   | 'toggleBookmark'
   | 'toggleBookmarksBar'
+  | 'openFavorites'
+  | 'openHistory'
+  | 'findInPage'
+  | 'zoomIn'
+  | 'zoomOut'
+  | 'zoomReset'
   | 'toggleMaximize';
 
 export interface ShortcutDefinition {
@@ -53,11 +73,17 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
   { id: 'goBack', label: 'Go Back', category: 'Navigation', defaultKey: 'Alt+Left', description: 'Navigate backward in history' },
   { id: 'goForward', label: 'Go Forward', category: 'Navigation', defaultKey: 'Alt+Right', description: 'Navigate forward in history' },
   { id: 'focusOmnibar', label: 'Focus Address Bar', category: 'Navigation', defaultKey: 'Ctrl+L', description: 'Focus and select omnibar URL' },
+  { id: 'findInPage', label: 'Find in Page', category: 'Navigation', defaultKey: 'Ctrl+F', description: 'Search text on active page' },
   { id: 'openSwitcher', label: 'Tab Switcher', category: 'Tabs', defaultKey: 'Ctrl+Tab', description: 'Open visual Alt-Tab switcher HUD' },
   { id: 'toggleBookmark', label: 'Bookmark Page', category: 'Bookmarks', defaultKey: 'Ctrl+D', description: 'Add or remove bookmark for current page' },
   { id: 'toggleBookmarksBar', label: 'Toggle Bookmarks Bar', category: 'Bookmarks', defaultKey: 'Ctrl+Shift+B', description: 'Show or hide the bookmarks bar' },
+  { id: 'openFavorites', label: 'Quick Favorites', category: 'Bookmarks', defaultKey: 'Ctrl+B', description: 'Open quick favorites popover' },
   { id: 'openSettings', label: 'Open Settings', category: 'Interface', defaultKey: 'Ctrl+,', description: 'Open preferences modal' },
   { id: 'openShortcuts', label: 'Keyboard Cheatsheet', category: 'Interface', defaultKey: 'Ctrl+/', description: 'Show shortcuts reference cheatsheet' },
+  { id: 'openHistory', label: 'Browsing History', category: 'Interface', defaultKey: 'Ctrl+H', description: 'Open browsing history' },
+  { id: 'zoomIn', label: 'Zoom In', category: 'Interface', defaultKey: 'Ctrl+=', description: 'Increase page zoom' },
+  { id: 'zoomOut', label: 'Zoom Out', category: 'Interface', defaultKey: 'Ctrl+-', description: 'Decrease page zoom' },
+  { id: 'zoomReset', label: 'Reset Zoom', category: 'Interface', defaultKey: 'Ctrl+0', description: 'Reset page zoom to 100%' },
   { id: 'toggleMaximize', label: 'Toggle Maximize', category: 'Interface', defaultKey: 'F11', description: 'Toggle window maximize state' },
 ];
 
@@ -71,7 +97,10 @@ export interface BrowserSettings {
   defaultSearchEngine: 'duckduckgo' | 'google' | 'brave' | 'bing';
   autoHibernateTabs: boolean;
   showBookmarksBar: boolean;
-  customShortcuts?: Record<string, string>;
+  showFavoritesOnNewTab: boolean;
+  startupBehavior: 'new-tab' | 'continue' | 'custom-url';
+  startupCustomUrl?: string;
+  customShortcuts?: Record<string, string> | null;
 }
 
 export interface BrowserState {
@@ -89,8 +118,11 @@ export type SwitcherDirection = 'forward' | 'backward';
 export interface IpcRendererApi {
   // State observation
   onStateUpdate: (callback: (state: BrowserState) => void) => () => void;
-  onToggleModal: (callback: (modal: 'settings' | 'shortcuts') => void) => () => void;
+  onToggleModal: (callback: (modal: 'settings' | 'shortcuts' | 'history') => void) => () => void;
   onFocusOmnibar: (callback: () => void) => () => void;
+  onToggleFind: (callback: () => void) => () => void;
+  onToggleFavorites: (callback: () => void) => () => void;
+  onFindResult: (callback: (result: FindResult) => void) => () => void;
   getState: () => Promise<BrowserState>;
 
   // Tab Operations
@@ -103,11 +135,24 @@ export interface IpcRendererApi {
   reloadTab: (tabId: string) => Promise<void>;
   toggleMuteTab: (tabId: string) => Promise<void>;
 
+  // Zoom
+  setZoomFactor: (tabId: string, factor: number) => Promise<number>;
+
+  // Find in Page
+  findInPage: (text: string, forward?: boolean, findNext?: boolean) => Promise<void>;
+  stopFindInPage: (action?: 'clearSelection' | 'keepSelection' | 'activateSelection') => Promise<void>;
+  setFindOpen: (isOpen: boolean) => Promise<void>;
+
   // Bookmarks
   getBookmarks: () => Promise<BookmarkItem[]>;
   addBookmark: (bookmark: { title: string; url: string; favicon?: string }) => Promise<BookmarkItem>;
   removeBookmark: (idOrUrl: string) => Promise<void>;
   toggleBookmark: (bookmark: { title: string; url: string; favicon?: string }) => Promise<{ bookmarked: boolean; item?: BookmarkItem }>;
+
+  // History & Browsing Data
+  getHistory: () => Promise<HistoryItem[]>;
+  clearHistory: () => Promise<void>;
+  clearBrowsingData: () => Promise<void>;
 
   // Settings & Theme
   setTheme: (theme: 'dark' | 'light') => Promise<void>;
@@ -133,4 +178,3 @@ declare global {
     browserApi: IpcRendererApi;
   }
 }
-

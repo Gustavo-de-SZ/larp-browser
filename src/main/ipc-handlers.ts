@@ -39,6 +39,24 @@ export function registerIpcHandlers(window: BrowserWindow, tabManager: TabManage
     tabManager.toggleMuteTab(tabId);
   });
 
+  // Zoom handler
+  ipcMain.handle('browser:set-zoom', (_event, tabId: string, factor: number) => {
+    return tabManager.setZoomFactor(tabId, factor);
+  });
+
+  // Find in Page handlers
+  ipcMain.handle('browser:find-in-page', (_event, text: string, forward?: boolean, findNext?: boolean) => {
+    tabManager.findInPage(text, forward, findNext);
+  });
+
+  ipcMain.handle('browser:stop-find-in-page', (_event, action?: 'clearSelection' | 'keepSelection' | 'activateSelection') => {
+    tabManager.stopFindInPage(action);
+  });
+
+  ipcMain.handle('browser:set-find-open', (_event, isOpen: boolean) => {
+    tabManager.setFindOpen(isOpen);
+  });
+
   // Bookmarks handlers
   ipcMain.handle('browser:get-bookmarks', () => {
     return tabManager.getBookmarks();
@@ -54,6 +72,19 @@ export function registerIpcHandlers(window: BrowserWindow, tabManager: TabManage
 
   ipcMain.handle('browser:toggle-bookmark', (_event, bookmark: { title: string; url: string; favicon?: string }) => {
     return tabManager.toggleBookmark(bookmark);
+  });
+
+  // History & Browsing Data handlers
+  ipcMain.handle('browser:get-history', () => {
+    return tabManager.getHistory();
+  });
+
+  ipcMain.handle('browser:clear-history', () => {
+    tabManager.clearHistory();
+  });
+
+  ipcMain.handle('browser:clear-browsing-data', async () => {
+    await tabManager.clearBrowsingData();
   });
 
   // Settings & Theme handlers

@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { BrowserState, BrowserSettings, IpcRendererApi, SwitcherDirection, BookmarkItem } from '../shared/types';
+import type {
+  BrowserState,
+  BrowserSettings,
+  IpcRendererApi,
+  SwitcherDirection,
+  BookmarkItem,
+  HistoryItem,
+  FindResult,
+} from '../shared/types';
 
 const api: IpcRendererApi = {
   onStateUpdate: (callback: (state: BrowserState) => void) => {
@@ -12,8 +20,8 @@ const api: IpcRendererApi = {
     };
   },
 
-  onToggleModal: (callback: (modal: 'settings' | 'shortcuts') => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, modal: 'settings' | 'shortcuts') => {
+  onToggleModal: (callback: (modal: 'settings' | 'shortcuts' | 'history') => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, modal: 'settings' | 'shortcuts' | 'history') => {
       callback(modal);
     };
     ipcRenderer.on('browser:toggle-modal', listener);
@@ -32,6 +40,36 @@ const api: IpcRendererApi = {
     };
   },
 
+  onToggleFind: (callback: () => void) => {
+    const listener = () => {
+      callback();
+    };
+    ipcRenderer.on('browser:toggle-find', listener);
+    return () => {
+      ipcRenderer.removeListener('browser:toggle-find', listener);
+    };
+  },
+
+  onToggleFavorites: (callback: () => void) => {
+    const listener = () => {
+      callback();
+    };
+    ipcRenderer.on('browser:toggle-favorites', listener);
+    return () => {
+      ipcRenderer.removeListener('browser:toggle-favorites', listener);
+    };
+  },
+
+  onFindResult: (callback: (result: FindResult) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, result: FindResult) => {
+      callback(result);
+    };
+    ipcRenderer.on('browser:found-in-page', listener);
+    return () => {
+      ipcRenderer.removeListener('browser:found-in-page', listener);
+    };
+  },
+
   getState: () => ipcRenderer.invoke('browser:get-state'),
 
   createTab: (url?: string) => ipcRenderer.invoke('browser:create-tab', url),
@@ -43,6 +81,18 @@ const api: IpcRendererApi = {
   reloadTab: (tabId: string) => ipcRenderer.invoke('browser:reload-tab', tabId),
   toggleMuteTab: (tabId: string) => ipcRenderer.invoke('browser:toggle-mute-tab', tabId),
 
+  // Zoom
+  setZoomFactor: (tabId: string, factor: number) =>
+    ipcRenderer.invoke('browser:set-zoom', tabId, factor),
+
+  // Find in Page
+  findInPage: (text: string, forward?: boolean, findNext?: boolean) =>
+    ipcRenderer.invoke('browser:find-in-page', text, forward, findNext),
+  stopFindInPage: (action?: 'clearSelection' | 'keepSelection' | 'activateSelection') =>
+    ipcRenderer.invoke('browser:stop-find-in-page', action),
+  setFindOpen: (isOpen: boolean) =>
+    ipcRenderer.invoke('browser:set-find-open', isOpen),
+
   // Bookmarks
   getBookmarks: () => ipcRenderer.invoke('browser:get-bookmarks'),
   addBookmark: (bookmark: { title: string; url: string; favicon?: string }) =>
@@ -50,6 +100,11 @@ const api: IpcRendererApi = {
   removeBookmark: (idOrUrl: string) => ipcRenderer.invoke('browser:remove-bookmark', idOrUrl),
   toggleBookmark: (bookmark: { title: string; url: string; favicon?: string }) =>
     ipcRenderer.invoke('browser:toggle-bookmark', bookmark),
+
+  // History & Browsing Data
+  getHistory: () => ipcRenderer.invoke('browser:get-history'),
+  clearHistory: () => ipcRenderer.invoke('browser:clear-history'),
+  clearBrowsingData: () => ipcRenderer.invoke('browser:clear-browsing-data'),
 
   setTheme: (theme: 'dark' | 'light') => ipcRenderer.invoke('browser:set-theme', theme),
   getSettings: () => ipcRenderer.invoke('browser:get-settings'),

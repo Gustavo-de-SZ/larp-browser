@@ -7,7 +7,7 @@ import {
   VolumeX,
   ArrowLeftRight,
 } from 'lucide-react';
-import type { BrowserState, TabInfo } from '../../shared/types';
+import type { BrowserState, TabInfo } from '@/shared/types';
 import type { ThemeMode } from '../App';
 
 interface TabSwitcherProps {

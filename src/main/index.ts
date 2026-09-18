@@ -132,8 +132,12 @@ async function createWindow() {
     await mainWindow.loadFile(indexPath);
   }
 
-  // Create a single initial clean new tab
-  await tabManager.createTab('about:blank');
+  // Initialize session based on user's startup preferences (new tab, restore previous session, or custom URL)
+  await tabManager.initializeSession();
+
+  mainWindow.on('close', () => {
+    tabManager?.saveSession();
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;

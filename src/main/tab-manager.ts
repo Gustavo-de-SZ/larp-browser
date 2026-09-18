@@ -1,10 +1,18 @@
 import { app, BrowserWindow, WebContentsView, nativeTheme } from 'electron';
 import fs from 'fs';
 import path from 'path';
-import type { BrowserState, BrowserSettings, TabInfo, SwitcherDirection, BookmarkItem } from '../shared/types';
+import type {
+  BrowserState,
+  BrowserSettings,
+  TabInfo,
+  SwitcherDirection,
+  BookmarkItem,
+  HistoryItem,
+} from '../shared/types';
 
 export const TOP_BAR_HEIGHT = 44;
 export const BOOKMARKS_BAR_HEIGHT = 28;
+export const FIND_BAR_HEIGHT = 36;
 
 const DEFAULT_SETTINGS: BrowserSettings = {
   theme: 'dark',
@@ -14,6 +22,9 @@ const DEFAULT_SETTINGS: BrowserSettings = {
   defaultSearchEngine: 'google',
   autoHibernateTabs: true,
   showBookmarksBar: false,
+  showFavoritesOnNewTab: true,
+  startupBehavior: 'new-tab',
+  startupCustomUrl: 'https://duckduckgo.com',
 };
 
 const SMART_DARK_CSS = `
@@ -34,19 +45,26 @@ export class TabManager {
   private mruTabIds: string[] = [];
   private isSwitcherOpen = false;
   private isModalOpen = false;
+  private isFindOpen = false;
   private selectedSwitcherIndex = 0;
   private settings: BrowserSettings = { ...DEFAULT_SETTINGS };
   private settingsPath: string;
   private bookmarks: BookmarkItem[] = [];
   private bookmarksPath: string;
+  private history: HistoryItem[] = [];
+  private historyPath: string;
+  private sessionPath: string;
   private onStateChangeCallback?: (state: BrowserState) => void;
 
   constructor(window: BrowserWindow) {
     this.window = window;
     this.settingsPath = path.join(app.getPath('userData'), 'larp-settings.json');
     this.bookmarksPath = path.join(app.getPath('userData'), 'larp-bookmarks.json');
+    this.historyPath = path.join(app.getPath('userData'), 'larp-history.json');
+    this.sessionPath = path.join(app.getPath('userData'), 'larp-session.json');
     this.loadSettings();
     this.loadBookmarks();
+    this.loadHistory();
 
     // Set Chromium native theme
     nativeTheme.themeSource = this.settings.theme;
@@ -77,6 +95,15 @@ export class TabManager {
     }
     if (typeof this.settings.showBookmarksBar !== 'boolean') {
       this.settings.showBookmarksBar = false;
+    }
+    if (typeof this.settings.showFavoritesOnNewTab !== 'boolean') {
+      this.settings.showFavoritesOnNewTab = true;
+    }
+    if (!['new-tab', 'continue', 'custom-url'].includes(this.settings.startupBehavior)) {
+      this.settings.startupBehavior = 'new-tab';
+    }
+    if (!this.settings.startupCustomUrl) {
+      this.settings.startupCustomUrl = 'https://duckduckgo.com';
     }
     this.saveSettings();
   }
@@ -150,6 +177,125 @@ export class TabManager {
       const item = this.addBookmark(data);
       return { bookmarked: true, item };
     }
+  }
+
+  // --- History Management ---
+
+  private loadHistory() {
+    try {
+      if (fs.existsSync(this.historyPath)) {
+        const raw = fs.readFileSync(this.historyPath, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          this.history = parsed;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load history:', err);
+      this.history = [];
+    }
+  }
+
+  private saveHistory() {
+    fs.promises.writeFile(this.historyPath, JSON.stringify(this.history, null, 2), 'utf8').catch((err) => {
+      console.error('Failed to save history:', err);
+    });
+  }
+
+  public addHistory(title: string, url: string) {
+    if (!url || url.startsWith('about:') || url.startsWith('data:') || url.startsWith('chrome:')) return;
+    if (
+      this.history.length > 0 &&
+      this.history[0].url === url &&
+      Date.now() - this.history[0].visitedAt < 120000
+    ) {
+      this.history[0].title = title || this.history[0].title;
+      this.saveHistory();
+      return;
+    }
+
+    const item: HistoryItem = {
+      id: 'h-' + Math.random().toString(36).substring(2, 9),
+      url,
+      title: title || url,
+      visitedAt: Date.now(),
+    };
+    this.history.unshift(item);
+    if (this.history.length > 500) {
+      this.history = this.history.slice(0, 500);
+    }
+    this.saveHistory();
+  }
+
+  public getHistory(): HistoryItem[] {
+    return [...this.history];
+  }
+
+  public clearHistory() {
+    this.history = [];
+    this.saveHistory();
+  }
+
+  public async clearBrowsingData() {
+    this.clearHistory();
+    try {
+      const { session } = await import('electron');
+      await session.defaultSession.clearCache();
+      await session.defaultSession.clearStorageData();
+    } catch (err) {
+      console.error('Failed to clear browsing data:', err);
+    }
+  }
+
+  // --- Session Save & Restore ---
+
+  public saveSession() {
+    try {
+      const tabsList = Array.from(this.tabs.values())
+        .map((t) => ({ url: t.info.url, title: t.info.title }))
+        .filter((t) => t.url && t.url !== 'about:blank');
+
+      const activeUrl = this.activeTabId ? this.tabs.get(this.activeTabId)?.info.url : undefined;
+      const sessionData = {
+        tabs: tabsList,
+        activeTabUrl: activeUrl,
+      };
+      fs.promises.writeFile(this.sessionPath, JSON.stringify(sessionData, null, 2), 'utf8').catch(() => {});
+    } catch {
+      // Ignore
+    }
+  }
+
+  public async initializeSession() {
+    const behavior = this.settings.startupBehavior || 'new-tab';
+    if (behavior === 'continue' && fs.existsSync(this.sessionPath)) {
+      try {
+        const raw = fs.readFileSync(this.sessionPath, 'utf8');
+        const data = JSON.parse(raw);
+        if (Array.isArray(data.tabs) && data.tabs.length > 0) {
+          let targetActiveId: string | null = null;
+          for (const t of data.tabs) {
+            if (t.url && t.url !== 'about:blank') {
+              const id = await this.createTab(t.url);
+              if (data.activeTabUrl && t.url === data.activeTabUrl) {
+                targetActiveId = id;
+              }
+            }
+          }
+          if (targetActiveId) {
+            await this.switchTab(targetActiveId);
+          }
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to restore session:', err);
+      }
+    } else if (behavior === 'custom-url' && this.settings.startupCustomUrl) {
+      await this.createTab(this.settings.startupCustomUrl);
+      return;
+    }
+
+    await this.createTab('about:blank');
   }
 
   public setOnStateChange(cb: (state: BrowserState) => void) {
@@ -274,6 +420,7 @@ export class TabManager {
       lastAccessed: Date.now(),
       audioPlaying: false,
       isMuted: false,
+      zoomFactor: 1.0,
     };
 
     this.tabs.set(id, { info, view });
@@ -291,11 +438,23 @@ export class TabManager {
 
     // Switch to the newly created tab
     await this.switchTab(id);
+    this.saveSession();
     return id;
   }
 
   private setupTabEvents(tabId: string, view: WebContentsView) {
     const wc = view.webContents;
+
+    // Found in page listener
+    wc.on('found-in-page', (_event, result) => {
+      if (tabId === this.activeTabId) {
+        this.window.webContents.send('browser:found-in-page', {
+          activeMatchOrdinal: result.activeMatchOrdinal,
+          numberOfMatches: result.matches,
+          finalUpdate: result.finalUpdate,
+        });
+      }
+    });
 
     // Security: Validate navigation protocol before allowing tabs to navigate
     wc.on('will-navigate', (event, url) => {
@@ -348,6 +507,8 @@ export class TabManager {
             this.detachActiveTabView();
           }
         }
+        this.addHistory(tab.info.title, url);
+        this.saveSession();
         this.notifyStateChange();
       }
     });
@@ -370,6 +531,8 @@ export class TabManager {
           }
         }
 
+        this.addHistory(tab.info.title, tab.info.url);
+        this.saveSession();
         this.notifyStateChange();
         
         // Apply theme and capture snapshot in background
@@ -535,7 +698,10 @@ export class TabManager {
     const tab = this.tabs.get(this.activeTabId);
     if (!tab || !tab.info.url || tab.info.url === 'about:blank') return;
 
-    const topOffset = this.settings.showBookmarksBar ? (TOP_BAR_HEIGHT + BOOKMARKS_BAR_HEIGHT) : TOP_BAR_HEIGHT;
+    const topOffset =
+      TOP_BAR_HEIGHT +
+      (this.settings.showBookmarksBar ? BOOKMARKS_BAR_HEIGHT : 0) +
+      (this.isFindOpen ? FIND_BAR_HEIGHT : 0);
     const [width, height] = this.window.getContentSize();
     tab.view.setBounds({
       x: 0,
@@ -543,6 +709,11 @@ export class TabManager {
       width: width,
       height: Math.max(0, height - topOffset),
     });
+  }
+
+  public setFindOpen(isOpen: boolean) {
+    this.isFindOpen = isOpen;
+    this.updateActiveViewBounds();
   }
 
   public async setModalOpen(isOpen: boolean) {
@@ -746,5 +917,33 @@ export class TabManager {
       this.attachActiveTabView();
       this.notifyStateChange();
     }
+  }
+
+  // --- Find in Page ---
+
+  public findInPage(text: string, forward = true, findNext = false) {
+    if (!this.activeTabId) return;
+    const tab = this.tabs.get(this.activeTabId);
+    if (!tab) return;
+    tab.view.webContents.findInPage(text, { forward, findNext });
+  }
+
+  public stopFindInPage(action: 'clearSelection' | 'keepSelection' | 'activateSelection' = 'clearSelection') {
+    if (!this.activeTabId) return;
+    const tab = this.tabs.get(this.activeTabId);
+    if (!tab) return;
+    tab.view.webContents.stopFindInPage(action);
+  }
+
+  // --- Page Zoom ---
+
+  public setZoomFactor(tabId: string, factor: number): number {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return 1.0;
+    const clamped = Math.min(3.0, Math.max(0.3, Math.round(factor * 10) / 10));
+    tab.view.webContents.setZoomFactor(clamped);
+    tab.info.zoomFactor = clamped;
+    this.notifyStateChange();
+    return clamped;
   }
 }

@@ -27,8 +27,11 @@ interface TopBarProps {
   state: BrowserState;
   theme: ThemeMode;
   onToggleTheme: () => void;
-  onOpenSettings: () => void;
+  onOpenSettings: (tab?: string) => void;
   onOpenShortcuts: () => void;
+  onToggleFavorites: () => void;
+  onOpenFind?: () => void;
+  isFavoritesOpen?: boolean;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -37,6 +40,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   onToggleTheme,
   onOpenSettings,
   onOpenShortcuts,
+  onToggleFavorites,
+  isFavoritesOpen = false,
 }) => {
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
   const [urlInput, setUrlInput] = useState('');
@@ -89,10 +94,20 @@ export const TopBar: React.FC<TopBarProps> = ({
     });
   };
 
+  const handleResetZoom = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (activeTab) {
+      window.browserApi.setZoomFactor(activeTab.id, 1.0);
+    }
+  };
+
   const isDark = theme === 'dark';
   const showBookmarksBar = state.settings?.showBookmarksBar;
   const focusKey = state.settings?.customShortcuts?.focusOmnibar || 'Ctrl+L';
   const bookmarkKey = state.settings?.customShortcuts?.toggleBookmark || 'Ctrl+D';
+  const favoritesKey = state.settings?.customShortcuts?.openFavorites || 'Ctrl+B';
+
+  const zoomPercent = activeTab?.zoomFactor ? Math.round(activeTab.zoomFactor * 100) : 100;
 
   return (
     <div className="flex flex-col w-full select-none z-40">
@@ -159,7 +174,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           </button>
         </div>
 
-        {/* Center: Clean Omnibar with Star Toggle */}
+        {/* Center: Clean Omnibar with Star Toggle & Zoom indicator */}
         <div
           className="flex-1 max-w-xl mx-3"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
@@ -184,7 +199,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               }}
               onBlur={() => setIsFocused(false)}
               placeholder="Search or enter web address..."
-              className="w-full h-7 pl-8 pr-20 rounded-md text-xs transition-all border focus:outline-none"
+              className="w-full h-7 pl-8 pr-24 rounded-md text-xs transition-all border focus:outline-none"
               style={{
                 backgroundColor: 'var(--bg-input)',
                 borderColor: isFocused ? 'var(--border-selected)' : 'var(--border-subtle)',
@@ -193,8 +208,20 @@ export const TopBar: React.FC<TopBarProps> = ({
               }}
             />
 
-            {/* Right badges in Omnibar (Audio, Star, Shortcut) */}
+            {/* Right badges in Omnibar (Audio, Zoom, Star, Shortcut) */}
             <div className="absolute right-2 flex items-center space-x-1">
+              {/* Zoom badge when not 100% */}
+              {zoomPercent !== 100 && (
+                <button
+                  type="button"
+                  onClick={handleResetZoom}
+                  className="text-[9px] font-mono px-1 py-0.2 rounded border bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500/20 cursor-pointer"
+                  title="Reset Zoom to 100% (Ctrl+0)"
+                >
+                  {zoomPercent}%
+                </button>
+              )}
+
               {activeTab?.audioPlaying && (
                 <button
                   type="button"
@@ -245,6 +272,19 @@ export const TopBar: React.FC<TopBarProps> = ({
           className="flex items-center space-x-1"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
+          {/* Favorites Quick Popover Trigger Button */}
+          <button
+            onClick={onToggleFavorites}
+            className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+              isFavoritesOpen
+                ? 'text-amber-400 bg-black/10 dark:bg-white/10'
+                : 'text-[var(--text-muted)] hover:text-amber-400 hover:bg-black/5 dark:hover:bg-white/5'
+            }`}
+            title={`Favorites (${favoritesKey})`}
+          >
+            <Star className={`w-3.5 h-3.5 ${isFavoritesOpen ? 'fill-amber-400' : ''}`} />
+          </button>
+
           {/* Tab Switcher Trigger Button */}
           <button
             onClick={() => window.browserApi.openSwitcher()}
@@ -282,7 +322,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
           {/* Settings Button */}
           <button
-            onClick={onOpenSettings}
+            onClick={() => onOpenSettings()}
             className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
             title="Settings (Ctrl+,)"
           >

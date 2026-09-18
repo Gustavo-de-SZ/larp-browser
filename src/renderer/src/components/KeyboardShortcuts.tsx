@@ -6,7 +6,7 @@ import { SHORTCUT_DEFINITIONS, ShortcutActionId } from '@/shared/types';
 interface KeyboardShortcutsProps {
   onClose: () => void;
   theme: ThemeMode;
-  customShortcuts?: Record<string, string>;
+  customShortcuts?: Record<string, string> | null;
 }
 
 function Kbd({ text }: { text: string }) {
@@ -41,7 +41,7 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
   }, [onClose]);
 
   const getKey = (actionId: ShortcutActionId): string[] => {
-    if (customShortcuts[actionId]) {
+    if (customShortcuts && customShortcuts[actionId]) {
       return customShortcuts[actionId].split('+');
     }
     const def = SHORTCUT_DEFINITIONS.find((d) => d.id === actionId);

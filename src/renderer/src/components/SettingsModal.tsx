@@ -16,15 +16,29 @@ import {
   ExternalLink,
   Bookmark,
   AlertTriangle,
+  Clock,
+  Power,
+  ShieldAlert,
 } from 'lucide-react';
 import { DARK_PALETTES, LIGHT_PALETTES, ColorPalette, getPalette } from '../theme/palettes';
 import {
   BrowserSettings,
   BookmarkItem,
+  HistoryItem,
   SHORTCUT_DEFINITIONS,
   ShortcutActionId,
 } from '@/shared/types';
 import type { ThemeMode } from '../App';
+
+export type SettingsTabType =
+  | 'appearance'
+  | 'shortcuts'
+  | 'bookmarks'
+  | 'startup'
+  | 'history'
+  | 'switcher'
+  | 'search'
+  | 'about';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -32,10 +46,9 @@ interface SettingsModalProps {
   settings: BrowserSettings;
   bookmarks?: BookmarkItem[];
   theme: ThemeMode;
+  initialTab?: SettingsTabType;
   onUpdateSettings: (settings: Partial<BrowserSettings>) => void;
 }
-
-type TabType = 'appearance' | 'shortcuts' | 'bookmarks' | 'switcher' | 'search' | 'about';
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -43,24 +56,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   settings,
   bookmarks = [],
   theme,
+  initialTab = 'appearance',
   onUpdateSettings,
 }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('appearance');
+  const [activeTab, setActiveTab] = useState<SettingsTabType>(initialTab);
   const [paletteModeTab, setPaletteModeTab] = useState<ThemeMode>(theme);
   const [recordingActionId, setRecordingActionId] = useState<ShortcutActionId | null>(null);
   const [bookmarkFilter, setBookmarkFilter] = useState('');
+  const [historyFilter, setHistoryFilter] = useState('');
+  const [historyList, setHistoryList] = useState<HistoryItem[]>([]);
+  const [customStartupInput, setCustomStartupInput] = useState('');
   const isDark = theme === 'dark';
+
+  // Sync initial tab when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   // Keep sub-tab in sync if main theme changes
   useEffect(() => {
     setPaletteModeTab(theme);
   }, [theme]);
 
+  // Load history when opening history tab
+  useEffect(() => {
+    if (isOpen && activeTab === 'history' && window.browserApi?.getHistory) {
+      window.browserApi.getHistory().then((items) => {
+        if (items) setHistoryList(items);
+      });
+    }
+  }, [isOpen, activeTab]);
+
   // Close on Escape key (when not recording a shortcut)
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (recordingActionId) return; // recording handler catches Escape
+      if (recordingActionId) return;
       if (e.key === 'Escape') {
         onClose();
       }
@@ -125,6 +158,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     defaultSearchEngine: 'google',
     autoHibernateTabs: true,
     showBookmarksBar: false,
+    showFavoritesOnNewTab: true,
+    startupBehavior: 'new-tab',
+    startupCustomUrl: 'https://duckduckgo.com',
   };
 
   const currentPalettes = paletteModeTab === 'dark' ? DARK_PALETTES : LIGHT_PALETTES;
@@ -187,7 +223,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onUpdateSettings({ customShortcuts: null });
   };
 
-  // Find shortcut conflicts
   const getConflictAction = (actionId: ShortcutActionId, combo: string): string | null => {
     for (const def of SHORTCUT_DEFINITIONS) {
       if (def.id === actionId) continue;
@@ -205,6 +240,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       b.url.toLowerCase().includes(bookmarkFilter.toLowerCase())
   );
 
+  const filteredHistory = historyList.filter(
+    (h) =>
+      h.title.toLowerCase().includes(historyFilter.toLowerCase()) ||
+      h.url.toLowerCase().includes(historyFilter.toLowerCase())
+  );
+
+  const handleClearHistory = () => {
+    if (window.browserApi?.clearHistory) {
+      window.browserApi.clearHistory();
+      setHistoryList([]);
+    }
+  };
+
+  const handleClearAllBrowsingData = () => {
+    if (confirm('Clear all browsing history, cache, cookies, and website storage?')) {
+      if (window.browserApi?.clearBrowsingData) {
+        window.browserApi.clearBrowsingData();
+        setHistoryList([]);
+      }
+    }
+  };
+
   return (
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-all duration-150 select-none ${
@@ -213,7 +270,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-3xl rounded-2xl border shadow-xl overflow-hidden flex flex-col md:flex-row h-[580px] animate-scale-up"
+        className="w-full max-w-3xl rounded-2xl border shadow-xl overflow-hidden flex flex-col md:flex-row h-[600px] animate-scale-up"
         style={{
           backgroundColor: 'var(--bg-app)',
           borderColor: 'var(--border-subtle)',
@@ -279,6 +336,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </button>
 
             <button
+              onClick={() => setActiveTab('startup')}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                activeTab === 'startup'
+                  ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)] font-semibold'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
+            >
+              <Power className="w-4 h-4 text-[var(--text-muted)]" />
+              <span>On Startup</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                activeTab === 'history'
+                  ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)] font-semibold'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
+            >
+              <Clock className="w-4 h-4 text-[var(--text-muted)]" />
+              <span>History</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('switcher')}
               className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                 activeTab === 'switcher'
@@ -334,6 +415,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {activeTab === 'appearance' && 'Appearance & Colors'}
               {activeTab === 'shortcuts' && 'Keyboard Shortcuts'}
               {activeTab === 'bookmarks' && 'Bookmarks & Favorites'}
+              {activeTab === 'startup' && 'Startup Behavior & Default Page'}
+              {activeTab === 'history' && 'Browsing History & Clear Data'}
               {activeTab === 'switcher' && 'Tab Switcher (Alt-Tab)'}
               {activeTab === 'search' && 'Default Search Engine'}
               {activeTab === 'about' && 'About Larp Browser'}
@@ -395,7 +478,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                 </div>
 
-                {/* Palette Palette Mode Sub-Tab */}
+                {/* Palette Sub-Tab */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs font-medium text-[var(--text-main)]">
@@ -535,30 +618,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                 </div>
 
-                {/* Bookmarks Bar Toggle */}
-                <div
-                  onClick={() => onUpdateSettings({ showBookmarksBar: !safeSettings.showBookmarksBar })}
-                  className="p-3.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/40 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
-                >
-                  <div className="space-y-0.5 mr-3 select-none">
-                    <div className="text-xs font-medium text-[var(--text-main)]">
-                      Show Bookmarks Bar
-                    </div>
-                    <div className="text-[11px] text-[var(--text-muted)]">
-                      Display a fast-access bookmarks bar directly beneath the address bar (Ctrl+Shift+B)
-                    </div>
-                  </div>
-                  <div className="relative inline-flex items-center flex-shrink-0 pointer-events-none">
-                    <input
-                      type="checkbox"
-                      readOnly
-                      checked={safeSettings.showBookmarksBar}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
-                  </div>
-                </div>
-
                 {/* Smart Page Dark Mode */}
                 <div
                   onClick={() =>
@@ -607,9 +666,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {recordingActionId && (
-                  <div
-                    className="p-3 rounded-xl border border-[var(--accent-primary)] bg-[var(--accent-primary)]/10 flex items-center justify-between text-xs animate-pulse"
-                  >
+                  <div className="p-3 rounded-xl border border-[var(--accent-primary)] bg-[var(--accent-primary)]/10 flex items-center justify-between text-xs animate-pulse">
                     <div className="flex items-center space-x-2">
                       <Keyboard className="w-4 h-4 text-[var(--accent-primary)]" />
                       <span>
@@ -685,9 +742,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           )}
 
                           <button
-                            onClick={() =>
-                              setRecordingActionId(isRecording ? null : def.id)
-                            }
+                            onClick={() => setRecordingActionId(isRecording ? null : def.id)}
                             className={`px-2.5 py-1 rounded-lg text-xs font-mono font-medium border transition-all cursor-pointer ${
                               isRecording
                                 ? 'bg-[var(--accent-primary)] text-white border-transparent'
@@ -704,10 +759,76 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
 
-            {/* 3. Bookmarks Manager */}
+            {/* 3. Bookmarks Manager & Settings */}
             {activeTab === 'bookmarks' && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                {/* Bookmarks Options Card */}
+                <div
+                  className="rounded-xl border divide-y overflow-hidden"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    borderColor: 'var(--border-card)',
+                  }}
+                >
+                  {/* Show Bookmarks Bar Toggle */}
+                  <div
+                    onClick={() =>
+                      onUpdateSettings({ showBookmarksBar: !safeSettings.showBookmarksBar })
+                    }
+                    className="p-3 px-4 flex items-center justify-between cursor-pointer hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
+                    style={{ borderColor: 'var(--border-subtle)' }}
+                  >
+                    <div className="space-y-0.5 mr-3 select-none">
+                      <div className="text-xs font-medium text-[var(--text-main)]">
+                        Show Bookmarks Bar
+                      </div>
+                      <div className="text-[11px] text-[var(--text-muted)]">
+                        Display a fast-access bookmarks bar beneath the address bar (Ctrl+Shift+B)
+                      </div>
+                    </div>
+                    <div className="relative inline-flex items-center flex-shrink-0 pointer-events-none">
+                      <input
+                        type="checkbox"
+                        readOnly
+                        checked={safeSettings.showBookmarksBar}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
+                    </div>
+                  </div>
+
+                  {/* Show Favorites on New Tab Page */}
+                  <div
+                    onClick={() =>
+                      onUpdateSettings({
+                        showFavoritesOnNewTab: !safeSettings.showFavoritesOnNewTab,
+                      })
+                    }
+                    className="p-3 px-4 flex items-center justify-between cursor-pointer hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
+                    style={{ borderColor: 'var(--border-subtle)' }}
+                  >
+                    <div className="space-y-0.5 mr-3 select-none">
+                      <div className="text-xs font-medium text-[var(--text-main)]">
+                        Show Favorites on New Tab Page
+                      </div>
+                      <div className="text-[11px] text-[var(--text-muted)]">
+                        Surface saved favorites in the quick-links speed dial on blank tabs
+                      </div>
+                    </div>
+                    <div className="relative inline-flex items-center flex-shrink-0 pointer-events-none">
+                      <input
+                        type="checkbox"
+                        readOnly
+                        checked={safeSettings.showFavoritesOnNewTab}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Search & List */}
+                <div className="flex items-center justify-between pt-1">
                   <div className="relative flex-1 mr-3">
                     <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-[var(--text-muted)] pointer-events-none" />
                     <input
@@ -725,7 +846,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {filteredBookmarks.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-[280px] overflow-y-auto">
                     {filteredBookmarks.map((bm) => (
                       <div
                         key={bm.id}
@@ -772,15 +893,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     ))}
                   </div>
                 ) : (
-                  <div
-                    className="p-8 rounded-xl border border-dashed border-[var(--border-subtle)] flex flex-col items-center justify-center text-center space-y-2 text-[var(--text-muted)]"
-                  >
+                  <div className="p-8 rounded-xl border border-dashed border-[var(--border-subtle)] flex flex-col items-center justify-center text-center space-y-2 text-[var(--text-muted)]">
                     <Bookmark className="w-6 h-6 opacity-40" />
                     <div className="text-xs font-medium text-[var(--text-main)]">
                       {bookmarkFilter ? 'No matching bookmarks' : 'No bookmarks yet'}
                     </div>
                     <p className="text-[11px] max-w-xs">
-                      Click the star icon in the address bar or press{' '}
+                      Click the star in the address bar or press{' '}
                       <kbd className="px-1 py-0.2 rounded font-mono border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">
                         {getEffectiveShortcut('toggleBookmark')}
                       </kbd>{' '}
@@ -791,7 +910,184 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
 
-            {/* 4. Tab Switcher Preferences */}
+            {/* 4. Startup & Session Preferences */}
+            {activeTab === 'startup' && (
+              <div className="space-y-4">
+                <label className="text-xs font-medium block text-[var(--text-main)]">
+                  On Startup
+                </label>
+                <div className="space-y-2.5">
+                  {/* Option 1: New Tab Page */}
+                  <button
+                    onClick={() => onUpdateSettings({ startupBehavior: 'new-tab' })}
+                    className={`w-full p-3 rounded-xl border flex items-center justify-between transition-all text-left cursor-pointer ${
+                      safeSettings.startupBehavior === 'new-tab'
+                        ? 'border-[var(--border-selected)] bg-[var(--bg-card-selected)] ring-1 ring-[var(--accent-primary)]/20 shadow-xs'
+                        : 'border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/40 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                    }`}
+                  >
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-medium text-[var(--text-main)]">
+                        Open the New Tab page
+                      </div>
+                      <div className="text-[10px] text-[var(--text-muted)]">
+                        Start with a fresh, clean search canvas and quick links (Default)
+                      </div>
+                    </div>
+                    {safeSettings.startupBehavior === 'new-tab' && (
+                      <Check className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                    )}
+                  </button>
+
+                  {/* Option 2: Continue where you left off */}
+                  <button
+                    onClick={() => onUpdateSettings({ startupBehavior: 'continue' })}
+                    className={`w-full p-3 rounded-xl border flex items-center justify-between transition-all text-left cursor-pointer ${
+                      safeSettings.startupBehavior === 'continue'
+                        ? 'border-[var(--border-selected)] bg-[var(--bg-card-selected)] ring-1 ring-[var(--accent-primary)]/20 shadow-xs'
+                        : 'border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/40 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                    }`}
+                  >
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-medium text-[var(--text-main)]">
+                        Continue where you left off
+                      </div>
+                      <div className="text-[10px] text-[var(--text-muted)]">
+                        Automatically restore all tabs and active tab from your previous session
+                      </div>
+                    </div>
+                    {safeSettings.startupBehavior === 'continue' && (
+                      <Check className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                    )}
+                  </button>
+
+                  {/* Option 3: Open a specific page */}
+                  <div
+                    className={`w-full p-3 rounded-xl border transition-all text-left ${
+                      safeSettings.startupBehavior === 'custom-url'
+                        ? 'border-[var(--border-selected)] bg-[var(--bg-card-selected)] ring-1 ring-[var(--accent-primary)]/20 shadow-xs'
+                        : 'border-[var(--border-card)] bg-[var(--bg-card)]'
+                    }`}
+                  >
+                    <div
+                      onClick={() => onUpdateSettings({ startupBehavior: 'custom-url' })}
+                      className="flex items-center justify-between cursor-pointer"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="text-xs font-medium text-[var(--text-main)]">
+                          Open a specific page
+                        </div>
+                        <div className="text-[10px] text-[var(--text-muted)]">
+                          Always open a specified URL upon launch
+                        </div>
+                      </div>
+                      {safeSettings.startupBehavior === 'custom-url' && (
+                        <Check className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                      )}
+                    </div>
+
+                    {safeSettings.startupBehavior === 'custom-url' && (
+                      <div className="mt-3 pt-3 border-t border-[var(--border-subtle)] flex items-center space-x-2">
+                        <input
+                          type="text"
+                          defaultValue={safeSettings.startupCustomUrl || 'https://duckduckgo.com'}
+                          onChange={(e) => setCustomStartupInput(e.target.value)}
+                          placeholder="https://..."
+                          className="flex-1 h-7 text-xs px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-input)] text-[var(--text-main)] focus:outline-none focus:border-[var(--border-selected)]"
+                        />
+                        <button
+                          onClick={() => {
+                            if (customStartupInput.trim()) {
+                              onUpdateSettings({ startupCustomUrl: customStartupInput.trim() });
+                            }
+                          }}
+                          className="px-3 py-1 text-xs rounded-lg text-white font-medium shadow-xs hover:opacity-90 cursor-pointer"
+                          style={{ backgroundColor: 'var(--accent-primary)' }}
+                        >
+                          Save
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 5. History & Clear Browsing Data */}
+            {activeTab === 'history' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="relative flex-1 mr-3">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-[var(--text-muted)] pointer-events-none" />
+                    <input
+                      type="text"
+                      value={historyFilter}
+                      onChange={(e) => setHistoryFilter(e.target.value)}
+                      placeholder="Search history..."
+                      className="w-full h-8 pl-8 pr-3 rounded-lg text-xs border border-[var(--border-subtle)] bg-[var(--bg-input)] text-[var(--text-main)] focus:outline-none focus:border-[var(--border-selected)]"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2 flex-shrink-0">
+                    <button
+                      onClick={handleClearHistory}
+                      disabled={historyList.length === 0}
+                      className="px-2.5 py-1 rounded-lg border border-[var(--border-subtle)] text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-30 cursor-pointer disabled:cursor-default"
+                    >
+                      Clear History
+                    </button>
+                    <button
+                      onClick={handleClearAllBrowsingData}
+                      className="px-2.5 py-1 rounded-lg border border-rose-500/30 bg-rose-500/10 text-xs text-rose-400 hover:bg-rose-500/20 cursor-pointer flex items-center space-x-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Clear All Data</span>
+                    </button>
+                  </div>
+                </div>
+
+                {filteredHistory.length > 0 ? (
+                  <div className="space-y-2 max-h-[340px] overflow-y-auto">
+                    {filteredHistory.map((item) => (
+                      <div
+                        key={item.id}
+                        onClick={() => {
+                          window.browserApi.createTab(item.url);
+                          onClose();
+                        }}
+                        className="p-2.5 px-3 rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] flex items-center justify-between hover:border-[var(--accent-primary)]/30 transition-colors cursor-pointer group"
+                      >
+                        <div className="overflow-hidden mr-3">
+                          <div className="text-xs font-medium text-[var(--text-main)] truncate group-hover:text-[var(--accent-primary)] transition-colors">
+                            {item.title || item.url}
+                          </div>
+                          <div className="text-[10px] text-[var(--text-muted)] truncate font-mono">
+                            {item.url}
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-[var(--text-muted)] flex-shrink-0">
+                          {new Date(item.visitedAt).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 rounded-xl border border-dashed border-[var(--border-subtle)] flex flex-col items-center justify-center text-center space-y-2 text-[var(--text-muted)]">
+                    <Clock className="w-6 h-6 opacity-40" />
+                    <div className="text-xs font-medium text-[var(--text-main)]">
+                      {historyFilter ? 'No matching history found' : 'No browsing history yet'}
+                    </div>
+                    <p className="text-[11px] max-w-xs">
+                      Web pages you visit will appear here for fast revisiting.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 6. Tab Switcher Preferences */}
             {activeTab === 'switcher' && (
               <div className="space-y-4">
                 <div
@@ -821,7 +1117,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
 
-            {/* 5. Search Engine */}
+            {/* 7. Search Engine */}
             {activeTab === 'search' && (
               <div className="space-y-3">
                 <label className="text-xs font-medium block text-[var(--text-main)]">
@@ -864,7 +1160,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
 
-            {/* 6. About */}
+            {/* 8. About */}
             {activeTab === 'about' && (
               <div className="space-y-4">
                 <div
@@ -876,7 +1172,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                   <div>
                     <h4 className="text-xs font-semibold text-[var(--text-main)]">Larp Browser</h4>
-                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.3.0</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.4.0</p>
                   </div>
                 </div>
 
@@ -897,8 +1193,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     ).
                   </p>
                   <p>
-                    Features editable keyboard shortcuts, dynamic favorites & bookmarks bar, and 9
-                    curated color palettes with 0ms optimistic theme updates.
+                    Includes editable keyboard shortcuts, quick-access favorites, session restore,
+                    in-page search (Ctrl+F), page zoom, and browsing history cleanup.
                   </p>
                   <p
                     className="text-[11px] pt-2 border-t"

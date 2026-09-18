@@ -239,7 +239,60 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
       return;
     }
 
-    // 14. Toggle Maximize Window
+    // 14. Find in Page
+    if (isTriggered('findInPage', input)) {
+      event.preventDefault();
+      window.webContents.send('browser:toggle-find');
+      return;
+    }
+
+    // 15. Quick Favorites Popover
+    if (isTriggered('openFavorites', input)) {
+      event.preventDefault();
+      window.webContents.send('browser:toggle-favorites');
+      return;
+    }
+
+    // 16. Browsing History
+    if (isTriggered('openHistory', input)) {
+      event.preventDefault();
+      window.webContents.send('browser:toggle-modal', 'history');
+      return;
+    }
+
+    // 17. Zoom Controls (In, Out, Reset)
+    if (isTriggered('zoomIn', input) || (input.control && (input.key === '+' || input.key === '='))) {
+      event.preventDefault();
+      const { activeTabId, tabs } = tabManager.getState();
+      if (activeTabId) {
+        const currentTab = tabs.find((t) => t.id === activeTabId);
+        const currentZoom = currentTab?.zoomFactor || 1.0;
+        tabManager.setZoomFactor(activeTabId, currentZoom + 0.1);
+      }
+      return;
+    }
+
+    if (isTriggered('zoomOut', input) || (input.control && (input.key === '-' || input.key === '_'))) {
+      event.preventDefault();
+      const { activeTabId, tabs } = tabManager.getState();
+      if (activeTabId) {
+        const currentTab = tabs.find((t) => t.id === activeTabId);
+        const currentZoom = currentTab?.zoomFactor || 1.0;
+        tabManager.setZoomFactor(activeTabId, currentZoom - 0.1);
+      }
+      return;
+    }
+
+    if (isTriggered('zoomReset', input) || (input.control && input.key === '0')) {
+      event.preventDefault();
+      const { activeTabId } = tabManager.getState();
+      if (activeTabId) {
+        tabManager.setZoomFactor(activeTabId, 1.0);
+      }
+      return;
+    }
+
+    // 18. Toggle Maximize Window
     if (isTriggered('toggleMaximize', input) || (!input.control && !input.alt && !input.shift && input.key === 'F11')) {
       event.preventDefault();
       if (window.isMaximized()) {

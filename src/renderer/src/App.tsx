@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { TopBar } from './components/TopBar';
 import { TabSwitcher } from './components/TabSwitcher';
 import { NewTabPage } from './components/NewTabPage';
-import { SettingsModal } from './components/SettingsModal';
+import { SettingsModal, type SettingsTabType } from './components/SettingsModal';
 import { KeyboardShortcuts } from './components/KeyboardShortcuts';
+import { QuickFavoritesPopover } from './components/QuickFavoritesPopover';
+import { FindInPageBar } from './components/FindInPageBar';
 import { getPalette, applyPalette } from './theme/palettes';
 import type { BrowserState, BrowserSettings } from '@/shared/types';
 
@@ -15,6 +17,9 @@ export const App: React.FC = () => {
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
+  const [isFindOpen, setIsFindOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTabType>('appearance');
 
   const [state, setState] = useState<BrowserState>({
     tabs: [],
@@ -31,6 +36,9 @@ export const App: React.FC = () => {
       defaultSearchEngine: 'google',
       autoHibernateTabs: true,
       showBookmarksBar: false,
+      showFavoritesOnNewTab: true,
+      startupBehavior: 'new-tab',
+      startupCustomUrl: 'https://duckduckgo.com',
     },
   });
 
@@ -113,17 +121,45 @@ export const App: React.FC = () => {
     }
   };
 
-  // Listen for toggle modal commands sent from Electron main process shortcuts
+  // Listen for toggle modal / shortcuts / find / favorites commands sent from Electron main process shortcuts
   useEffect(() => {
+    const cleanups: (() => void)[] = [];
+
     if (window.browserApi?.onToggleModal) {
-      return window.browserApi.onToggleModal((modal) => {
-        if (modal === 'settings') {
-          setIsSettingsOpen((prev) => !prev);
-        } else if (modal === 'shortcuts') {
-          setIsShortcutsOpen((prev) => !prev);
-        }
-      });
+      cleanups.push(
+        window.browserApi.onToggleModal((modal) => {
+          if (modal === 'settings') {
+            setSettingsTab('appearance');
+            setIsSettingsOpen((prev) => !prev);
+          } else if (modal === 'shortcuts') {
+            setIsShortcutsOpen((prev) => !prev);
+          } else if (modal === 'history') {
+            setSettingsTab('history');
+            setIsSettingsOpen(true);
+          }
+        })
+      );
     }
+
+    if (window.browserApi?.onToggleFavorites) {
+      cleanups.push(
+        window.browserApi.onToggleFavorites(() => {
+          setIsFavoritesOpen((prev) => !prev);
+        })
+      );
+    }
+
+    if (window.browserApi?.onToggleFind) {
+      cleanups.push(
+        window.browserApi.onToggleFind(() => {
+          setIsFindOpen((prev) => !prev);
+        })
+      );
+    }
+
+    return () => {
+      cleanups.forEach((c) => c());
+    };
   }, []);
 
   // Global renderer keyboard shortcuts when focused in shell
@@ -134,12 +170,29 @@ export const App: React.FC = () => {
 
       if (e.ctrlKey && e.key === ',') {
         e.preventDefault();
+        setSettingsTab('appearance');
         setIsSettingsOpen((prev) => !prev);
         return;
       }
       if (e.ctrlKey && e.key === '/') {
         e.preventDefault();
         setIsShortcutsOpen((prev) => !prev);
+        return;
+      }
+      if (e.ctrlKey && (e.key === 'b' || e.key === 'B') && !e.shiftKey) {
+        e.preventDefault();
+        setIsFavoritesOpen((prev) => !prev);
+        return;
+      }
+      if (e.ctrlKey && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        setIsFindOpen((prev) => !prev);
+        return;
+      }
+      if (e.ctrlKey && (e.key === 'h' || e.key === 'H')) {
+        e.preventDefault();
+        setSettingsTab('history');
+        setIsSettingsOpen(true);
         return;
       }
       if (!typing && !e.ctrlKey && !e.altKey && e.key === '?') {
@@ -176,18 +229,18 @@ export const App: React.FC = () => {
 
   // Synchronize modal open state with Electron main process so native WebContentsView is detached
   useEffect(() => {
-    const isAnyModalOpen = isSettingsOpen || isShortcutsOpen;
+    const isAnyModalOpen = isSettingsOpen || isShortcutsOpen || isFavoritesOpen;
     if (window.browserApi?.setModalOpen) {
       window.browserApi.setModalOpen(isAnyModalOpen);
     }
-  }, [isSettingsOpen, isShortcutsOpen]);
+  }, [isSettingsOpen, isShortcutsOpen, isFavoritesOpen]);
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
   const isNewTab = !activeTab || !activeTab.url || activeTab.url === 'about:blank';
 
   return (
     <div
-      className="flex flex-col h-screen w-screen overflow-hidden transition-colors duration-150"
+      className="flex flex-col h-screen w-screen overflow-hidden transition-colors duration-150 relative"
       style={{
         backgroundColor: 'var(--bg-app)',
         color: 'var(--text-main)',
@@ -198,8 +251,20 @@ export const App: React.FC = () => {
         state={state}
         theme={theme}
         onToggleTheme={toggleTheme}
-        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenSettings={(tab) => {
+          if (tab) setSettingsTab(tab as SettingsTabType);
+          setIsSettingsOpen(true);
+        }}
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
+        onToggleFavorites={() => setIsFavoritesOpen((prev) => !prev)}
+        isFavoritesOpen={isFavoritesOpen}
+      />
+
+      {/* Docked In-Page Find Bar */}
+      <FindInPageBar
+        isOpen={isFindOpen}
+        onClose={() => setIsFindOpen(false)}
+        theme={theme}
       />
 
       {/* Main Content Area */}
@@ -210,7 +275,7 @@ export const App: React.FC = () => {
         {isNewTab ? (
           <NewTabPage state={state} theme={theme} />
         ) : (
-          (state.isSwitcherOpen || isSettingsOpen || isShortcutsOpen) && activeTab?.previewImage ? (
+          (state.isSwitcherOpen || isSettingsOpen || isShortcutsOpen || isFavoritesOpen) && activeTab?.previewImage ? (
             <img
               src={activeTab.previewImage}
               alt="Active tab preview"
@@ -219,6 +284,19 @@ export const App: React.FC = () => {
           ) : null
         )}
       </main>
+
+      {/* Quick Favorites Popover */}
+      <QuickFavoritesPopover
+        isOpen={isFavoritesOpen}
+        onClose={() => setIsFavoritesOpen(false)}
+        state={state}
+        theme={theme}
+        onOpenSettingsToBookmarks={() => {
+          setSettingsTab('bookmarks');
+          setIsFavoritesOpen(false);
+          setIsSettingsOpen(true);
+        }}
+      />
 
       {/* Alt-Tab / Ctrl-Shift-Tab Switcher HUD */}
       {state.isSwitcherOpen && <TabSwitcher state={state} theme={theme} />}
@@ -230,6 +308,7 @@ export const App: React.FC = () => {
         settings={state.settings}
         bookmarks={state.bookmarks}
         theme={theme}
+        initialTab={settingsTab}
         onUpdateSettings={handleUpdateSettings}
       />
 

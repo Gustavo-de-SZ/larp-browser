@@ -160,5 +160,38 @@ Palettes are defined in `src/renderer/src/theme/palettes.ts`:
 ### Versioning Rules
 - Semantic versioning: `MAJOR.MINOR.PATCH` in `package.json`.
 - Increment `PATCH` for bug fixes and UI polish (e.g. 1.2.0 -> 1.2.1).
-- Increment `MINOR` for new features (e.g. editable shortcuts & bookmarks in 1.3.0).
+- Increment `MINOR` for new features (e.g. editable shortcuts & bookmarks in 1.3.0, modern browser suite in 1.4.0).
 - Update version labels in `SettingsModal.tsx` about tab when bumping versions.
+
+---
+
+## 8. Features Implemented in v1.4.0
+
+### 1. Quick-Access Favorites Popover
+- Accessible via the Star button in the TopBar or `Ctrl+B`.
+- Features real-time search filtering, 1-click navigation in the active tab, open in new tab CTA, bookmark deletion, and quick toggle for the bookmarks bar.
+- Shows current tab state with 1-click Favorite/Remove button.
+- Smooth modal overlay over page preview with zero latency.
+
+### 2. Consolidated Bookmarks Settings
+- Reorganized Settings modal so all bookmarks-related configuration ("Show Bookmarks Bar" and "Show Favorites on New Tab") resides in the **Bookmarks** tab rather than Appearance.
+
+### 3. Startup / Session Restore Configuration
+- Configurable under **Settings > On Startup**:
+  - `Open New Tab Page`: Starts clean on about:blank with speed-dial favorites.
+  - `Continue Where You Left Off`: Fully persists tab URLs, titles, and active tab across restarts (`userData/larp-session.json`). Automatically saves on tab creation, navigation, and app close.
+  - `Open a Specific Page`: Loads user-defined custom startup URL (e.g. custom dashboard, search engine).
+
+### 4. Native In-Page Search (Find in Page)
+- Triggered by `Ctrl+F` globally (even when focus is inside live web pages).
+- Docked 36px search bar with match counter (`X of Y`), next (`Enter`), previous (`Shift+Enter`), and close (`Esc`).
+- Automatically adjusts `WebContentsView` vertical bounds by +36px so the search bar never obscures live web content.
+
+### 5. Native Page Zoom Controls
+- Global shortcuts: `Ctrl+=` (Zoom In), `Ctrl+-` (Zoom Out), `Ctrl+0` (Reset to 100%).
+- Real-time zoom percentage badge displayed inside Omnibar when zoom is not 100%. Clicking the badge resets zoom to 100% instantly.
+
+### 6. Browsing History & Privacy Clearing
+- Automatic URL visit recording persisted to `userData/larp-history.json` with timestamp and titles.
+- Dedicated **History** tab in Settings with search filter and item-by-item removal.
+- **Clear All Browsing Data** utility clearing Electron web session cache, cookies, local storage, indexDB, and browsing history.
