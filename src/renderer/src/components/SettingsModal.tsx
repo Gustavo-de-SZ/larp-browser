@@ -2457,7 +2457,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                   <div>
                     <h4 className="text-xs font-semibold text-[var(--text-main)]">Larp Browser</h4>
-                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.5.2</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.5.5</p>
                   </div>
                 </div>
 
