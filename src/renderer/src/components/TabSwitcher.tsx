@@ -20,7 +20,14 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
   const [filterQuery, setFilterQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const cardsContainerRef = useRef<HTMLDivElement>(null);
+  const switcherContainerRef = useRef<HTMLDivElement>(null);
   const isDark = theme === 'dark';
+
+  // Ensure HUD container and window have immediate keyboard focus on mount
+  useEffect(() => {
+    switcherContainerRef.current?.focus();
+    window.focus();
+  }, []);
 
   const sortOrder = state.settings?.switcherSortOrder || 'mru';
   const isCompact = state.settings?.switcherLayout === 'compact';
@@ -67,23 +74,26 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!state.isSwitcherOpen) return;
+      const keyLower = e.key.toLowerCase();
 
-      if (e.key === 'Escape') {
+      if (keyLower === 'escape') {
         e.preventDefault();
         window.browserApi.closeSwitcher();
         return;
       }
 
-      if (e.key === 'Enter') {
+      if (keyLower === 'enter' || keyLower === 'return') {
         e.preventDefault();
         window.browserApi.commitSwitcher();
         return;
       }
 
       if (
-        e.key === 'ArrowRight' ||
-        e.key === 'ArrowDown' ||
-        (e.key === 'Tab' && !e.shiftKey)
+        keyLower === 'arrowright' ||
+        keyLower === 'right' ||
+        keyLower === 'arrowdown' ||
+        keyLower === 'down' ||
+        (keyLower === 'tab' && !e.shiftKey)
       ) {
         e.preventDefault();
         window.browserApi.cycleSwitcher('forward');
@@ -91,9 +101,11 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
       }
 
       if (
-        e.key === 'ArrowLeft' ||
-        e.key === 'ArrowUp' ||
-        (e.key === 'Tab' && e.shiftKey)
+        keyLower === 'arrowleft' ||
+        keyLower === 'left' ||
+        keyLower === 'arrowup' ||
+        keyLower === 'up' ||
+        (keyLower === 'tab' && e.shiftKey)
       ) {
         e.preventDefault();
         window.browserApi.cycleSwitcher('backward');
@@ -102,7 +114,7 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
 
       // 'w' or 'Delete' closes current tab if not typing in search
       if (
-        (e.key.toLowerCase() === 'w' || e.key === 'Delete') &&
+        (keyLower === 'w' || keyLower === 'delete') &&
         document.activeElement !== searchInputRef.current
       ) {
         e.preventDefault();
@@ -169,7 +181,9 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
     >
       {/* Main HUD Container */}
       <div
-        className="w-full max-w-4xl flex flex-col max-h-[82vh] rounded-2xl border p-5 relative overflow-hidden animate-scale-up"
+        ref={switcherContainerRef}
+        tabIndex={-1}
+        className="w-full max-w-4xl flex flex-col max-h-[82vh] rounded-2xl border p-5 relative overflow-hidden animate-scale-up outline-none"
         style={{
           backgroundColor: 'var(--bg-app)',
           borderColor: 'var(--border-subtle)',
@@ -207,7 +221,7 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                 </span>
               </div>
               <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                Release Ctrl or press Enter to switch
+                Navigate with Arrows or Tab • Press Enter to switch • Esc to cancel
               </p>
             </div>
           </div>
@@ -470,15 +484,15 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
           <div className="flex items-center space-x-4">
             <span className="flex items-center space-x-1">
               <kbd className="px-1.5 py-0.5 rounded font-mono text-[10px] border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">
-                Ctrl+Shift+Tab
+                ← / →
               </kbd>
-              <span>Prev</span>
+              <span>Navigate</span>
             </span>
             <span className="flex items-center space-x-1">
               <kbd className="px-1.5 py-0.5 rounded font-mono text-[10px] border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">
                 Ctrl+Tab
               </kbd>
-              <span>Next</span>
+              <span>Cycle</span>
             </span>
             <span className="flex items-center space-x-1">
               <kbd className="px-1.5 py-0.5 rounded font-mono text-[10px] border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">

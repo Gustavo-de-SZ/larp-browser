@@ -1167,6 +1167,11 @@ export class TabManager {
       this.window.contentView.addChildView(tab.view);
     }
     this.updateActiveViewBounds();
+    try {
+      tab.view.webContents.focus();
+    } catch {
+      // Ignore
+    }
   }
 
   public detachActiveTabView() {
@@ -1207,12 +1212,14 @@ export class TabManager {
   public async setModalOpen(isOpen: boolean) {
     this.isModalOpen = isOpen;
     if (isOpen) {
-      if (this.activeTabId) {
-        await this.capturePreview(this.activeTabId);
-      }
       this.detachActiveTabView();
-      // Ensure shell window has keyboard focus for shortcuts and escape handling
+      // Ensure shell window has immediate keyboard focus for shortcuts and escape handling
+      this.window.focus();
       this.window.webContents.focus();
+      // Capture preview in background without blocking modal appearance
+      if (this.activeTabId) {
+        this.capturePreview(this.activeTabId).then(() => this.notifyStateChange()).catch(() => {});
+      }
     } else {
       if (!this.isSwitcherOpen) {
         this.attachActiveTabView();
@@ -1350,18 +1357,29 @@ export class TabManager {
   public async openSwitcher() {
     if (this.tabs.size === 0) return;
 
-    // Capture the current page before opening HUD so background blur and current card look pristine
-    if (this.activeTabId) {
-      await this.capturePreview(this.activeTabId);
-    }
-
     this.isSwitcherOpen = true;
     // Set index to the next tab in MRU order (index 1 if available, otherwise 0)
     this.selectedSwitcherIndex = this.mruTabIds.length > 1 ? 1 : 0;
 
-    // Detach active web contents view so HUD is fully visible in window
+    // Detach active web contents view so HUD is immediately visible in window
     this.detachActiveTabView();
+
+    // Immediately focus shell window and webContents so arrow keys and enter work with 0ms latency
+    this.window.focus();
+    this.window.webContents.focus();
+
     this.notifyStateChange();
+
+    // Capture the current page in background (non-blocking) so HUD opening is never delayed
+    if (this.activeTabId) {
+      this.capturePreview(this.activeTabId)
+        .then(() => {
+          if (this.isSwitcherOpen) {
+            this.notifyStateChange();
+          }
+        })
+        .catch(() => {});
+    }
   }
 
   public closeSwitcher() {

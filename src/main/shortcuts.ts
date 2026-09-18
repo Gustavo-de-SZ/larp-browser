@@ -80,14 +80,10 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
   };
 
   const handleInputEvent = (event: Electron.Event, input: Electron.Input) => {
-    // Track Ctrl modifier state for switcher commit-on-release
+    // Track Ctrl modifier state
     if (input.key === 'Control') {
       if (input.type === 'keyUp') {
         isCtrlPressed = false;
-        if (tabManager.getState().isSwitcherOpen) {
-          event.preventDefault();
-          tabManager.commitSwitcher();
-        }
       } else if (input.type === 'keyDown') {
         isCtrlPressed = true;
       }
@@ -98,22 +94,39 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
 
     // ── Tab Switcher HUD Navigation & Esc ──────────────────────────────────
     if (tabManager.getState().isSwitcherOpen) {
-      if (input.key === 'Escape') {
+      const keyLower = input.key.toLowerCase();
+
+      if (keyLower === 'escape') {
         event.preventDefault();
         tabManager.closeSwitcher();
         return;
       }
-      if (input.key === 'ArrowRight' || input.key === 'ArrowDown') {
+
+      if (
+        keyLower === 'arrowright' ||
+        keyLower === 'right' ||
+        keyLower === 'arrowdown' ||
+        keyLower === 'down' ||
+        (keyLower === 'tab' && !input.shift)
+      ) {
         event.preventDefault();
         tabManager.cycleSwitcher('forward');
         return;
       }
-      if (input.key === 'ArrowLeft' || input.key === 'ArrowUp') {
+
+      if (
+        keyLower === 'arrowleft' ||
+        keyLower === 'left' ||
+        keyLower === 'arrowup' ||
+        keyLower === 'up' ||
+        (keyLower === 'tab' && input.shift)
+      ) {
         event.preventDefault();
         tabManager.cycleSwitcher('backward');
         return;
       }
-      if (input.key === 'Enter') {
+
+      if (keyLower === 'enter' || keyLower === 'return') {
         event.preventDefault();
         tabManager.commitSwitcher();
         return;
