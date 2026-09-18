@@ -35,10 +35,11 @@ export const App: React.FC = () => {
       forcePageDarkMode: true,
       defaultSearchEngine: 'google',
       autoHibernateTabs: true,
+      idleHibernateMinutes: 30,
       showBookmarksBar: false,
       showFavoritesOnNewTab: true,
       startupBehavior: 'new-tab',
-      startupCustomUrl: 'https://duckduckgo.com',
+      startupCustomUrl: 'https://www.google.com',
     },
   });
 

@@ -104,7 +104,16 @@ const api: IpcRendererApi = {
   // History & Browsing Data
   getHistory: () => ipcRenderer.invoke('browser:get-history'),
   clearHistory: () => ipcRenderer.invoke('browser:clear-history'),
+  deleteHistoryItem: (id: string) => ipcRenderer.invoke('browser:delete-history-item', id),
   clearBrowsingData: () => ipcRenderer.invoke('browser:clear-browsing-data'),
+  clearBrowsingDataAdvanced: (options: any) =>
+    ipcRenderer.invoke('browser:clear-browsing-data-advanced', options),
+
+  // Passwords Vault
+  getPasswords: () => ipcRenderer.invoke('browser:get-passwords'),
+  savePassword: (entry: any) => ipcRenderer.invoke('browser:save-password', entry),
+  updatePassword: (entry: any) => ipcRenderer.invoke('browser:update-password', entry),
+  deletePassword: (id: string) => ipcRenderer.invoke('browser:delete-password', id),
 
   setTheme: (theme: 'dark' | 'light') => ipcRenderer.invoke('browser:set-theme', theme),
   getSettings: () => ipcRenderer.invoke('browser:get-settings'),

@@ -195,3 +195,34 @@ Palettes are defined in `src/renderer/src/theme/palettes.ts`:
 - Automatic URL visit recording persisted to `userData/larp-history.json` with timestamp and titles.
 - Dedicated **History** tab in Settings with search filter and item-by-item removal.
 - **Clear All Browsing Data** utility clearing Electron web session cache, cookies, local storage, indexDB, and browsing history.
+
+---
+
+## 9. Features Implemented in v1.5.0
+
+### 1. Encrypted Password Manager (Local Vault)
+- **Native OS Keychain Security**: Uses Electron's `safeStorage` API backed by GNOME Keyring / KWallet via `libsecret` on Linux, with AES-256-GCM cipher fallback. Passwords are never saved in plain text.
+- **Dedicated Settings Tab**: Search saved credentials, add new entries, edit website/username/password, toggle masked visibility, and copy credentials to clipboard with 1-click confirmation feedback.
+- Securely stored in `userData/larp-passwords.json`.
+
+### 2. Tab Auto-Hibernation & Memory Saver
+- **Configurable Idle Timeout**: Settings > Tab Switcher allows selecting inactivity threshold: Disabled, 5 minutes, 15 minutes, 30 minutes (default), or 60 minutes.
+- **Background Execution Suspension**: Automatically activates background execution throttling on tabs exceeding idle threshold, reducing background CPU and memory overhead.
+- **Instant Restore**: Swapping back to a sleeping tab instantly clears throttle without forcing a destructive web page reload.
+- **Visual Sleeping Badge**: Displays a sleeping moon badge on hibernated tabs in the Tab Switcher.
+
+### 3. Tab Switcher Customization & Compact Layout Mode
+- **Dual Layout Options**: Choose between the visual thumbnail carousel (**Visual Cards**) or a high-density vertical list view (**Compact List**).
+- **Preview & URL Toggles**: Toggle live thumbnail snapshot previews and domain/URL subtitles.
+- **Ordering Preferences**: Switch between Most Recently Used (**MRU** - classic Alt-Tab) and **Creation Order** (tab bar sequence).
+- **Expanded Keyboard Navigation**: Supports both Arrow Left/Right and Arrow Up/Down to navigate tabs.
+
+### 4. Advanced Browsing Data Cleanup & Time-Range Filtering
+- **History Time-Range Filters**: Filter history by *All Time*, *Today*, *Yesterday*, and *Last 7 Days*.
+- **Individual Deletion**: Trash button allows deleting specific history visits directly.
+- **Granular Clear Data Modal**: Dedicated modal supporting selectable time ranges (*Last hour*, *Last 24 hours*, *Last 7 days*, *Last 4 weeks*, *All time*) and individual category checkboxes for *Browsing history*, *Cookies and site data*, and *Cached images and files*.
+
+### 5. Startup Page Alignment & Presets
+- Custom startup URL now matches the selected search engine by default (e.g. Google instead of DuckDuckGo when Google is selected).
+- Added quick 1-click preset buttons: *Sync with Search Engine*, *Google*, *DuckDuckGo*, and *Brave*.
+

@@ -1,6 +1,7 @@
-import { app, BrowserWindow, WebContentsView, nativeTheme } from 'electron';
+import { app, BrowserWindow, WebContentsView, nativeTheme, safeStorage } from 'electron';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import type {
   BrowserState,
   BrowserSettings,
@@ -8,11 +9,27 @@ import type {
   SwitcherDirection,
   BookmarkItem,
   HistoryItem,
+  PasswordEntry,
+  ClearBrowsingDataOptions,
 } from '../shared/types';
 
 export const TOP_BAR_HEIGHT = 44;
 export const BOOKMARKS_BAR_HEIGHT = 28;
 export const FIND_BAR_HEIGHT = 36;
+
+export function getSearchEngineHomeUrl(engine: string): string {
+  switch (engine) {
+    case 'duckduckgo':
+      return 'https://duckduckgo.com';
+    case 'brave':
+      return 'https://search.brave.com';
+    case 'bing':
+      return 'https://www.bing.com';
+    case 'google':
+    default:
+      return 'https://www.google.com';
+  }
+}
 
 const DEFAULT_SETTINGS: BrowserSettings = {
   theme: 'dark',
@@ -21,10 +38,15 @@ const DEFAULT_SETTINGS: BrowserSettings = {
   forcePageDarkMode: true,
   defaultSearchEngine: 'google',
   autoHibernateTabs: true,
+  idleHibernateMinutes: 30,
+  switcherLayout: 'grid',
+  switcherShowPreviews: true,
+  switcherShowUrls: true,
+  switcherSortOrder: 'mru',
   showBookmarksBar: false,
   showFavoritesOnNewTab: true,
   startupBehavior: 'new-tab',
-  startupCustomUrl: 'https://duckduckgo.com',
+  startupCustomUrl: 'https://www.google.com',
 };
 
 const SMART_DARK_CSS = `
@@ -53,6 +75,8 @@ export class TabManager {
   private bookmarksPath: string;
   private history: HistoryItem[] = [];
   private historyPath: string;
+  private passwords: PasswordEntry[] = [];
+  private passwordsPath: string;
   private sessionPath: string;
   private onStateChangeCallback?: (state: BrowserState) => void;
 
@@ -61,10 +85,13 @@ export class TabManager {
     this.settingsPath = path.join(app.getPath('userData'), 'larp-settings.json');
     this.bookmarksPath = path.join(app.getPath('userData'), 'larp-bookmarks.json');
     this.historyPath = path.join(app.getPath('userData'), 'larp-history.json');
+    this.passwordsPath = path.join(app.getPath('userData'), 'larp-passwords.json');
     this.sessionPath = path.join(app.getPath('userData'), 'larp-session.json');
     this.loadSettings();
     this.loadBookmarks();
     this.loadHistory();
+    this.loadPasswords();
+    this.startHibernateTimer();
 
     // Set Chromium native theme
     nativeTheme.themeSource = this.settings.theme;
@@ -93,6 +120,21 @@ export class TabManager {
     if (!['google', 'duckduckgo', 'brave', 'bing'].includes(this.settings.defaultSearchEngine)) {
       this.settings.defaultSearchEngine = 'google';
     }
+    if (typeof this.settings.idleHibernateMinutes !== 'number') {
+      this.settings.idleHibernateMinutes = 30;
+    }
+    if (!['grid', 'compact'].includes(this.settings.switcherLayout || '')) {
+      this.settings.switcherLayout = 'grid';
+    }
+    if (typeof this.settings.switcherShowPreviews !== 'boolean') {
+      this.settings.switcherShowPreviews = true;
+    }
+    if (typeof this.settings.switcherShowUrls !== 'boolean') {
+      this.settings.switcherShowUrls = true;
+    }
+    if (!['mru', 'creation'].includes(this.settings.switcherSortOrder || '')) {
+      this.settings.switcherSortOrder = 'mru';
+    }
     if (typeof this.settings.showBookmarksBar !== 'boolean') {
       this.settings.showBookmarksBar = false;
     }
@@ -103,7 +145,7 @@ export class TabManager {
       this.settings.startupBehavior = 'new-tab';
     }
     if (!this.settings.startupCustomUrl) {
-      this.settings.startupCustomUrl = 'https://duckduckgo.com';
+      this.settings.startupCustomUrl = getSearchEngineHomeUrl(this.settings.defaultSearchEngine);
     }
     this.saveSettings();
   }
@@ -236,6 +278,11 @@ export class TabManager {
     this.saveHistory();
   }
 
+  public deleteHistoryItem(id: string) {
+    this.history = this.history.filter((item) => item.id !== id);
+    this.saveHistory();
+  }
+
   public async clearBrowsingData() {
     this.clearHistory();
     try {
@@ -244,6 +291,206 @@ export class TabManager {
       await session.defaultSession.clearStorageData();
     } catch (err) {
       console.error('Failed to clear browsing data:', err);
+    }
+  }
+
+  public async clearBrowsingDataAdvanced(options: ClearBrowsingDataOptions) {
+    let cutoff = 0;
+    const now = Date.now();
+    if (options.timeRange === 'hour') {
+      cutoff = now - 3600 * 1000;
+    } else if (options.timeRange === '24h') {
+      cutoff = now - 24 * 3600 * 1000;
+    } else if (options.timeRange === '7d') {
+      cutoff = now - 7 * 24 * 3600 * 1000;
+    } else if (options.timeRange === '4w') {
+      cutoff = now - 28 * 24 * 3600 * 1000;
+    } else if (options.timeRange === 'all') {
+      cutoff = 0;
+    }
+
+    if (options.clearHistory) {
+      if (cutoff === 0) {
+        this.history = [];
+      } else {
+        this.history = this.history.filter((h) => h.visitedAt < cutoff);
+      }
+      this.saveHistory();
+    }
+
+    try {
+      const { session } = await import('electron');
+      if (options.clearCookies) {
+        await session.defaultSession.clearStorageData({
+          storages: ['cookies', 'localstorage', 'websql', 'indexdb'],
+        });
+      }
+      if (options.clearCache) {
+        await session.defaultSession.clearCache();
+      }
+    } catch (err) {
+      console.error('Failed to clear browsing data:', err);
+    }
+  }
+
+  // --- Password Vault Management ---
+
+  private encryptSecret(text: string): string {
+    try {
+      if (safeStorage && safeStorage.isEncryptionAvailable()) {
+        return 'safe:' + safeStorage.encryptString(text).toString('base64');
+      }
+    } catch {
+      // Fallback to AES-GCM
+    }
+    try {
+      const iv = crypto.randomBytes(12);
+      const key = crypto.createHash('sha256').update(app.getPath('userData') + '-larp-secret').digest();
+      const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+      const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
+      const tag = cipher.getAuthTag();
+      return 'aes:' + Buffer.concat([iv, tag, encrypted]).toString('base64');
+    } catch (err) {
+      console.error('Fallback encryption error:', err);
+      return 'plain:' + Buffer.from(text).toString('base64');
+    }
+  }
+
+  private decryptSecret(ciphertext: string): string {
+    if (!ciphertext) return '';
+    try {
+      if (ciphertext.startsWith('safe:')) {
+        const raw = Buffer.from(ciphertext.substring(5), 'base64');
+        return safeStorage.decryptString(raw);
+      } else if (ciphertext.startsWith('aes:')) {
+        const raw = Buffer.from(ciphertext.substring(4), 'base64');
+        const iv = raw.subarray(0, 12);
+        const tag = raw.subarray(12, 28);
+        const data = raw.subarray(28);
+        const key = crypto.createHash('sha256').update(app.getPath('userData') + '-larp-secret').digest();
+        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+        decipher.setAuthTag(tag);
+        return decipher.update(data) + decipher.final('utf8');
+      } else if (ciphertext.startsWith('plain:')) {
+        return Buffer.from(ciphertext.substring(6), 'base64').toString('utf8');
+      }
+    } catch (err) {
+      console.error('Failed to decrypt secret:', err);
+    }
+    return '';
+  }
+
+  private loadPasswords() {
+    try {
+      if (fs.existsSync(this.passwordsPath)) {
+        const raw = fs.readFileSync(this.passwordsPath, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          this.passwords = parsed.map((item: any) => ({
+            id: item.id,
+            site: item.site || '',
+            username: item.username || '',
+            password: this.decryptSecret(item.secret || ''),
+            createdAt: item.createdAt || Date.now(),
+            updatedAt: item.updatedAt || Date.now(),
+          }));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load passwords:', err);
+      this.passwords = [];
+    }
+  }
+
+  private savePasswords() {
+    try {
+      const serializable = this.passwords.map((p) => ({
+        id: p.id,
+        site: p.site,
+        username: p.username,
+        secret: this.encryptSecret(p.password),
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+      }));
+      fs.promises.writeFile(this.passwordsPath, JSON.stringify(serializable, null, 2), 'utf8').catch((err) => {
+        console.error('Failed to save passwords:', err);
+      });
+    } catch (err) {
+      console.error('Failed to serialize passwords:', err);
+    }
+  }
+
+  public getPasswords(): PasswordEntry[] {
+    return [...this.passwords];
+  }
+
+  public savePassword(entry: Omit<PasswordEntry, 'id' | 'createdAt' | 'updatedAt'>): PasswordEntry {
+    const newEntry: PasswordEntry = {
+      id: 'pwd-' + Math.random().toString(36).substring(2, 9),
+      site: entry.site.trim(),
+      username: entry.username.trim(),
+      password: entry.password,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    this.passwords.unshift(newEntry);
+    this.savePasswords();
+    return newEntry;
+  }
+
+  public updatePassword(entry: PasswordEntry) {
+    const idx = this.passwords.findIndex((p) => p.id === entry.id);
+    if (idx !== -1) {
+      this.passwords[idx] = {
+        ...this.passwords[idx],
+        site: entry.site.trim(),
+        username: entry.username.trim(),
+        password: entry.password,
+        updatedAt: Date.now(),
+      };
+      this.savePasswords();
+    }
+  }
+
+  public deletePassword(id: string) {
+    this.passwords = this.passwords.filter((p) => p.id !== id);
+    this.savePasswords();
+  }
+
+  // --- Active Tab Hibernation ---
+
+  private startHibernateTimer() {
+    setInterval(() => {
+      this.checkTabHibernation();
+    }, 60000);
+  }
+
+  private checkTabHibernation() {
+    const idleMinutes = this.settings.idleHibernateMinutes ?? 30;
+    if (!this.settings.autoHibernateTabs || idleMinutes <= 0) return;
+    const now = Date.now();
+    const thresholdMs = idleMinutes * 60 * 1000;
+
+    let changed = false;
+    for (const [tabId, tab] of this.tabs.entries()) {
+      if (tabId === this.activeTabId) continue;
+      if (tab.info.audioPlaying) continue;
+      if (tab.info.isHibernated) continue;
+      if (!tab.info.url || tab.info.url === 'about:blank') continue;
+
+      const idleDuration = now - (tab.info.lastAccessed || 0);
+      if (idleDuration > thresholdMs) {
+        tab.info.isHibernated = true;
+        try {
+          tab.view.webContents.setBackgroundThrottling(true);
+        } catch {
+          // Ignore
+        }
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.notifyStateChange();
     }
   }
 
@@ -345,6 +592,8 @@ export class TabManager {
     const themeChanged = newSettings.theme !== undefined && newSettings.theme !== this.settings.theme;
     const forceDarkChanged = newSettings.forcePageDarkMode !== undefined && newSettings.forcePageDarkMode !== this.settings.forcePageDarkMode;
     const bookmarksBarChanged = newSettings.showBookmarksBar !== undefined;
+    const oldEngine = this.settings.defaultSearchEngine;
+    const wasUsingSearchHome = !this.settings.startupCustomUrl || this.settings.startupCustomUrl === getSearchEngineHomeUrl(oldEngine);
 
     for (const [key, value] of Object.entries(newSettings)) {
       if (value === null || value === undefined) {
@@ -352,6 +601,10 @@ export class TabManager {
       } else {
         (this.settings as any)[key] = value;
       }
+    }
+
+    if (newSettings.defaultSearchEngine && newSettings.defaultSearchEngine !== oldEngine && wasUsingSearchHome && !newSettings.startupCustomUrl) {
+      this.settings.startupCustomUrl = getSearchEngineHomeUrl(newSettings.defaultSearchEngine);
     }
 
     if (newSettings.theme) {
@@ -639,6 +892,14 @@ export class TabManager {
     this.activeTabId = tabId;
     const currentTab = this.tabs.get(tabId)!;
     currentTab.info.lastAccessed = Date.now();
+    if (currentTab.info.isHibernated) {
+      currentTab.info.isHibernated = false;
+      try {
+        currentTab.view.webContents.setBackgroundThrottling(false);
+      } catch {
+        // Ignore
+      }
+    }
 
     // Update MRU list: move tabId to the front
     this.mruTabIds = [tabId, ...this.mruTabIds.filter(id => id !== tabId)];

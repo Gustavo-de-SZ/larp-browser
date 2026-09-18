@@ -83,8 +83,33 @@ export function registerIpcHandlers(window: BrowserWindow, tabManager: TabManage
     tabManager.clearHistory();
   });
 
+  ipcMain.handle('browser:delete-history-item', (_event, id: string) => {
+    tabManager.deleteHistoryItem(id);
+  });
+
   ipcMain.handle('browser:clear-browsing-data', async () => {
     await tabManager.clearBrowsingData();
+  });
+
+  ipcMain.handle('browser:clear-browsing-data-advanced', async (_event, options: any) => {
+    await tabManager.clearBrowsingDataAdvanced(options);
+  });
+
+  // Password Vault handlers
+  ipcMain.handle('browser:get-passwords', () => {
+    return tabManager.getPasswords();
+  });
+
+  ipcMain.handle('browser:save-password', (_event, entry: any) => {
+    return tabManager.savePassword(entry);
+  });
+
+  ipcMain.handle('browser:update-password', (_event, entry: any) => {
+    tabManager.updatePassword(entry);
+  });
+
+  ipcMain.handle('browser:delete-password', (_event, id: string) => {
+    tabManager.deletePassword(id);
   });
 
   // Settings & Theme handlers

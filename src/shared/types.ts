@@ -11,6 +11,7 @@ export interface TabInfo {
   audioPlaying?: boolean;
   isMuted?: boolean;
   zoomFactor?: number;
+  isHibernated?: boolean;
 }
 
 export interface BookmarkItem {
@@ -26,6 +27,22 @@ export interface HistoryItem {
   url: string;
   title: string;
   visitedAt: number;
+}
+
+export interface ClearBrowsingDataOptions {
+  timeRange: 'hour' | '24h' | '7d' | '4w' | 'all';
+  clearHistory: boolean;
+  clearCookies: boolean;
+  clearCache: boolean;
+}
+
+export interface PasswordEntry {
+  id: string;
+  site: string;
+  username: string;
+  password: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface FindResult {
@@ -96,6 +113,11 @@ export interface BrowserSettings {
   forcePageDarkMode: boolean; // Forces dark theme even on sites without dark mode
   defaultSearchEngine: 'duckduckgo' | 'google' | 'brave' | 'bing';
   autoHibernateTabs: boolean;
+  idleHibernateMinutes?: number; // 0 = disabled, 5, 15, 30, 60
+  switcherLayout?: 'grid' | 'compact';
+  switcherShowPreviews?: boolean;
+  switcherShowUrls?: boolean;
+  switcherSortOrder?: 'mru' | 'creation';
   showBookmarksBar: boolean;
   showFavoritesOnNewTab: boolean;
   startupBehavior: 'new-tab' | 'continue' | 'custom-url';
@@ -118,7 +140,7 @@ export type SwitcherDirection = 'forward' | 'backward';
 export interface IpcRendererApi {
   // State observation
   onStateUpdate: (callback: (state: BrowserState) => void) => () => void;
-  onToggleModal: (callback: (modal: 'settings' | 'shortcuts' | 'history') => void) => () => void;
+  onToggleModal: (callback: (modal: 'settings' | 'shortcuts' | 'history' | 'passwords') => void) => () => void;
   onFocusOmnibar: (callback: () => void) => () => void;
   onToggleFind: (callback: () => void) => () => void;
   onToggleFavorites: (callback: () => void) => () => void;
@@ -152,7 +174,15 @@ export interface IpcRendererApi {
   // History & Browsing Data
   getHistory: () => Promise<HistoryItem[]>;
   clearHistory: () => Promise<void>;
+  deleteHistoryItem: (id: string) => Promise<void>;
   clearBrowsingData: () => Promise<void>;
+  clearBrowsingDataAdvanced: (options: ClearBrowsingDataOptions) => Promise<void>;
+
+  // Passwords Vault
+  getPasswords: () => Promise<PasswordEntry[]>;
+  savePassword: (entry: Omit<PasswordEntry, 'id' | 'createdAt' | 'updatedAt'>) => Promise<PasswordEntry>;
+  updatePassword: (entry: PasswordEntry) => Promise<void>;
+  deletePassword: (id: string) => Promise<void>;
 
   // Settings & Theme
   setTheme: (theme: 'dark' | 'light') => Promise<void>;
