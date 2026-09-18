@@ -68,7 +68,7 @@ const SMART_DARK_CSS = `
 
 export class TabManager {
   private window: BrowserWindow;
-  private tabs: Map<string, { info: TabInfo; view: WebContentsView; cssKey?: string }> = new Map();
+  private tabs: Map<string, { info: TabInfo; view?: WebContentsView; cssKey?: string }> = new Map();
   private activeTabId: string | null = null;
   private mruTabIds: string[] = [];
   private isSwitcherOpen = false;
@@ -700,13 +700,12 @@ export class TabManager {
     timer.unref?.();
   }
 
-  private checkTabHibernation() {
+  private async checkTabHibernation() {
     const idleMinutes = this.settings.idleHibernateMinutes ?? 30;
     if (!this.settings.autoHibernateTabs || idleMinutes <= 0) return;
     const now = Date.now();
     const thresholdMs = idleMinutes * 60 * 1000;
 
-    let changed = false;
     for (const [tabId, tab] of this.tabs.entries()) {
       if (tabId === this.activeTabId) continue;
       if (tab.info.audioPlaying) continue;
@@ -715,38 +714,64 @@ export class TabManager {
 
       const idleDuration = now - (tab.info.lastAccessed || 0);
       if (idleDuration > thresholdMs) {
-        tab.info.isHibernated = true;
-        try {
-          tab.view.webContents.setBackgroundThrottling(true);
-        } catch {
-          // Ignore
-        }
-        changed = true;
+        await this.hibernateTab(tabId);
       }
-    }
-    if (changed) {
-      this.notifyStateChange();
     }
   }
 
-  public hibernateTab(tabId: string) {
+  public async hibernateTab(tabId: string) {
     const tab = this.tabs.get(tabId);
     if (!tab || tabId === this.activeTabId || tab.info.isHibernated) return;
-    tab.info.isHibernated = true;
-    try {
-      tab.view.webContents.setBackgroundThrottling(true);
-    } catch {
-      // Ignore
+    if (tab.info.audioPlaying) return;
+    if (!tab.info.url || tab.info.url === 'about:blank') return;
+
+    // Pre-capture preview before discarding view so Alt-Tab switcher card never goes blank
+    if (!tab.info.previewImage && tab.view?.webContents && !tab.view.webContents.isDestroyed()) {
+      await this.capturePreview(tabId);
     }
+
+    if (tab.view) {
+      const viewToDestroy = tab.view;
+      tab.view = undefined;
+
+      try {
+        if (this.window.contentView.children.includes(viewToDestroy)) {
+          this.window.contentView.removeChildView(viewToDestroy);
+        }
+      } catch {
+        // Ignore
+      }
+
+      try {
+        if (tab.cssKey && viewToDestroy.webContents && !viewToDestroy.webContents.isDestroyed()) {
+          viewToDestroy.webContents.removeInsertedCSS(tab.cssKey).catch(() => {});
+          tab.cssKey = undefined;
+        }
+      } catch {
+        // Ignore
+      }
+
+      try {
+        if (viewToDestroy.webContents && !viewToDestroy.webContents.isDestroyed()) {
+          (viewToDestroy.webContents as any).destroy?.();
+        }
+      } catch (err) {
+        console.warn(`Failed to destroy WebContentsView for hibernated tab ${tabId}:`, err);
+      }
+    }
+
+    tab.info.isHibernated = true;
     this.notifyStateChange();
   }
 
-  public hibernateAllInactive() {
+  public async hibernateAllInactive() {
+    const promises: Promise<void>[] = [];
     for (const [tabId] of this.tabs.entries()) {
       if (tabId !== this.activeTabId) {
-        this.hibernateTab(tabId);
+        promises.push(this.hibernateTab(tabId));
       }
     }
+    await Promise.all(promises);
   }
 
   // --- Session Save & Restore ---
@@ -831,7 +856,7 @@ export class TabManager {
 
   public getTabView(tabId: string): { webContents: Electron.WebContents } | undefined {
     const tab = this.tabs.get(tabId);
-    return tab ? tab.view : undefined;
+    return tab && tab.view ? tab.view : undefined;
   }
 
   public async setTheme(theme: 'dark' | 'light') {
@@ -887,7 +912,7 @@ export class TabManager {
 
   private async applyThemeToTab(tabId: string) {
     const tab = this.tabs.get(tabId);
-    if (!tab || tab.view.webContents.isDestroyed()) return;
+    if (!tab || !tab.view || tab.view.webContents.isDestroyed()) return;
 
     try {
       // Clean previous custom CSS
@@ -907,6 +932,61 @@ export class TabManager {
   private async applyThemeToAllTabs() {
     const promises = Array.from(this.tabs.keys()).map((id) => this.applyThemeToTab(id));
     await Promise.all(promises);
+  }
+
+  public ensureTabView(tabId: string): WebContentsView {
+    const tab = this.tabs.get(tabId);
+    if (!tab) throw new Error(`Tab ${tabId} not found`);
+
+    if (tab.view?.webContents && !tab.view.webContents.isDestroyed()) {
+      return tab.view;
+    }
+
+    const view = new WebContentsView({
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: true,
+        spellcheck: true,
+        partition: tab.info.isPrivate ? 'incognito' : undefined,
+      },
+    });
+
+    tab.view = view;
+    tab.info.isHibernated = false;
+
+    // Setup webContents event listeners
+    this.setupTabEvents(tabId, view);
+
+    // Re-apply zoom factor if customized
+    if (tab.info.zoomFactor && tab.info.zoomFactor !== 1.0) {
+      try {
+        if (view.webContents && !view.webContents.isDestroyed()) {
+          view.webContents.setZoomFactor(tab.info.zoomFactor);
+        }
+      } catch {
+        // Ignore
+      }
+    }
+
+    // Apply smart dark mode
+    this.applyThemeToTab(tabId).catch(() => {});
+
+    // Reload content transparently
+    if (tab.info.url && tab.info.url !== 'about:blank') {
+      tab.info.isLoading = true;
+      view.webContents?.loadURL(tab.info.url).catch((err) => {
+        try {
+          if (view?.webContents && !view.webContents.isDestroyed() && err?.code !== 'ERR_ABORTED') {
+            console.warn(`Failed to reload hibernated tab ${tabId} (${tab.info.url}):`, err);
+          }
+        } catch {
+          // Ignore
+        }
+      });
+    }
+
+    return view;
   }
 
   public async createTab(initialUrl = 'about:blank', isPrivate = false): Promise<string> {
@@ -943,8 +1023,14 @@ export class TabManager {
 
     // Load initial URL
     if (initialUrl && initialUrl !== 'about:blank') {
-      view.webContents.loadURL(initialUrl).catch(err => {
-        console.error(`Failed to load ${initialUrl}:`, err);
+      view.webContents?.loadURL(initialUrl).catch(err => {
+        try {
+          if (view?.webContents && !view.webContents.isDestroyed() && err?.code !== 'ERR_ABORTED') {
+            console.error(`Failed to load ${initialUrl}:`, err);
+          }
+        } catch {
+          // Ignore
+        }
       });
     }
 
@@ -1116,13 +1202,19 @@ export class TabManager {
   public async capturePreview(tabId: string): Promise<string | undefined> {
     const tab = this.tabs.get(tabId);
     if (!tab) return undefined;
+    const wc = tab.view?.webContents;
+    if (!wc || wc.isDestroyed()) {
+      return tab.info.previewImage;
+    }
+    if (!tab.info.url || tab.info.url === 'about:blank') return undefined;
+
     try {
-      if (tab.view.webContents.isDestroyed() || !tab.info.url || tab.info.url === 'about:blank') return undefined;
+      if (!tab.view?.webContents || tab.view.webContents.isDestroyed()) return tab.info.previewImage;
       // Race capturePage with a 400ms timeout guard in case view is detached or compositor unpainted
-      const capturePromise = tab.view.webContents.capturePage();
+      const capturePromise = wc.capturePage();
       const timeoutPromise = new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), 400));
       const image = await Promise.race([capturePromise, timeoutPromise]);
-      if (!image || (image as any).isEmpty?.()) return undefined;
+      if (!image || (image as any).isEmpty?.()) return tab.info.previewImage;
       // High-performance downscale for thumbnail card: drops payload and encoding time by 99%
       const thumbnail = (image as any).resize({ width: 360, quality: 'good' });
       const preview = thumbnail.toDataURL();
@@ -1130,7 +1222,7 @@ export class TabManager {
       return preview;
     } catch {
       // Quietly ignore if frame has not painted yet
-      return undefined;
+      return tab.info.previewImage;
     }
   }
 
@@ -1145,24 +1237,21 @@ export class TabManager {
     // Hide previous tab view
     if (this.activeTabId && this.tabs.has(this.activeTabId)) {
       const prevTab = this.tabs.get(this.activeTabId)!;
-      try {
-        this.window.contentView.removeChildView(prevTab.view);
-      } catch {
-        // Ignore if not already attached
+      if (prevTab.view) {
+        try {
+          this.window.contentView.removeChildView(prevTab.view);
+        } catch {
+          // Ignore if not already attached
+        }
       }
     }
 
     this.activeTabId = tabId;
     const currentTab = this.tabs.get(tabId)!;
     currentTab.info.lastAccessed = Date.now();
-    if (currentTab.info.isHibernated) {
-      currentTab.info.isHibernated = false;
-      try {
-        currentTab.view.webContents.setBackgroundThrottling(false);
-      } catch {
-        // Ignore
-      }
-    }
+
+    // Ensure tab has an active WebContentsView (resurrects if hibernated)
+    this.ensureTabView(tabId);
 
     // Update MRU list: move tabId to the front
     this.mruTabIds = [tabId, ...this.mruTabIds.filter(id => id !== tabId)];
@@ -1186,9 +1275,11 @@ export class TabManager {
       return;
     }
 
+    const view = this.ensureTabView(this.activeTabId);
+
     // Detach any other tab's view
     for (const [id, otherTab] of this.tabs) {
-      if (id !== this.activeTabId) {
+      if (id !== this.activeTabId && otherTab.view) {
         try {
           if (this.window.contentView.children.includes(otherTab.view)) {
             this.window.contentView.removeChildView(otherTab.view);
@@ -1199,12 +1290,12 @@ export class TabManager {
       }
     }
 
-    if (!this.window.contentView.children.includes(tab.view)) {
-      this.window.contentView.addChildView(tab.view);
+    if (!this.window.contentView.children.includes(view)) {
+      this.window.contentView.addChildView(view);
     }
     this.updateActiveViewBounds();
     try {
-      tab.view.webContents.focus();
+      view.webContents.focus();
     } catch {
       // Ignore
     }
@@ -1213,19 +1304,21 @@ export class TabManager {
   public detachActiveTabView() {
     if (!this.activeTabId || !this.tabs.has(this.activeTabId)) return;
     const tab = this.tabs.get(this.activeTabId)!;
-    try {
-      if (this.window.contentView.children.includes(tab.view)) {
-        this.window.contentView.removeChildView(tab.view);
+    if (tab.view) {
+      try {
+        if (this.window.contentView.children.includes(tab.view)) {
+          this.window.contentView.removeChildView(tab.view);
+        }
+      } catch {
+        // Ignore
       }
-    } catch {
-      // Ignore
     }
   }
 
   public updateActiveViewBounds() {
     if (!this.activeTabId || this.isSwitcherOpen || this.isModalOpen) return;
     const tab = this.tabs.get(this.activeTabId);
-    if (!tab || !tab.info.url || tab.info.url === 'about:blank') return;
+    if (!tab || !tab.view || !tab.info.url || tab.info.url === 'about:blank') return;
 
     const topOffset =
       TOP_BAR_HEIGHT +
@@ -1268,14 +1361,25 @@ export class TabManager {
     if (!this.tabs.has(tabId)) return;
     const tab = this.tabs.get(tabId)!;
 
-    try {
-      this.window.contentView.removeChildView(tab.view);
-    } catch {
-      // Ignore
-    }
+    if (tab.view) {
+      const viewToDestroy = tab.view;
+      tab.view = undefined;
 
-    // Destroy webContents
-    (tab.view.webContents as any).destroy?.();
+      try {
+        this.window.contentView.removeChildView(viewToDestroy);
+      } catch {
+        // Ignore
+      }
+
+      // Destroy webContents
+      try {
+        if (viewToDestroy.webContents && !viewToDestroy.webContents.isDestroyed()) {
+          (viewToDestroy.webContents as any).destroy?.();
+        }
+      } catch {
+        // Ignore
+      }
+    }
     this.tabs.delete(tabId);
     this.mruTabIds = this.mruTabIds.filter(id => id !== tabId);
 
@@ -1345,6 +1449,8 @@ export class TabManager {
     tab.info.url = targetUrl;
     tab.info.isLoading = true;
 
+    const view = this.ensureTabView(tabId);
+
     // Immediately attach the view if this is the active tab and it is not about:blank
     if (tabId === this.activeTabId && !this.isSwitcherOpen) {
       if (targetUrl && targetUrl !== 'about:blank') {
@@ -1357,16 +1463,19 @@ export class TabManager {
     this.notifyStateChange();
 
     try {
-      await tab.view.webContents.loadURL(targetUrl);
-    } catch (err) {
-      console.error(`Failed to navigate tab ${tabId} to ${targetUrl}:`, err);
+      await view.webContents.loadURL(targetUrl);
+    } catch (err: any) {
+      if (!view.webContents.isDestroyed() && err?.code !== 'ERR_ABORTED') {
+        console.error(`Failed to navigate tab ${tabId} to ${targetUrl}:`, err);
+      }
     }
   }
 
   public goBack(tabId: string) {
     const tab = this.tabs.get(tabId);
     if (!tab) return;
-    const wc = tab.view.webContents;
+    const view = this.ensureTabView(tabId);
+    const wc = view.webContents;
     if (wc.navigationHistory ? wc.navigationHistory.canGoBack() : wc.canGoBack()) {
       if (wc.navigationHistory) {
         wc.navigationHistory.goBack();
@@ -1379,7 +1488,8 @@ export class TabManager {
   public goForward(tabId: string) {
     const tab = this.tabs.get(tabId);
     if (!tab) return;
-    const wc = tab.view.webContents;
+    const view = this.ensureTabView(tabId);
+    const wc = view.webContents;
     if (wc.navigationHistory ? wc.navigationHistory.canGoForward() : wc.canGoForward()) {
       if (wc.navigationHistory) {
         wc.navigationHistory.goForward();
@@ -1392,15 +1502,22 @@ export class TabManager {
   public reloadTab(tabId: string) {
     const tab = this.tabs.get(tabId);
     if (tab) {
-      tab.view.webContents.reload();
+      const view = this.ensureTabView(tabId);
+      view.webContents.reload();
     }
   }
 
   public toggleMuteTab(tabId: string) {
     const tab = this.tabs.get(tabId);
     if (tab) {
-      const isMuted = !tab.view.webContents.isAudioMuted();
-      tab.view.webContents.setAudioMuted(isMuted);
+      const isMuted = tab.view?.webContents ? !tab.view.webContents.isAudioMuted() : !tab.info.isMuted;
+      try {
+        if (tab.view?.webContents && !tab.view.webContents.isDestroyed()) {
+          tab.view.webContents.setAudioMuted(isMuted);
+        }
+      } catch {
+        // Ignore
+      }
       tab.info.isMuted = isMuted;
       this.notifyStateChange();
     }
@@ -1486,14 +1603,14 @@ export class TabManager {
   public findInPage(text: string, forward = true, findNext = false) {
     if (!this.activeTabId) return;
     const tab = this.tabs.get(this.activeTabId);
-    if (!tab) return;
+    if (!tab || !tab.view?.webContents || tab.view.webContents.isDestroyed()) return;
     tab.view.webContents.findInPage(text, { forward, findNext });
   }
 
   public stopFindInPage(action: 'clearSelection' | 'keepSelection' | 'activateSelection' = 'clearSelection') {
     if (!this.activeTabId) return;
     const tab = this.tabs.get(this.activeTabId);
-    if (!tab) return;
+    if (!tab || !tab.view?.webContents || tab.view.webContents.isDestroyed()) return;
     tab.view.webContents.stopFindInPage(action);
   }
 
@@ -1503,8 +1620,14 @@ export class TabManager {
     const tab = this.tabs.get(tabId);
     if (!tab) return 1.0;
     const clamped = Math.min(3.0, Math.max(0.3, Math.round(factor * 10) / 10));
-    tab.view.webContents.setZoomFactor(clamped);
     tab.info.zoomFactor = clamped;
+    try {
+      if (tab.view?.webContents && !tab.view.webContents.isDestroyed()) {
+        tab.view.webContents.setZoomFactor(clamped);
+      }
+    } catch {
+      // Ignore
+    }
     this.notifyStateChange();
     return clamped;
   }

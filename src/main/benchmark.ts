@@ -197,8 +197,8 @@ export async function runBenchmark(
 
   // 4. Tab Hibernation Benchmark
   console.log('[5/6] Tab Hibernation: Putting 9 inactive tabs to sleep...');
-  tabManager.hibernateAllInactive();
-  await sleep(1200); // Wait for background throttling and Chromium memory trim
+  await tabManager.hibernateAllInactive();
+  await sleep(1500); // Wait for WebContentsView destruction and renderer process cleanup
 
   const hibernatedState = getMemoryStats();
   const memoryReclaimedMB = Number((loadedState.totalMB - hibernatedState.totalMB).toFixed(1));
