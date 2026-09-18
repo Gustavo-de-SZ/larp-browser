@@ -29,6 +29,8 @@ import {
   Calendar,
 } from 'lucide-react';
 import { DARK_PALETTES, LIGHT_PALETTES, ColorPalette, getPalette } from '../theme/palettes';
+import { ConfirmModal } from './ConfirmModal';
+import type { ToastItem } from './Toast';
 import {
   BrowserSettings,
   BookmarkItem,
@@ -59,6 +61,7 @@ interface SettingsModalProps {
   theme: ThemeMode;
   initialTab?: SettingsTabType;
   onUpdateSettings: (settings: Partial<BrowserSettings>) => void;
+  onShowToast?: (toast: Omit<ToastItem, 'id'>) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -69,6 +72,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   theme,
   initialTab = 'appearance',
   onUpdateSettings,
+  onShowToast,
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTabType>(initialTab);
   const [paletteModeTab, setPaletteModeTab] = useState<ThemeMode>(theme);
@@ -94,6 +98,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isAddPasswordOpen, setIsAddPasswordOpen] = useState(false);
   const [editingPasswordId, setEditingPasswordId] = useState<string | null>(null);
   const [passwordForm, setPasswordForm] = useState({ site: '', username: '', password: '' });
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: React.ReactNode;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    variant?: 'danger' | 'warning' | 'primary';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   const isDark = theme === 'dark';
 
@@ -257,8 +275,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     });
   };
 
-  const handleResetAllShortcuts = () => {
-    onUpdateSettings({ customShortcuts: null });
+  const handlePromptResetAllShortcuts = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Reset All Shortcuts',
+      variant: 'primary',
+      confirmLabel: 'Reset to Defaults',
+      message: (
+        <span>
+          Are you sure you want to reset all keyboard shortcuts to their factory defaults? Any custom shortcuts you configured will be removed.
+        </span>
+      ),
+      onConfirm: () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        onUpdateSettings({ customShortcuts: null });
+        onShowToast?.({
+          type: 'info',
+          message: 'Shortcuts reset to factory defaults',
+        });
+      },
+    });
   };
 
   const getConflictAction = (actionId: ShortcutActionId, combo: string): string | null => {
@@ -303,14 +339,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setHistoryList((prev) => prev.filter((h) => h.id !== id));
     if (window.browserApi?.deleteHistoryItem) {
       window.browserApi.deleteHistoryItem(id);
+      onShowToast?.({
+        type: 'info',
+        message: 'History item removed',
+      });
     }
   };
 
-  const handleClearHistory = () => {
-    if (window.browserApi?.clearHistory) {
-      window.browserApi.clearHistory();
-      setHistoryList([]);
-    }
+  const handlePromptClearHistory = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Clear All Browsing History',
+      variant: 'danger',
+      confirmLabel: 'Clear History',
+      message: (
+        <span>
+          Are you sure you want to delete all <strong className="text-[var(--text-main)] font-semibold">{historyList.length}</strong> recorded
+          browsing visits? Your saved bookmarks and passwords will not be affected.
+        </span>
+      ),
+      onConfirm: () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        if (window.browserApi?.clearHistory) {
+          window.browserApi.clearHistory();
+          setHistoryList([]);
+        }
+        onShowToast?.({
+          type: 'info',
+          message: 'Browsing history cleared',
+        });
+      },
+    });
   };
 
   const handleExecuteClearBrowsingData = async () => {
@@ -322,6 +381,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         });
       }
       setShowClearModal(false);
+      onShowToast?.({
+        type: 'success',
+        message: 'Browsing data cleared successfully',
+      });
     }
   };
 
@@ -335,6 +398,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleSavePasswordForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!passwordForm.site.trim() || !passwordForm.username.trim() || !passwordForm.password) return;
+
+    const isEditing = Boolean(editingPasswordId);
+    const siteName = passwordForm.site.trim();
 
     if (editingPasswordId) {
       const existing = passwordsList.find((p) => p.id === editingPasswordId);
@@ -364,19 +430,48 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setIsAddPasswordOpen(false);
     setEditingPasswordId(null);
     setPasswordForm({ site: '', username: '', password: '' });
+
+    onShowToast?.({
+      type: 'success',
+      message: isEditing ? `Updated credentials for ${siteName}` : `Saved credentials for ${siteName}`,
+    });
   };
 
-  const handleDeletePassword = async (id: string) => {
-    setPasswordsList((prev) => prev.filter((p) => p.id !== id));
-    if (window.browserApi?.deletePassword) {
-      await window.browserApi.deletePassword(id);
-    }
+  const handlePromptDeletePassword = (pwd: PasswordEntry) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Saved Password',
+      variant: 'danger',
+      confirmLabel: 'Delete Password',
+      message: (
+        <span>
+          Are you sure you want to delete the saved credentials for{' '}
+          <strong className="text-[var(--text-main)] font-semibold">{pwd.site}</strong> (
+          <span className="font-mono">{pwd.username}</span>)? This action cannot be undone.
+        </span>
+      ),
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        setPasswordsList((prev) => prev.filter((p) => p.id !== pwd.id));
+        if (window.browserApi?.deletePassword) {
+          await window.browserApi.deletePassword(pwd.id);
+        }
+        onShowToast?.({
+          type: 'danger',
+          message: `Deleted credentials for ${pwd.site}`,
+        });
+      },
+    });
   };
 
   const handleCopyText = (text: string, fieldKey: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(fieldKey);
     setTimeout(() => setCopiedField(null), 1500);
+    onShowToast?.({
+      type: 'info',
+      message: 'Copied to clipboard',
+    });
   };
 
   const togglePasswordVisibility = (id: string) => {
@@ -794,7 +889,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {safeSettings.customShortcuts &&
                     Object.keys(safeSettings.customShortcuts).length > 0 && (
                       <button
-                        onClick={handleResetAllShortcuts}
+                        onClick={handlePromptResetAllShortcuts}
                         className="text-[11px] text-[var(--accent-primary)] hover:underline flex items-center space-x-1 cursor-pointer"
                       >
                         <RotateCcw className="w-3 h-3" />
@@ -1220,6 +1315,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                   <div className="flex items-center space-x-2 flex-shrink-0">
                     <button
+                      onClick={handlePromptClearHistory}
+                      disabled={historyList.length === 0}
+                      className="px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-30 cursor-pointer disabled:cursor-default transition-colors"
+                    >
+                      Clear History
+                    </button>
+                    <button
                       onClick={() => setShowClearModal(true)}
                       className="px-2.5 py-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 text-xs text-rose-400 hover:bg-rose-500/20 cursor-pointer flex items-center space-x-1.5 transition-colors"
                     >
@@ -1428,7 +1530,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               <Edit2 className="w-3 h-3" />
                             </button>
                             <button
-                              onClick={() => handleDeletePassword(pwd.id)}
+                              onClick={() => handlePromptDeletePassword(pwd)}
                               className="p-1.5 rounded-lg border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                               title="Delete password"
                             >
@@ -1484,7 +1586,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 {/* Idle Timeout Selector (only if enabled) */}
                 {safeSettings.autoHibernateTabs && (
-                  <div className="p-3.5 rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] flex items-center justify-between">
+                  <div className="p-3.5 rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                     <div>
                       <div className="text-xs font-medium text-[var(--text-main)]">
                         Inactivity Timeout
@@ -1493,18 +1595,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         Tabs become hibernated after this period of inactivity
                       </div>
                     </div>
-                    <select
-                      value={safeSettings.idleHibernateMinutes ?? 30}
-                      onChange={(e) =>
-                        onUpdateSettings({ idleHibernateMinutes: Number(e.target.value) })
-                      }
-                      className="h-8 text-xs px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-input)] text-[var(--text-main)] focus:outline-none focus:border-[var(--border-selected)] cursor-pointer"
-                    >
-                      <option value={5}>5 minutes</option>
-                      <option value={15}>15 minutes</option>
-                      <option value={30}>30 minutes (Default)</option>
-                      <option value={60}>60 minutes (1 hour)</option>
-                    </select>
+                    <div className="flex items-center space-x-1 p-0.5 rounded-lg border border-[var(--border-subtle)] bg-black/[0.03] dark:bg-white/[0.03] self-start sm:self-auto">
+                      {[
+                        { val: 5, label: '5m' },
+                        { val: 15, label: '15m' },
+                        { val: 30, label: '30m' },
+                        { val: 60, label: '60m' },
+                      ].map((item) => {
+                        const isSelected = (safeSettings.idleHibernateMinutes ?? 30) === item.val;
+                        return (
+                          <button
+                            key={item.val}
+                            type="button"
+                            onClick={() => onUpdateSettings({ idleHibernateMinutes: item.val })}
+                            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                              isSelected
+                                ? 'text-white shadow-xs font-semibold'
+                                : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
+                            }`}
+                            style={
+                              isSelected ? { backgroundColor: 'var(--accent-primary)' } : undefined
+                            }
+                          >
+                            {item.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
@@ -1603,23 +1720,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
 
                   {/* Tab Switcher Ordering */}
-                  <div className="p-3 rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] flex items-center justify-between">
+                  <div className="p-3.5 rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                     <div>
                       <div className="text-xs font-medium text-[var(--text-main)]">Tab Switcher Sort Order</div>
                       <div className="text-[11px] text-[var(--text-muted)]">
                         Order tabs by most recently visited or creation order
                       </div>
                     </div>
-                    <select
-                      value={safeSettings.switcherSortOrder || 'mru'}
-                      onChange={(e) =>
-                        onUpdateSettings({ switcherSortOrder: e.target.value as any })
-                      }
-                      className="h-8 text-xs px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-input)] text-[var(--text-main)] focus:outline-none focus:border-[var(--border-selected)] cursor-pointer"
-                    >
-                      <option value="mru">Most Recently Used (Alt-Tab)</option>
-                      <option value="creation">Creation Order (Tab Bar)</option>
-                    </select>
+                    <div className="flex items-center space-x-1 p-0.5 rounded-lg border border-[var(--border-subtle)] bg-black/[0.03] dark:bg-white/[0.03] self-start sm:self-auto">
+                      {[
+                        { id: 'mru', label: 'Recently Used' },
+                        { id: 'creation', label: 'Tab Order' },
+                      ].map((item) => {
+                        const isSelected = (safeSettings.switcherSortOrder || 'mru') === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => onUpdateSettings({ switcherSortOrder: item.id as any })}
+                            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                              isSelected
+                                ? 'text-white shadow-xs font-semibold'
+                                : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
+                            }`}
+                            style={
+                              isSelected ? { backgroundColor: 'var(--accent-primary)' } : undefined
+                            }
+                          >
+                            {item.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1680,7 +1812,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                   <div>
                     <h4 className="text-xs font-semibold text-[var(--text-main)]">Larp Browser</h4>
-                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.5.0</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.5.1</p>
                   </div>
                 </div>
 
@@ -1762,25 +1894,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </button>
               </div>
 
-              {/* Time range selector */}
+              {/* Time range selector - Modern Segmented Buttons */}
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-[var(--text-main)] block">Time range</label>
-                <select
-                  value={clearOptions.timeRange}
-                  onChange={(e) =>
-                    setClearOptions((prev) => ({
-                      ...prev,
-                      timeRange: e.target.value as any,
-                    }))
-                  }
-                  className="w-full h-8 text-xs px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-input)] text-[var(--text-main)] focus:outline-none focus:border-[var(--border-selected)]"
-                >
-                  <option value="hour">Last hour</option>
-                  <option value="24h">Last 24 hours</option>
-                  <option value="7d">Last 7 days</option>
-                  <option value="4w">Last 4 weeks</option>
-                  <option value="all">All time</option>
-                </select>
+                <div className="flex flex-wrap gap-1.5 p-1 rounded-xl border border-[var(--border-subtle)] bg-black/[0.03] dark:bg-white/[0.03]">
+                  {[
+                    { id: 'hour', label: 'Last hour' },
+                    { id: '24h', label: '24 hours' },
+                    { id: '7d', label: '7 days' },
+                    { id: '4w', label: '4 weeks' },
+                    { id: 'all', label: 'All time' },
+                  ].map((range) => {
+                    const isSelected = clearOptions.timeRange === range.id;
+                    return (
+                      <button
+                        key={range.id}
+                        type="button"
+                        onClick={() =>
+                          setClearOptions((prev) => ({
+                            ...prev,
+                            timeRange: range.id as any,
+                          }))
+                        }
+                        className={`flex-1 min-w-[65px] px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all text-center cursor-pointer ${
+                          isSelected
+                            ? 'text-white shadow-xs font-semibold'
+                            : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
+                        }`}
+                        style={
+                          isSelected
+                            ? { backgroundColor: 'var(--accent-primary)' }
+                            : undefined
+                        }
+                      >
+                        {range.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Checkboxes */}
@@ -1942,6 +2093,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
         )}
+
+        {/* Reusable Confirm Dialog */}
+        <ConfirmModal
+          isOpen={confirmModal.isOpen}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          confirmLabel={confirmModal.confirmLabel}
+          cancelLabel={confirmModal.cancelLabel}
+          variant={confirmModal.variant}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        />
       </div>
     </div>
   );

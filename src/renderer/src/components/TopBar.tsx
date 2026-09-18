@@ -32,6 +32,7 @@ interface TopBarProps {
   onToggleFavorites: () => void;
   onOpenFind?: () => void;
   isFavoritesOpen?: boolean;
+  onShowToast?: (toast: { type: 'success' | 'info' | 'warning' | 'danger'; message: string }) => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -42,6 +43,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenShortcuts,
   onToggleFavorites,
   isFavoritesOpen = false,
+  onShowToast,
 }) => {
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
   const [urlInput, setUrlInput] = useState('');
@@ -87,10 +89,15 @@ export const TopBar: React.FC<TopBarProps> = ({
     e.preventDefault();
     e.stopPropagation();
     if (!activeTab || !activeTab.url || activeTab.url === 'about:blank') return;
+    const willAdd = !isBookmarked;
     window.browserApi.toggleBookmark({
       title: activeTab.title || activeTab.url,
       url: activeTab.url,
       favicon: activeTab.favicon,
+    });
+    onShowToast?.({
+      type: willAdd ? 'success' : 'info',
+      message: willAdd ? 'Saved to Bookmarks' : 'Removed from Bookmarks',
     });
   };
 

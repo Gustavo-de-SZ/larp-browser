@@ -19,6 +19,7 @@ interface QuickFavoritesPopoverProps {
   state: BrowserState;
   theme: ThemeMode;
   onOpenSettingsToBookmarks: () => void;
+  onShowToast?: (toast: { type: 'success' | 'info' | 'warning' | 'danger'; message: string }) => void;
 }
 
 export const QuickFavoritesPopover: React.FC<QuickFavoritesPopoverProps> = ({
@@ -27,6 +28,7 @@ export const QuickFavoritesPopover: React.FC<QuickFavoritesPopoverProps> = ({
   state,
   theme,
   onOpenSettingsToBookmarks,
+  onShowToast,
 }) => {
   const [filter, setFilter] = useState('');
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -78,10 +80,15 @@ export const QuickFavoritesPopover: React.FC<QuickFavoritesPopoverProps> = ({
 
   const handleBookmarkCurrentPage = () => {
     if (!activeTab || !activeTab.url || activeTab.url === 'about:blank') return;
+    const willAdd = !isCurrentPageBookmarked;
     window.browserApi.toggleBookmark({
       title: activeTab.title || activeTab.url,
       url: activeTab.url,
       favicon: activeTab.favicon,
+    });
+    onShowToast?.({
+      type: willAdd ? 'success' : 'info',
+      message: willAdd ? 'Saved to Bookmarks' : 'Removed from Bookmarks',
     });
   };
 
@@ -230,7 +237,13 @@ export const QuickFavoritesPopover: React.FC<QuickFavoritesPopoverProps> = ({
                   <ExternalLink className="w-3 h-3" />
                 </button>
                 <button
-                  onClick={() => window.browserApi.removeBookmark(bm.id)}
+                  onClick={() => {
+                    window.browserApi.removeBookmark(bm.id);
+                    onShowToast?.({
+                      type: 'info',
+                      message: `Removed "${bm.title || bm.url}" from favorites`,
+                    });
+                  }}
                   className="p-1 rounded text-[var(--text-muted)] hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                   title="Delete bookmark"
                 >

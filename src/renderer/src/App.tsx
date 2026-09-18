@@ -6,6 +6,7 @@ import { SettingsModal, type SettingsTabType } from './components/SettingsModal'
 import { KeyboardShortcuts } from './components/KeyboardShortcuts';
 import { QuickFavoritesPopover } from './components/QuickFavoritesPopover';
 import { FindInPageBar } from './components/FindInPageBar';
+import { ToastContainer, type ToastItem } from './components/Toast';
 import { getPalette, applyPalette } from './theme/palettes';
 import type { BrowserState, BrowserSettings } from '@/shared/types';
 
@@ -20,6 +21,16 @@ export const App: React.FC = () => {
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const [isFindOpen, setIsFindOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTabType>('appearance');
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  const showToast = (toast: Omit<ToastItem, 'id'>) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    setToasts((prev) => [...prev, { ...toast, id }]);
+  };
+
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
 
   const [state, setState] = useState<BrowserState>({
     tabs: [],
@@ -259,6 +270,7 @@ export const App: React.FC = () => {
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
         onToggleFavorites={() => setIsFavoritesOpen((prev) => !prev)}
         isFavoritesOpen={isFavoritesOpen}
+        onShowToast={showToast}
       />
 
       {/* Docked In-Page Find Bar */}
@@ -297,6 +309,7 @@ export const App: React.FC = () => {
           setIsFavoritesOpen(false);
           setIsSettingsOpen(true);
         }}
+        onShowToast={showToast}
       />
 
       {/* Alt-Tab / Ctrl-Shift-Tab Switcher HUD */}
@@ -311,6 +324,7 @@ export const App: React.FC = () => {
         theme={theme}
         initialTab={settingsTab}
         onUpdateSettings={handleUpdateSettings}
+        onShowToast={showToast}
       />
 
       {/* Keyboard Shortcuts Cheatsheet */}
@@ -321,6 +335,9 @@ export const App: React.FC = () => {
           customShortcuts={state.settings?.customShortcuts}
         />
       )}
+
+      {/* Floating Toast Feedback Notifications */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 };

@@ -226,3 +226,34 @@ Palettes are defined in `src/renderer/src/theme/palettes.ts`:
 - Custom startup URL now matches the selected search engine by default (e.g. Google instead of DuckDuckGo when Google is selected).
 - Added quick 1-click preset buttons: *Sync with Search Engine*, *Google*, *DuckDuckGo*, and *Brave*.
 
+---
+
+## 10. Features Implemented in v1.5.1
+
+### 1. Modern Notification & Confirmation System
+- **Strict Separation of Modals vs. Toasts**:
+  - In alignment with modern browser standards (Chrome, Edge, Arc, Firefox), **blocking modals** are strictly reserved for destructive or irreversible actions where accidental data loss could occur.
+  - **Non-blocking Toasts (Snackbars)** are used for informative status notifications, success alerts, and temporary confirmations.
+- **Confirmation Modals (`ConfirmModal.tsx`)**:
+  - Modal dialog with glassmorphic styling, danger/primary action button styles, responsive layout, backdrop blur, and full keyboard navigation (`Escape` to cancel, `Enter` to confirm).
+  - Wired into:
+    - **Password Vault Deletion**: Prompts with website and username before removing credentials.
+    - **Clear All History**: Prompts user before wiping the browsing history log.
+    - **Reset All Shortcuts**: Prompts user before reverting all custom keyboard shortcuts to factory defaults.
+- **Toast Notification Engine (`Toast.tsx`)**:
+  - Glassmorphic floating toast alerts in the bottom-right corner with auto-dismiss timers (3s), smooth scale/fade animations, status icons, and manual dismiss (`X`).
+  - Supports `'success' | 'info' | 'warning' | 'danger'` types.
+  - Wired into:
+    - Bookmark creation and removal from TopBar star button and Quick Favorites popover.
+    - Bookmark deletion from Quick Favorites popover list.
+    - History entry deletion and browsing data clearance.
+    - Password vault save, update, delete, and copy to clipboard actions.
+    - Shortcut restore actions.
+
+### 2. Modern Segmented Button Selectors (Native Select Redesign)
+- Replaced the clunky, unstyled native HTML `<select>` dropdown in the **Clear Browsing Data** modal with a modern, glassmorphic segmented pill selector (`[Last hour] [24 hours] [7 days] [4 weeks] [All time]`).
+- Replaced the native `<select>` dropdowns in Settings:
+  - **Inactivity Timeout**: Segmented pills (`[Disabled] [5m] [15m] [30m] [60m]`).
+  - **Tab Switcher Sort Order**: Segmented pills (`[Recently Used] [Tab Order]`).
+
+
