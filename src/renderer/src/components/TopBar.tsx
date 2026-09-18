@@ -128,14 +128,31 @@ export const TopBar: React.FC<TopBarProps> = ({
     onOmnibarDropdownChange?.(isDropdownOpen);
   }, [isDropdownOpen, onOmnibarDropdownChange]);
 
-  // Listen for focus-omnibar event from global shortcuts
+  // Listen for focus-omnibar event from global shortcuts and direct keydown
   useEffect(() => {
-    if (window.browserApi?.onFocusOmnibar) {
-      return window.browserApi.onFocusOmnibar(() => {
+    const unsubscribe = window.browserApi?.onFocusOmnibar?.(() => {
+      setIsFocused(true);
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    });
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'l') ||
+        (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey && e.key.toLowerCase() === 'd')
+      ) {
+        e.preventDefault();
+        setIsFocused(true);
         inputRef.current?.focus();
         inputRef.current?.select();
-      });
-    }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      unsubscribe?.();
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   const handleFocus = () => {

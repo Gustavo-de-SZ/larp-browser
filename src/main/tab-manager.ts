@@ -1037,6 +1037,19 @@ export class TabManager {
     // Switch to the newly created tab
     await this.switchTab(id);
     this.saveSession();
+
+    if (initialUrl === 'about:blank') {
+      setTimeout(() => {
+        try {
+          this.window.focus();
+          this.window.webContents.focus();
+          this.window.webContents.send('browser:focus-omnibar');
+        } catch {
+          // Ignore
+        }
+      }, 50);
+    }
+
     return id;
   }
 
@@ -1312,6 +1325,12 @@ export class TabManager {
       } catch {
         // Ignore
       }
+    }
+    try {
+      this.window.focus();
+      this.window.webContents.focus();
+    } catch {
+      // Ignore
     }
   }
 

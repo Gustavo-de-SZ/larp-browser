@@ -239,9 +239,14 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
       return;
     }
 
-    // 11. Focus Address Bar
-    if (isTriggered('focusOmnibar', input)) {
+    // 11. Focus Address Bar (Ctrl+L or Alt+D)
+    if (
+      isTriggered('focusOmnibar', input) ||
+      (input.alt && !input.control && !input.shift && input.key.toLowerCase() === 'd')
+    ) {
       event.preventDefault();
+      window.focus();
+      window.webContents.focus();
       window.webContents.send('browser:focus-omnibar');
       return;
     }
