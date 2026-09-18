@@ -2,11 +2,10 @@
 
 A minimalist, high-performance desktop web browser built with electron.
 
-Replaces the cluttered top horizontal tab bar with a keyboard-first, visual **Alt-Tab / Ctrl-Shift-Tab** switcher HUD with live snapshot previews.
+I've always had a problem managing multiple tabs on a browser and never quite found anything that fixed this issue in a way I liked so this aims to replace the cluttered top horizontal tab bar with a alt-tab-like function to be easily keyboard driven.
 
----
 
-Visual Design & Color Palettes
+## Visual Design & Color Palettes
 
 Allows you decent customization regarding the browser's natural look
 Both dark and light mode have their presets which are also customizable
@@ -25,7 +24,7 @@ Both dark and light mode have their presets which are also customizable
   - Search bar for quickly finding/filtering
 ---
 
-Default kb shortcuts (can be changed to ur liking)
+## Default kb shortcuts (can be changed to ur liking)
 
 | Shortcut | Action |
 | :--- | :--- |
