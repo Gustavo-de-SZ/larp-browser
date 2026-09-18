@@ -19,9 +19,16 @@ import {
   Star,
   Globe,
   Bookmark,
+  Clock,
 } from 'lucide-react';
-import type { BrowserState } from '@/shared/types';
+import type { BrowserState, HistoryItem } from '@/shared/types';
 import type { ThemeMode } from '../App';
+import {
+  computeUrlSuggestions,
+  computeInlineAutocomplete,
+  cleanUrlForMatching,
+  type UrlSuggestion,
+} from '../utils/autocomplete';
 
 interface TopBarProps {
   state: BrowserState;
@@ -33,6 +40,7 @@ interface TopBarProps {
   onOpenFind?: () => void;
   isFavoritesOpen?: boolean;
   onShowToast?: (toast: { type: 'success' | 'info' | 'warning' | 'danger'; message: string }) => void;
+  onOmnibarDropdownChange?: (isOpen: boolean) => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -44,22 +52,49 @@ export const TopBar: React.FC<TopBarProps> = ({
   onToggleFavorites,
   isFavoritesOpen = false,
   onShowToast,
+  onOmnibarDropdownChange,
 }) => {
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
   const [urlInput, setUrlInput] = useState('');
   const [isFocused, setIsFocused] = useState(false);
+  const [historyList, setHistoryList] = useState<HistoryItem[]>([]);
+  const [suggestions, setSuggestions] = useState<UrlSuggestion[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState<number>(-1);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const skipNextAutocompleteRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const isBookmarked =
     activeTab && activeTab.url && activeTab.url !== 'about:blank'
       ? state.bookmarks?.some((b) => b.url === activeTab.url)
       : false;
 
+  const loadHistory = async () => {
+    if (window.browserApi?.getHistory) {
+      try {
+        const items = await window.browserApi.getHistory();
+        setHistoryList(items || []);
+      } catch (err) {
+        console.warn('Failed to load history for autocomplete:', err);
+      }
+    }
+  };
+
+  useEffect(() => {
+    loadHistory();
+  }, []);
+
   useEffect(() => {
     if (activeTab && !isFocused) {
       setUrlInput(activeTab.url === 'about:blank' ? '' : activeTab.url);
+      setIsDropdownOpen(false);
     }
   }, [activeTab, isFocused]);
+
+  useEffect(() => {
+    onOmnibarDropdownChange?.(isDropdownOpen);
+  }, [isDropdownOpen, onOmnibarDropdownChange]);
 
   // Listen for focus-omnibar event from global shortcuts
   useEffect(() => {
@@ -71,10 +106,172 @@ export const TopBar: React.FC<TopBarProps> = ({
     }
   }, []);
 
+  const handleFocus = () => {
+    setIsFocused(true);
+    loadHistory();
+    const computed = computeUrlSuggestions(
+      urlInput,
+      historyList,
+      state.bookmarks || [],
+      state.settings?.defaultSearchEngine || 'google'
+    );
+    setSuggestions(computed);
+    setSelectedIndex(-1);
+    if (computed.length > 0) {
+      setIsDropdownOpen(true);
+    }
+    inputRef.current?.select();
+  };
+
+  const handleBlur = (e: React.FocusEvent) => {
+    if (dropdownRef.current && dropdownRef.current.contains(e.relatedTarget as Node)) {
+      return;
+    }
+    setIsFocused(false);
+    setIsDropdownOpen(false);
+    if (activeTab) {
+      setUrlInput(activeTab.url === 'about:blank' ? '' : activeTab.url);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawVal = e.target.value;
+    setUrlInput(rawVal);
+
+    const computed = computeUrlSuggestions(
+      rawVal,
+      historyList,
+      state.bookmarks || [],
+      state.settings?.defaultSearchEngine || 'google'
+    );
+    setSuggestions(computed);
+    setSelectedIndex(computed.length > 0 ? 0 : -1);
+    setIsDropdownOpen(computed.length > 0);
+
+    if (skipNextAutocompleteRef.current) {
+      skipNextAutocompleteRef.current = false;
+      return;
+    }
+
+    if (computed.length > 0) {
+      const top = computed[0];
+      const inline = computeInlineAutocomplete(rawVal, top);
+      if (inline && inputRef.current) {
+        setUrlInput(inline.fullCompletedText);
+        const typedLen = rawVal.length;
+        const totalLen = inline.fullCompletedText.length;
+        requestAnimationFrame(() => {
+          inputRef.current?.setSelectionRange(typedLen, totalLen);
+        });
+      }
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      skipNextAutocompleteRef.current = true;
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      if (isDropdownOpen) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDropdownOpen(false);
+        if (activeTab) {
+          setUrlInput(activeTab.url === 'about:blank' ? '' : activeTab.url);
+        }
+        inputRef.current?.blur();
+        return;
+      }
+    }
+
+    if (e.key === 'Tab' || e.key === 'ArrowRight') {
+      if (
+        inputRef.current &&
+        inputRef.current.selectionStart !== null &&
+        inputRef.current.selectionEnd !== null
+      ) {
+        if (
+          inputRef.current.selectionStart < inputRef.current.selectionEnd &&
+          inputRef.current.selectionEnd === urlInput.length
+        ) {
+          e.preventDefault();
+          inputRef.current.setSelectionRange(urlInput.length, urlInput.length);
+          return;
+        }
+      }
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!isDropdownOpen && suggestions.length > 0) {
+        setIsDropdownOpen(true);
+        setSelectedIndex(0);
+      } else if (suggestions.length > 0) {
+        const nextIdx = (selectedIndex + 1) % suggestions.length;
+        setSelectedIndex(nextIdx);
+        const item = suggestions[nextIdx];
+        if (item) {
+          skipNextAutocompleteRef.current = true;
+          setUrlInput(item.type === 'search' ? item.url : item.displayUrl);
+        }
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (isDropdownOpen && suggestions.length > 0) {
+        const prevIdx = (selectedIndex - 1 + suggestions.length) % suggestions.length;
+        setSelectedIndex(prevIdx);
+        const item = suggestions[prevIdx];
+        if (item) {
+          skipNextAutocompleteRef.current = true;
+          setUrlInput(item.type === 'search' ? item.url : item.displayUrl);
+        }
+      }
+      return;
+    }
+  };
+
+  const handleSelectSuggestion = (suggestion: UrlSuggestion) => {
+    if (!activeTab) return;
+    setIsDropdownOpen(false);
+    setIsFocused(false);
+    window.browserApi.navigateTab(activeTab.id, suggestion.url);
+    inputRef.current?.blur();
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeTab || !urlInput.trim()) return;
-    window.browserApi.navigateTab(activeTab.id, urlInput.trim());
+    if (!activeTab) return;
+
+    let targetUrl = urlInput.trim();
+
+    if (isDropdownOpen && selectedIndex >= 0 && selectedIndex < suggestions.length) {
+      const selected = suggestions[selectedIndex];
+      targetUrl = selected.url;
+    } else if (isDropdownOpen && suggestions.length > 0) {
+      const top = suggestions[0];
+      if (top.type !== 'search') {
+        const { cleanUrl, cleanDomain } = cleanUrlForMatching(top.url);
+        const inputLower = urlInput.toLowerCase();
+        if (
+          inputLower === cleanDomain.toLowerCase() ||
+          inputLower === cleanUrl.toLowerCase() ||
+          top.url.toLowerCase().startsWith(inputLower)
+        ) {
+          targetUrl = top.url;
+        }
+      }
+    }
+
+    if (!targetUrl) return;
+
+    setIsDropdownOpen(false);
+    setIsFocused(false);
+    window.browserApi.navigateTab(activeTab.id, targetUrl);
     inputRef.current?.blur();
   };
 
@@ -183,7 +380,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         {/* Center: Clean Omnibar with Star Toggle & Zoom indicator */}
         <div
-          className="flex-1 max-w-xl mx-3"
+          className="flex-1 max-w-xl mx-3 relative"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           <form onSubmit={handleSubmit} className="relative flex items-center">
@@ -199,12 +396,10 @@ export const TopBar: React.FC<TopBarProps> = ({
               ref={inputRef}
               type="text"
               value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
-              onFocus={() => {
-                setIsFocused(true);
-                inputRef.current?.select();
-              }}
-              onBlur={() => setIsFocused(false)}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
               placeholder="Search or enter web address..."
               className="w-full h-7 pl-8 pr-24 rounded-md text-xs transition-all border focus:outline-none"
               style={{
@@ -272,6 +467,101 @@ export const TopBar: React.FC<TopBarProps> = ({
               </span>
             </div>
           </form>
+
+          {/* Omnibar Autocomplete Suggestions Dropdown */}
+          {isDropdownOpen && suggestions.length > 0 && (
+            <div
+              ref={dropdownRef}
+              onMouseDown={(e) => e.preventDefault()}
+              className="absolute left-0 right-0 top-full mt-1.5 rounded-xl border shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-1 duration-150 py-1"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--border-card)',
+                boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.35), 0 6px 16px -2px rgba(0, 0, 0, 0.2)',
+              }}
+            >
+              {suggestions.map((item, idx) => {
+                const isSelected = idx === selectedIndex;
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => handleSelectSuggestion(item)}
+                    onMouseEnter={() => setSelectedIndex(idx)}
+                    className={`px-3 py-2 flex items-center justify-between cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)]'
+                        : 'hover:bg-black/5 dark:hover:bg-white/5 text-[var(--text-main)]'
+                    }`}
+                  >
+                    {/* Left: Icon & Text (Title + URL) */}
+                    <div className="flex items-center space-x-2.5 min-w-0 flex-1 mr-2">
+                      <div className="shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-[var(--text-muted)]">
+                        {item.type === 'bookmark' ? (
+                          <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
+                        ) : item.type === 'search' ? (
+                          <Search className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                        ) : item.type === 'top-hit' ? (
+                          <Globe className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                        ) : (
+                          <Clock className="w-3.5 h-3.5 opacity-70" />
+                        )}
+                      </div>
+
+                      <div className="flex items-baseline space-x-2 min-w-0 flex-1 truncate">
+                        <span className="text-xs font-medium truncate">
+                          {item.title}
+                        </span>
+                        {item.type !== 'search' && (
+                          <span className="text-[11px] font-mono text-[var(--text-muted)] truncate opacity-80">
+                            {item.displayUrl}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right: Badge / Tag */}
+                    <div className="shrink-0 flex items-center space-x-1.5">
+                      {item.type === 'top-hit' && (
+                        <span
+                          className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                          style={{
+                            backgroundColor: 'var(--accent-primary)',
+                            color: 'white',
+                          }}
+                        >
+                          Top Hit
+                        </span>
+                      )}
+                      {item.type === 'bookmark' && (
+                        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 border border-amber-500/20">
+                          Bookmark
+                        </span>
+                      )}
+                      {item.type === 'history' && (
+                        <span className="text-[9px] text-[var(--text-muted)] opacity-70">
+                          History
+                        </span>
+                      )}
+                      {item.type === 'search' && (
+                        <span className="text-[9px] text-[var(--text-muted)] font-mono">
+                          ↵ Search
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Footer Navigation Tip */}
+              <div
+                className="px-3 py-1.5 border-t text-[10px] text-[var(--text-muted)] flex items-center justify-between opacity-70 select-none"
+                style={{ borderColor: 'var(--border-subtle)' }}
+              >
+                <span>↑↓ Navigate • ↵ Open • Tab Complete</span>
+                <span>Esc Dismiss</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right controls */}

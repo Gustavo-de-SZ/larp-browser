@@ -239,13 +239,15 @@ export const App: React.FC = () => {
     }
   }, []);
 
+  const [isOmnibarOpen, setIsOmnibarOpen] = useState(false);
+
   // Synchronize modal open state with Electron main process so native WebContentsView is detached
   useEffect(() => {
-    const isAnyModalOpen = isSettingsOpen || isShortcutsOpen || isFavoritesOpen;
+    const isAnyModalOpen = isSettingsOpen || isShortcutsOpen || isFavoritesOpen || isOmnibarOpen;
     if (window.browserApi?.setModalOpen) {
       window.browserApi.setModalOpen(isAnyModalOpen);
     }
-  }, [isSettingsOpen, isShortcutsOpen, isFavoritesOpen]);
+  }, [isSettingsOpen, isShortcutsOpen, isFavoritesOpen, isOmnibarOpen]);
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
   const isNewTab = !activeTab || !activeTab.url || activeTab.url === 'about:blank';
@@ -271,6 +273,7 @@ export const App: React.FC = () => {
         onToggleFavorites={() => setIsFavoritesOpen((prev) => !prev)}
         isFavoritesOpen={isFavoritesOpen}
         onShowToast={showToast}
+        onOmnibarDropdownChange={setIsOmnibarOpen}
       />
 
       {/* Docked In-Page Find Bar */}
@@ -288,7 +291,7 @@ export const App: React.FC = () => {
         {isNewTab ? (
           <NewTabPage state={state} theme={theme} />
         ) : (
-          (state.isSwitcherOpen || isSettingsOpen || isShortcutsOpen || isFavoritesOpen) && activeTab?.previewImage ? (
+          (state.isSwitcherOpen || isSettingsOpen || isShortcutsOpen || isFavoritesOpen || isOmnibarOpen) && activeTab?.previewImage ? (
             <img
               src={activeTab.previewImage}
               alt="Active tab preview"

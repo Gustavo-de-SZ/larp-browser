@@ -19,8 +19,14 @@ import {
   Sliders,
   X,
 } from 'lucide-react';
-import type { BrowserState, WeatherData } from '@/shared/types';
+import type { BrowserState, WeatherData, HistoryItem } from '@/shared/types';
 import type { ThemeMode } from '../App';
+import {
+  computeUrlSuggestions,
+  computeInlineAutocomplete,
+  cleanUrlForMatching,
+  type UrlSuggestion,
+} from '../utils/autocomplete';
 
 interface NewTabPageProps {
   state: BrowserState;
@@ -68,6 +74,15 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
   const [showCustomizer, setShowCustomizer] = useState(false);
   const customizerRef = useRef<HTMLDivElement>(null);
 
+  // Autocomplete state
+  const [historyList, setHistoryList] = useState<HistoryItem[]>([]);
+  const [suggestions, setSuggestions] = useState<UrlSuggestion[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState<number>(-1);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const skipNextAutocompleteRef = useRef(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchDropdownRef = useRef<HTMLDivElement>(null);
+
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
   const safeSettings = state.settings || ({} as any);
 
@@ -75,6 +90,13 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
   const clockFormat = safeSettings.newTabClockFormat || '12h';
   const showWeather = safeSettings.newTabShowWeather !== false;
   const showQuickLinks = safeSettings.newTabShowQuickLinks !== false;
+
+  // Load history for autocomplete
+  useEffect(() => {
+    if (window.browserApi?.getHistory) {
+      window.browserApi.getHistory().then((items) => setHistoryList(items || [])).catch(() => {});
+    }
+  }, []);
 
   // Live Clock Interval
   useEffect(() => {
@@ -120,10 +142,165 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
     return () => window.removeEventListener('mousedown', handleClickOutside);
   }, [showCustomizer]);
 
+  const handleSearchFocus = () => {
+    if (query.trim()) {
+      const computed = computeUrlSuggestions(
+        query,
+        historyList,
+        state.bookmarks || [],
+        safeSettings.defaultSearchEngine || 'google'
+      );
+      setSuggestions(computed);
+      setSelectedIndex(-1);
+      setIsDropdownOpen(computed.length > 0);
+    }
+  };
+
+  const handleSearchBlur = (e: React.FocusEvent) => {
+    if (searchDropdownRef.current && searchDropdownRef.current.contains(e.relatedTarget as Node)) {
+      return;
+    }
+    setIsDropdownOpen(false);
+  };
+
+  const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawVal = e.target.value;
+    setQuery(rawVal);
+
+    if (!rawVal.trim()) {
+      setSuggestions([]);
+      setIsDropdownOpen(false);
+      setSelectedIndex(-1);
+      return;
+    }
+
+    const computed = computeUrlSuggestions(
+      rawVal,
+      historyList,
+      state.bookmarks || [],
+      safeSettings.defaultSearchEngine || 'google'
+    );
+    setSuggestions(computed);
+    setSelectedIndex(computed.length > 0 ? 0 : -1);
+    setIsDropdownOpen(computed.length > 0);
+
+    if (skipNextAutocompleteRef.current) {
+      skipNextAutocompleteRef.current = false;
+      return;
+    }
+
+    if (computed.length > 0) {
+      const top = computed[0];
+      const inline = computeInlineAutocomplete(rawVal, top);
+      if (inline && searchInputRef.current) {
+        setQuery(inline.fullCompletedText);
+        const typedLen = rawVal.length;
+        const totalLen = inline.fullCompletedText.length;
+        requestAnimationFrame(() => {
+          searchInputRef.current?.setSelectionRange(typedLen, totalLen);
+        });
+      }
+    }
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      skipNextAutocompleteRef.current = true;
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      if (isDropdownOpen) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDropdownOpen(false);
+        return;
+      }
+    }
+
+    if (e.key === 'Tab' || e.key === 'ArrowRight') {
+      if (
+        searchInputRef.current &&
+        searchInputRef.current.selectionStart !== null &&
+        searchInputRef.current.selectionEnd !== null
+      ) {
+        if (
+          searchInputRef.current.selectionStart < searchInputRef.current.selectionEnd &&
+          searchInputRef.current.selectionEnd === query.length
+        ) {
+          e.preventDefault();
+          searchInputRef.current.setSelectionRange(query.length, query.length);
+          return;
+        }
+      }
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!isDropdownOpen && suggestions.length > 0) {
+        setIsDropdownOpen(true);
+        setSelectedIndex(0);
+      } else if (suggestions.length > 0) {
+        const nextIdx = (selectedIndex + 1) % suggestions.length;
+        setSelectedIndex(nextIdx);
+        const item = suggestions[nextIdx];
+        if (item) {
+          skipNextAutocompleteRef.current = true;
+          setQuery(item.type === 'search' ? item.url : item.displayUrl);
+        }
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (isDropdownOpen && suggestions.length > 0) {
+        const prevIdx = (selectedIndex - 1 + suggestions.length) % suggestions.length;
+        setSelectedIndex(prevIdx);
+        const item = suggestions[prevIdx];
+        if (item) {
+          skipNextAutocompleteRef.current = true;
+          setQuery(item.type === 'search' ? item.url : item.displayUrl);
+        }
+      }
+      return;
+    }
+  };
+
+  const handleSelectSuggestion = (suggestion: UrlSuggestion) => {
+    if (!activeTab) return;
+    setIsDropdownOpen(false);
+    window.browserApi.navigateTab(activeTab.id, suggestion.url);
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeTab || !query.trim()) return;
-    window.browserApi.navigateTab(activeTab.id, query.trim());
+    if (!activeTab) return;
+
+    let targetUrl = query.trim();
+
+    if (isDropdownOpen && selectedIndex >= 0 && selectedIndex < suggestions.length) {
+      const selected = suggestions[selectedIndex];
+      targetUrl = selected.url;
+    } else if (isDropdownOpen && suggestions.length > 0) {
+      const top = suggestions[0];
+      if (top.type !== 'search') {
+        const { cleanUrl, cleanDomain } = cleanUrlForMatching(top.url);
+        const inputLower = query.toLowerCase();
+        if (
+          inputLower === cleanDomain.toLowerCase() ||
+          inputLower === cleanUrl.toLowerCase() ||
+          top.url.toLowerCase().startsWith(inputLower)
+        ) {
+          targetUrl = top.url;
+        }
+      }
+    }
+
+    if (!targetUrl) return;
+
+    setIsDropdownOpen(false);
+    window.browserApi.navigateTab(activeTab.id, targetUrl);
   };
 
   const handleShortcutClick = (url: string) => {
@@ -415,26 +592,115 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
             <Search className="w-4 h-4" />
           </div>
           <input
+            ref={searchInputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={handleQueryChange}
+            onKeyDown={handleSearchKeyDown}
+            onFocus={handleSearchFocus}
+            onBlur={handleSearchBlur}
             placeholder="Search the web or enter an address..."
             autoFocus
             className="w-full h-11 pl-10 pr-4 rounded-xl text-xs sm:text-sm transition-all border focus:outline-none shadow-sm"
             style={{
               backgroundColor: 'var(--bg-card)',
-              borderColor: 'var(--border-subtle)',
+              borderColor: isDropdownOpen ? 'var(--border-selected)' : 'var(--border-subtle)',
               color: 'var(--text-main)',
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = 'var(--border-selected)';
-              e.currentTarget.style.boxShadow = '0 0 0 1px var(--border-selected)';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = 'var(--border-subtle)';
-              e.currentTarget.style.boxShadow = 'none';
+              boxShadow: isDropdownOpen ? '0 0 0 1px var(--border-selected)' : 'none',
             }}
           />
+
+          {/* Autocomplete Suggestions Dropdown */}
+          {isDropdownOpen && suggestions.length > 0 && (
+            <div
+              ref={searchDropdownRef}
+              onMouseDown={(e) => e.preventDefault()}
+              className="absolute left-0 right-0 top-full mt-2 rounded-xl border shadow-2xl overflow-hidden z-30 animate-in fade-in slide-in-from-top-1 duration-150 py-1"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--border-card)',
+                boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.35), 0 6px 16px -2px rgba(0, 0, 0, 0.2)',
+              }}
+            >
+              {suggestions.map((item, idx) => {
+                const isSelected = idx === selectedIndex;
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => handleSelectSuggestion(item)}
+                    onMouseEnter={() => setSelectedIndex(idx)}
+                    className={`px-3.5 py-2.5 flex items-center justify-between cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)]'
+                        : 'hover:bg-black/5 dark:hover:bg-white/5 text-[var(--text-main)]'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3 min-w-0 flex-1 mr-2">
+                      <div className="shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-[var(--text-muted)]">
+                        {item.type === 'bookmark' ? (
+                          <Star className="w-4 h-4 text-amber-400 fill-amber-400/20" />
+                        ) : item.type === 'search' ? (
+                          <Search className="w-4 h-4 text-[var(--accent-primary)]" />
+                        ) : item.type === 'top-hit' ? (
+                          <Globe className="w-4 h-4 text-[var(--accent-primary)]" />
+                        ) : (
+                          <Clock className="w-4 h-4 opacity-70" />
+                        )}
+                      </div>
+
+                      <div className="flex items-baseline space-x-2 min-w-0 flex-1 truncate">
+                        <span className="text-xs sm:text-sm font-medium truncate">
+                          {item.title}
+                        </span>
+                        {item.type !== 'search' && (
+                          <span className="text-xs font-mono text-[var(--text-muted)] truncate opacity-80">
+                            {item.displayUrl}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 flex items-center space-x-1.5">
+                      {item.type === 'top-hit' && (
+                        <span
+                          className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                          style={{
+                            backgroundColor: 'var(--accent-primary)',
+                            color: 'white',
+                          }}
+                        >
+                          Top Hit
+                        </span>
+                      )}
+                      {item.type === 'bookmark' && (
+                        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 border border-amber-500/20">
+                          Bookmark
+                        </span>
+                      )}
+                      {item.type === 'history' && (
+                        <span className="text-[9px] text-[var(--text-muted)] opacity-70">
+                          History
+                        </span>
+                      )}
+                      {item.type === 'search' && (
+                        <span className="text-[9px] text-[var(--text-muted)] font-mono">
+                          ↵ Search
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div
+                className="px-3.5 py-1.5 border-t text-[10px] text-[var(--text-muted)] flex items-center justify-between opacity-70 select-none"
+                style={{ borderColor: 'var(--border-subtle)' }}
+              >
+                <span>↑↓ Navigate • ↵ Open • Tab Complete</span>
+                <span>Esc Dismiss</span>
+              </div>
+            </div>
+          )}
         </form>
 
         {/* Bookmarks / Quick Links Speed Dial */}
