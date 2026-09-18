@@ -333,6 +333,11 @@ export const App: React.FC = () => {
           onClose={() => setIsShortcutsOpen(false)}
           theme={theme}
           customShortcuts={state.settings?.customShortcuts}
+          onOpenSettingsToShortcuts={() => {
+            setIsShortcutsOpen(false);
+            setSettingsTab('shortcuts');
+            setIsSettingsOpen(true);
+          }}
         />
       )}
 

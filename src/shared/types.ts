@@ -123,6 +123,10 @@ export interface BrowserSettings {
   startupBehavior: 'new-tab' | 'continue' | 'custom-url';
   startupCustomUrl?: string;
   customShortcuts?: Record<string, string> | null;
+  newTabShowClock?: boolean;
+  newTabClockFormat?: '12h' | '24h';
+  newTabShowWeather?: boolean;
+  newTabShowQuickLinks?: boolean;
 }
 
 export interface BrowserState {
@@ -183,6 +187,8 @@ export interface IpcRendererApi {
   savePassword: (entry: Omit<PasswordEntry, 'id' | 'createdAt' | 'updatedAt'>) => Promise<PasswordEntry>;
   updatePassword: (entry: PasswordEntry) => Promise<void>;
   deletePassword: (id: string) => Promise<void>;
+  exportPasswords: () => Promise<{ success: boolean; count?: number; path?: string; canceled?: boolean; error?: string }>;
+  importPasswords: () => Promise<{ success: boolean; importedCount?: number; totalCount?: number; canceled?: boolean; error?: string }>;
 
   // Settings & Theme
   setTheme: (theme: 'dark' | 'light') => Promise<void>;

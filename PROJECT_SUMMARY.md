@@ -256,4 +256,37 @@ Palettes are defined in `src/renderer/src/theme/palettes.ts`:
   - **Inactivity Timeout**: Segmented pills (`[Disabled] [5m] [15m] [30m] [60m]`).
   - **Tab Switcher Sort Order**: Segmented pills (`[Recently Used] [Tab Order]`).
 
+---
+
+## 11. Features Implemented in v1.5.2
+
+### 1. Sequential Tab Counting Beyond 9
+- Fixed tab switcher numbering so all tabs show their sequential number (`#1`, `#2`, ... `#10`, `#11`, etc.) in both Compact List and Carousel Card views.
+- Updated index column styling in compact mode (`min-w-[28px]`) to maintain clean alignment for multi-digit tab counts.
+
+### 2. Reliable Hierarchical Escape Key & Window Focus
+- **Window Focus Transfer**: In `tab-manager.ts`, `this.window.webContents.focus()` is automatically called upon modal opening to guarantee immediate keyboard event delivery.
+- **Hierarchical Escape Dismissal**: Pressing `Escape` closes nested dialogs in order of priority:
+  1. `ConfirmModal` (stops event propagation with `e.stopPropagation()`).
+  2. Submodals: "Clear Browsing Data" modal or "Add/Edit Password" modal.
+  3. Interactive shortcut recorder (cancels recording).
+  4. Main Settings modal.
+- Added `tabIndex={-1}` and auto-focus ref to Settings container to capture keydown events reliably.
+
+### 3. Password Vault Import & Export (CSV & JSON)
+- Native desktop file dialogs for exporting and importing credentials.
+- **Export**: Generates standard RFC CSV (`url,username,password`) or JSON. Prompts user with a security confirmation modal warning that exported credentials are saved unencrypted in plain text.
+- **Import**: Parses CSV (auto-detecting columns for URL, username, and password) or JSON arrays. Deduplicates and merges entries into the local vault, encrypting them via `safeStorage`.
+- Full toast notifications showing count of exported or imported credentials.
+
+### 4. Keyboard Shortcuts Cheatsheet (Ctrl+/) Navigation
+- Added a direct "Customize Shortcuts in Settings" button in the cheatsheet modal footer and header.
+- 1-click smooth navigation to Settings with the `shortcuts` tab automatically active.
+
+### 5. New Tab Page Customizable Widgets
+- **Live Digital Clock & Localized Date**: Large clock (12h or 24h format) with date string above the search bar.
+- **Live Weather Widget**: Auto-locating weather powered by `wttr.in` with local 20-minute cache and condition icons (Sun, Rain, Thunderstorm, Snow, Fog, Cloud).
+- **On-Page Customizer Dropdown**: Subtle slider button in top-right opening a glassmorphic popover to toggle Clock, 24h format, Weather, and Quick Links. Settings also configurable in **Settings > Appearance**.
+
+
 

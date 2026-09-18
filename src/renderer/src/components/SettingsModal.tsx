@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Palette,
@@ -27,6 +27,9 @@ import {
   Edit2,
   ShieldCheck,
   Calendar,
+  Upload,
+  Download,
+  CloudSun,
 } from 'lucide-react';
 import { DARK_PALETTES, LIGHT_PALETTES, ColorPalette, getPalette } from '../theme/palettes';
 import { ConfirmModal } from './ConfirmModal';
@@ -145,18 +148,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   }, [isOpen, activeTab]);
 
-  // Close on Escape key (when not recording a shortcut)
+  const modalContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      modalContainerRef.current?.focus();
+    }
+  }, [isOpen]);
+
+  // Close on Escape key hierarchically
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (recordingActionId) return;
-      if (e.key === 'Escape') {
-        onClose();
+      if (e.key !== 'Escape') return;
+
+      if (confirmModal.isOpen) {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        return;
       }
+      if (showClearModal) {
+        setShowClearModal(false);
+        return;
+      }
+      if (isAddPasswordOpen) {
+        setIsAddPasswordOpen(false);
+        return;
+      }
+      if (recordingActionId) {
+        setRecordingActionId(null);
+        return;
+      }
+      onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose, recordingActionId]);
+  }, [isOpen, onClose, confirmModal.isOpen, showClearModal, isAddPasswordOpen, recordingActionId]);
 
   // Interactive Shortcut Recorder listener
   useEffect(() => {
@@ -464,6 +490,65 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     });
   };
 
+  const handlePromptExportPasswords = () => {
+    if (passwordsList.length === 0) {
+      onShowToast?.({
+        type: 'warning',
+        message: 'No passwords in vault to export',
+      });
+      return;
+    }
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Export Passwords',
+      variant: 'warning',
+      confirmLabel: 'Export Passwords',
+      message: (
+        <span>
+          Exported passwords are saved in <strong>plain text</strong> (CSV or JSON). Anyone with access to that file will be able to view your passwords. Make sure to keep the exported file safe and secure.
+        </span>
+      ),
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        if (window.browserApi?.exportPasswords) {
+          const res = await window.browserApi.exportPasswords();
+          if (res.success) {
+            onShowToast?.({
+              type: 'success',
+              message: `Exported ${res.count ?? passwordsList.length} passwords successfully`,
+            });
+          } else if (!res.canceled) {
+            onShowToast?.({
+              type: 'danger',
+              message: res.error || 'Failed to export passwords',
+            });
+          }
+        }
+      },
+    });
+  };
+
+  const handleImportPasswords = async () => {
+    if (!window.browserApi?.importPasswords) return;
+    const res = await window.browserApi.importPasswords();
+    if (res.success) {
+      if (window.browserApi.getPasswords) {
+        const items = await window.browserApi.getPasswords();
+        if (items) setPasswordsList(items);
+      }
+      onShowToast?.({
+        type: 'success',
+        message: `Imported ${res.importedCount} passwords successfully`,
+      });
+    } else if (!res.canceled) {
+      onShowToast?.({
+        type: 'danger',
+        message: res.error || 'Failed to import passwords',
+      });
+    }
+  };
+
   const handleCopyText = (text: string, fieldKey: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(fieldKey);
@@ -491,7 +576,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-3xl rounded-2xl border shadow-xl overflow-hidden flex flex-col md:flex-row h-[600px] animate-scale-up"
+        ref={modalContainerRef}
+        tabIndex={-1}
+        className="w-full max-w-3xl rounded-2xl border shadow-xl overflow-hidden flex flex-col md:flex-row h-[600px] animate-scale-up focus:outline-none"
         style={{
           backgroundColor: 'var(--bg-app)',
           borderColor: 'var(--border-subtle)',
@@ -874,6 +961,110 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       className="sr-only peer"
                     />
                     <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
+                  </div>
+                </div>
+
+                {/* New Tab Page Widgets */}
+                <div className="space-y-2 pt-2 border-t border-[var(--border-subtle)]">
+                  <div className="flex items-center space-x-2 text-xs font-semibold text-[var(--text-main)]">
+                    <CloudSun className="w-4 h-4 text-[var(--accent-primary)]" />
+                    <span>New Tab Page Widgets</span>
+                  </div>
+
+                  {/* Clock Widget */}
+                  <div
+                    onClick={() =>
+                      onUpdateSettings({
+                        newTabShowClock: safeSettings.newTabShowClock === false ? true : false,
+                      })
+                    }
+                    className="p-3 rounded-xl border flex items-center justify-between cursor-pointer border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/40"
+                  >
+                    <div>
+                      <div className="text-xs font-medium text-[var(--text-main)]">Live Digital Clock & Date</div>
+                      <div className="text-[11px] text-[var(--text-muted)]">
+                        Display a sleek live clock and localized date on new tab page
+                      </div>
+                    </div>
+                    <div className="relative inline-flex items-center flex-shrink-0 pointer-events-none">
+                      <input
+                        type="checkbox"
+                        readOnly
+                        checked={safeSettings.newTabShowClock !== false}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
+                    </div>
+                  </div>
+
+                  {/* Clock Format */}
+                  {safeSettings.newTabShowClock !== false && (
+                    <div className="p-3 rounded-xl border flex items-center justify-between border-[var(--border-card)] bg-[var(--bg-card)]">
+                      <div>
+                        <div className="text-xs font-medium text-[var(--text-main)]">Clock Format</div>
+                        <div className="text-[11px] text-[var(--text-muted)]">Choose between 12-hour (AM/PM) and 24-hour time</div>
+                      </div>
+                      <div className="flex rounded-lg border border-[var(--border-subtle)] p-0.5 bg-black/[0.03] dark:bg-white/[0.03]">
+                        <button
+                          type="button"
+                          onClick={() => onUpdateSettings({ newTabClockFormat: '12h' })}
+                          className={`px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer transition-all ${
+                            (safeSettings.newTabClockFormat || '12h') === '12h'
+                              ? 'text-white shadow-xs font-semibold'
+                              : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                          }`}
+                          style={
+                            (safeSettings.newTabClockFormat || '12h') === '12h'
+                              ? { backgroundColor: 'var(--accent-primary)' }
+                              : undefined
+                          }
+                        >
+                          12-Hour
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onUpdateSettings({ newTabClockFormat: '24h' })}
+                          className={`px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer transition-all ${
+                            safeSettings.newTabClockFormat === '24h'
+                              ? 'text-white shadow-xs font-semibold'
+                              : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                          }`}
+                          style={
+                            safeSettings.newTabClockFormat === '24h'
+                              ? { backgroundColor: 'var(--accent-primary)' }
+                              : undefined
+                          }
+                        >
+                          24-Hour
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Weather Widget */}
+                  <div
+                    onClick={() =>
+                      onUpdateSettings({
+                        newTabShowWeather: safeSettings.newTabShowWeather === false ? true : false,
+                      })
+                    }
+                    className="p-3 rounded-xl border flex items-center justify-between cursor-pointer border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/40"
+                  >
+                    <div>
+                      <div className="text-xs font-medium text-[var(--text-main)]">Live Weather Widget</div>
+                      <div className="text-[11px] text-[var(--text-muted)]">
+                        Fetch and display current local temperature and forecast conditions
+                      </div>
+                    </div>
+                    <div className="relative inline-flex items-center flex-shrink-0 pointer-events-none">
+                      <input
+                        type="checkbox"
+                        readOnly
+                        checked={safeSettings.newTabShowWeather !== false}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1428,18 +1619,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       className="w-full h-8 pl-8 pr-3 rounded-lg text-xs border border-[var(--border-subtle)] bg-[var(--bg-input)] text-[var(--text-main)] focus:outline-none focus:border-[var(--border-selected)]"
                     />
                   </div>
-                  <button
-                    onClick={() => {
-                      setEditingPasswordId(null);
-                      setPasswordForm({ site: '', username: '', password: '' });
-                      setIsAddPasswordOpen(true);
-                    }}
-                    className="px-3 py-1.5 rounded-lg text-white text-xs font-medium shadow-xs flex items-center space-x-1.5 cursor-pointer hover:opacity-90 transition-opacity"
-                    style={{ backgroundColor: 'var(--accent-primary)' }}
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Password</span>
-                  </button>
+                  <div className="flex items-center space-x-1.5 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleImportPasswords}
+                      className="px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] text-xs text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 flex items-center space-x-1.5 cursor-pointer transition-colors"
+                      title="Import passwords from CSV or JSON"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                      <span>Import</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handlePromptExportPasswords}
+                      className="px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] text-xs text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 flex items-center space-x-1.5 cursor-pointer transition-colors"
+                      title="Export passwords to CSV or JSON"
+                    >
+                      <Download className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                      <span>Export</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingPasswordId(null);
+                        setPasswordForm({ site: '', username: '', password: '' });
+                        setIsAddPasswordOpen(true);
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-white text-xs font-medium shadow-xs flex items-center space-x-1.5 cursor-pointer hover:opacity-90 transition-opacity"
+                      style={{ backgroundColor: 'var(--accent-primary)' }}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Password</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] px-1">
@@ -1812,7 +2024,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                   <div>
                     <h4 className="text-xs font-semibold text-[var(--text-main)]">Larp Browser</h4>
-                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.5.1</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.5.2</p>
                   </div>
                 </div>
 

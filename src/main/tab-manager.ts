@@ -1,4 +1,4 @@
-import { app, BrowserWindow, WebContentsView, nativeTheme, safeStorage } from 'electron';
+import { app, BrowserWindow, WebContentsView, nativeTheme, safeStorage, dialog } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -47,6 +47,10 @@ const DEFAULT_SETTINGS: BrowserSettings = {
   showFavoritesOnNewTab: true,
   startupBehavior: 'new-tab',
   startupCustomUrl: 'https://www.google.com',
+  newTabShowClock: true,
+  newTabClockFormat: '12h',
+  newTabShowWeather: true,
+  newTabShowQuickLinks: true,
 };
 
 const SMART_DARK_CSS = `
@@ -455,6 +459,187 @@ export class TabManager {
   public deletePassword(id: string) {
     this.passwords = this.passwords.filter((p) => p.id !== id);
     this.savePasswords();
+  }
+
+  public async exportPasswords(): Promise<{
+    success: boolean;
+    count?: number;
+    path?: string;
+    canceled?: boolean;
+    error?: string;
+  }> {
+    try {
+      const result = await dialog.showSaveDialog(this.window, {
+        title: 'Export Passwords',
+        defaultPath: 'larp-passwords.csv',
+        filters: [
+          { name: 'CSV (*.csv)', extensions: ['csv'] },
+          { name: 'JSON (*.json)', extensions: ['json'] },
+        ],
+      });
+
+      if (result.canceled || !result.filePath) {
+        return { success: false, canceled: true };
+      }
+
+      const filePath = result.filePath;
+      const isJson = filePath.toLowerCase().endsWith('.json');
+
+      if (isJson) {
+        const payload = this.passwords.map((p) => ({
+          site: p.site,
+          username: p.username,
+          password: p.password,
+        }));
+        await fs.promises.writeFile(filePath, JSON.stringify(payload, null, 2), 'utf-8');
+      } else {
+        const escapeCsv = (val: string) => {
+          if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+            return `"${val.replace(/"/g, '""')}"`;
+          }
+          return val;
+        };
+        const header = 'url,username,password\n';
+        const rows = this.passwords
+          .map((p) => `${escapeCsv(p.site)},${escapeCsv(p.username)},${escapeCsv(p.password)}`)
+          .join('\n');
+        await fs.promises.writeFile(filePath, header + rows, 'utf-8');
+      }
+
+      return { success: true, count: this.passwords.length, path: filePath };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Export failed' };
+    }
+  }
+
+  public async importPasswords(): Promise<{
+    success: boolean;
+    importedCount?: number;
+    totalCount?: number;
+    canceled?: boolean;
+    error?: string;
+  }> {
+    try {
+      const result = await dialog.showOpenDialog(this.window, {
+        title: 'Import Passwords',
+        properties: ['openFile'],
+        filters: [
+          { name: 'Passwords (*.csv, *.json)', extensions: ['csv', 'json'] },
+        ],
+      });
+
+      if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+        return { success: false, canceled: true };
+      }
+
+      const filePath = result.filePaths[0];
+      const raw = await fs.promises.readFile(filePath, 'utf-8');
+      const newEntries: Array<{ site: string; username: string; password: string }> = [];
+
+      if (filePath.toLowerCase().endsWith('.json')) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          for (const item of parsed) {
+            const site = String(item.site || item.url || item.website || item.name || '').trim();
+            const username = String(item.username || item.login || item.user || item.email || '').trim();
+            const password = String(item.password || item.pass || '');
+            if (site && username && password) {
+              newEntries.push({ site, username, password });
+            }
+          }
+        }
+      } else {
+        const lines = raw.split(/\r?\n/).filter((l) => l.trim().length > 0);
+        if (lines.length > 0) {
+          const parseCsvLine = (line: string): string[] => {
+            const res: string[] = [];
+            let current = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+              const char = line[i];
+              if (char === '"') {
+                if (inQuotes && line[i + 1] === '"') {
+                  current += '"';
+                  i++;
+                } else {
+                  inQuotes = !inQuotes;
+                }
+              } else if (char === ',' && !inQuotes) {
+                res.push(current.trim());
+                current = '';
+              } else {
+                current += char;
+              }
+            }
+            res.push(current.trim());
+            return res;
+          };
+
+          const firstLineCols = parseCsvLine(lines[0]).map((c) => c.toLowerCase());
+          let urlIdx = firstLineCols.findIndex((c) => c === 'url' || c === 'site' || c === 'website' || c === 'name');
+          let userIdx = firstLineCols.findIndex((c) => c === 'username' || c === 'user' || c === 'login' || c === 'email');
+          let passIdx = firstLineCols.findIndex((c) => c === 'password' || c === 'pass');
+
+          let startIndex = 1;
+          if (urlIdx === -1 && userIdx === -1 && passIdx === -1) {
+            urlIdx = 0;
+            userIdx = 1;
+            passIdx = 2;
+            startIndex = 0;
+          } else {
+            if (urlIdx === -1) urlIdx = 0;
+            if (userIdx === -1) userIdx = 1;
+            if (passIdx === -1) passIdx = 2;
+          }
+
+          for (let i = startIndex; i < lines.length; i++) {
+            const cols = parseCsvLine(lines[i]);
+            const site = (cols[urlIdx] || '').trim();
+            const username = (cols[userIdx] || '').trim();
+            const password = cols[passIdx] || '';
+            if (site && username && password) {
+              newEntries.push({ site, username, password });
+            }
+          }
+        }
+      }
+
+      if (newEntries.length === 0) {
+        return { success: false, error: 'No valid passwords found in selected file' };
+      }
+
+      let importedCount = 0;
+      for (const entry of newEntries) {
+        const existingIdx = this.passwords.findIndex(
+          (p) =>
+            p.site.toLowerCase() === entry.site.toLowerCase() &&
+            p.username.toLowerCase() === entry.username.toLowerCase()
+        );
+        if (existingIdx !== -1) {
+          this.passwords[existingIdx] = {
+            ...this.passwords[existingIdx],
+            password: entry.password,
+            updatedAt: Date.now(),
+          };
+          importedCount++;
+        } else {
+          this.passwords.unshift({
+            id: 'pwd-' + Math.random().toString(36).substring(2, 9),
+            site: entry.site,
+            username: entry.username,
+            password: entry.password,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          });
+          importedCount++;
+        }
+      }
+
+      this.savePasswords();
+      return { success: true, importedCount, totalCount: this.passwords.length };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Import failed' };
+    }
   }
 
   // --- Active Tab Hibernation ---
@@ -984,6 +1169,8 @@ export class TabManager {
         await this.capturePreview(this.activeTabId);
       }
       this.detachActiveTabView();
+      // Ensure shell window has keyboard focus for shortcuts and escape handling
+      this.window.webContents.focus();
     } else {
       if (!this.isSwitcherOpen) {
         this.attachActiveTabView();

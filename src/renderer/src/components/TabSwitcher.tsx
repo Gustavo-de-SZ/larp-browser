@@ -261,12 +261,12 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                 >
                   <div className="flex items-center space-x-3 overflow-hidden flex-1 mr-3">
                     <span
-                      className="font-mono text-[10px] font-semibold w-5 text-center flex-shrink-0"
+                      className="font-mono text-[10px] font-semibold min-w-[28px] text-center flex-shrink-0"
                       style={{
                         color: isSelected ? 'var(--accent-primary)' : 'var(--text-muted)',
                       }}
                     >
-                      {index < 9 ? `#${index + 1}` : ''}
+                      #{index + 1}
                     </span>
 
                     {tab.favicon ? (
@@ -436,7 +436,7 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                         color: isSelected ? 'var(--accent-primary)' : 'var(--text-muted)',
                       }}
                     >
-                      {index < 9 ? `#${index + 1}` : ''}
+                      #{index + 1}
                     </span>
                     <div className="flex items-center space-x-1.5">
                       {tab.isHibernated && (

@@ -114,6 +114,8 @@ const api: IpcRendererApi = {
   savePassword: (entry: any) => ipcRenderer.invoke('browser:save-password', entry),
   updatePassword: (entry: any) => ipcRenderer.invoke('browser:update-password', entry),
   deletePassword: (id: string) => ipcRenderer.invoke('browser:delete-password', id),
+  exportPasswords: () => ipcRenderer.invoke('browser:export-passwords'),
+  importPasswords: () => ipcRenderer.invoke('browser:import-passwords'),
 
   setTheme: (theme: 'dark' | 'light') => ipcRenderer.invoke('browser:set-theme', theme),
   getSettings: () => ipcRenderer.invoke('browser:get-settings'),

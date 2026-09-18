@@ -112,6 +112,14 @@ export function registerIpcHandlers(window: BrowserWindow, tabManager: TabManage
     tabManager.deletePassword(id);
   });
 
+  ipcMain.handle('browser:export-passwords', () => {
+    return tabManager.exportPasswords();
+  });
+
+  ipcMain.handle('browser:import-passwords', () => {
+    return tabManager.importPasswords();
+  });
+
   // Settings & Theme handlers
   ipcMain.handle('browser:set-theme', (_event, theme: 'dark' | 'light') => {
     return tabManager.setTheme(theme);

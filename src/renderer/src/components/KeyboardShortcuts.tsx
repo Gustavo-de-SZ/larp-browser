@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { X, Keyboard } from 'lucide-react';
+import { X, Keyboard, Settings } from 'lucide-react';
 import type { ThemeMode } from '../App';
 import { SHORTCUT_DEFINITIONS, ShortcutActionId } from '@/shared/types';
 
@@ -7,6 +7,7 @@ interface KeyboardShortcutsProps {
   onClose: () => void;
   theme: ThemeMode;
   customShortcuts?: Record<string, string> | null;
+  onOpenSettingsToShortcuts?: () => void;
 }
 
 function Kbd({ text }: { text: string }) {
@@ -28,6 +29,7 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
   onClose,
   theme,
   customShortcuts = {},
+  onOpenSettingsToShortcuts,
 }) => {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -118,12 +120,25 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
               Keyboard Shortcuts
             </h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-lg transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center space-x-2">
+            {onOpenSettingsToShortcuts && (
+              <button
+                type="button"
+                onClick={onOpenSettingsToShortcuts}
+                className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border border-[var(--border-subtle)] text-xs font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-[var(--text-main)]"
+                title="Customize in Settings"
+              >
+                <Settings className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
+                <span>Customize</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1 rounded-lg transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -167,7 +182,19 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
             backgroundColor: 'rgba(128, 128, 128, 0.03)',
           }}
         >
-          <span>Shortcuts can be customized in Settings (Ctrl+,)</span>
+          {onOpenSettingsToShortcuts ? (
+            <button
+              type="button"
+              onClick={onOpenSettingsToShortcuts}
+              className="flex items-center space-x-1.5 px-2 py-1 rounded-lg text-xs font-medium hover:underline cursor-pointer"
+              style={{ color: 'var(--accent-primary)' }}
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span>Customize Shortcuts in Settings (Ctrl+,)</span>
+            </button>
+          ) : (
+            <span>Shortcuts can be customized in Settings (Ctrl+,)</span>
+          )}
           <button
             onClick={onClose}
             className="px-3 py-1 rounded-lg text-xs font-medium border border-[var(--border-subtle)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-[var(--text-main)]"
