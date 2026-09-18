@@ -45,6 +45,13 @@ export interface PasswordEntry {
   updatedAt: number;
 }
 
+export interface WeatherData {
+  tempC: string;
+  tempF: string;
+  desc: string;
+  area: string;
+}
+
 export interface FindResult {
   activeMatchOrdinal: number;
   numberOfMatches: number;
@@ -194,6 +201,7 @@ export interface IpcRendererApi {
   setTheme: (theme: 'dark' | 'light') => Promise<void>;
   getSettings: () => Promise<BrowserSettings>;
   updateSettings: (settings: Partial<BrowserSettings>) => Promise<BrowserSettings>;
+  getWeather: () => Promise<WeatherData | null>;
 
   // Switcher HUD & Modal operations
   openSwitcher: () => Promise<void>;

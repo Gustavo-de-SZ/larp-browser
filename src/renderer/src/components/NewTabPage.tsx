@@ -19,18 +19,12 @@ import {
   Sliders,
   X,
 } from 'lucide-react';
-import type { BrowserState } from '@/shared/types';
+import type { BrowserState, WeatherData } from '@/shared/types';
 import type { ThemeMode } from '../App';
 
 interface NewTabPageProps {
   state: BrowserState;
   theme: ThemeMode;
-}
-
-interface WeatherInfo {
-  tempC: string;
-  desc: string;
-  area: string;
 }
 
 const DEFAULT_SHORTCUTS = [
@@ -69,7 +63,8 @@ const DEFAULT_SHORTCUTS = [
 export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
   const [query, setQuery] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [weather, setWeather] = useState<WeatherInfo | null>(null);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
   const [showCustomizer, setShowCustomizer] = useState(false);
   const customizerRef = useRef<HTMLDivElement>(null);
 
@@ -89,63 +84,28 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
     return () => clearInterval(timer);
   }, []);
 
-  // Weather fetch with session storage cache (20 min)
-  useEffect(() => {
+  // Weather fetch via main process IPC
+  const fetchWeather = async () => {
     if (!showWeather) return;
-
-    const CACHE_KEY = 'larp_weather_data';
-    const CACHE_TTL = 20 * 60 * 1000; // 20 minutes
-
+    setWeatherLoading(true);
     try {
-      const cached = sessionStorage.getItem(CACHE_KEY);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Date.now() - parsed.timestamp < CACHE_TTL) {
-          setWeather(parsed.data);
-          return;
+      if (window.browserApi?.getWeather) {
+        const data = await window.browserApi.getWeather();
+        if (data) {
+          setWeather(data);
         }
       }
-    } catch {
-      // Ignore cache read error
+    } catch (err) {
+      console.warn('Weather fetch failed:', err);
+    } finally {
+      setWeatherLoading(false);
     }
+  };
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4500);
-
-    fetch('https://wttr.in/?format=j1', { signal: controller.signal })
-      .then((res) => {
-        clearTimeout(timeout);
-        if (!res.ok) throw new Error('Weather request failed');
-        return res.json();
-      })
-      .then((data) => {
-        const current = data.current_condition?.[0];
-        const area = data.nearest_area?.[0]?.areaName?.[0]?.value || '';
-        if (current) {
-          const wInfo: WeatherInfo = {
-            tempC: current.temp_C || '',
-            desc: current.weatherDesc?.[0]?.value || 'Clear',
-            area: area,
-          };
-          setWeather(wInfo);
-          try {
-            sessionStorage.setItem(
-              CACHE_KEY,
-              JSON.stringify({ timestamp: Date.now(), data: wInfo })
-            );
-          } catch {
-            // Ignore cache write error
-          }
-        }
-      })
-      .catch(() => {
-        // Silently ignore if offline or blocked
-      });
-
-    return () => {
-      clearTimeout(timeout);
-      controller.abort();
-    };
+  useEffect(() => {
+    if (showWeather) {
+      fetchWeather();
+    }
   }, [showWeather]);
 
   // Close customizer dropdown on outside click
@@ -238,7 +198,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
     >
       {/* Top Header Widgets: Weather & Customizer */}
       <div className="absolute top-4 right-6 flex items-center space-x-2 z-20">
-        {showWeather && weather && (
+        {showWeather && (
           <div
             className="flex items-center space-x-2 px-3 py-1.5 rounded-xl border text-xs shadow-xs transition-all select-none backdrop-blur-xs animate-in fade-in duration-200"
             style={{
@@ -246,14 +206,32 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
               borderColor: 'var(--border-card)',
               color: 'var(--text-main)',
             }}
-            title={`${weather.desc} in ${weather.area}`}
+            title={weather ? `${weather.desc} in ${weather.area}` : 'Local Weather'}
           >
-            {getWeatherIcon(weather.desc)}
-            <span className="font-medium font-mono">{weather.tempC}°C</span>
-            {weather.area && (
-              <span className="text-[11px] text-[var(--text-muted)] hidden sm:inline truncate max-w-[120px]">
-                {weather.area}
-              </span>
+            {weatherLoading && !weather ? (
+              <div className="flex items-center space-x-1.5 text-[var(--text-muted)] animate-pulse">
+                <CloudSun className="w-3.5 h-3.5 animate-spin" />
+                <span className="text-[11px]">Loading...</span>
+              </div>
+            ) : weather ? (
+              <>
+                {getWeatherIcon(weather.desc)}
+                <span className="font-medium font-mono">{weather.tempC}°C</span>
+                {weather.area && (
+                  <span className="text-[11px] text-[var(--text-muted)] hidden sm:inline truncate max-w-[120px]">
+                    {weather.area}
+                  </span>
+                )}
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={fetchWeather}
+                className="flex items-center space-x-1 text-[var(--text-muted)] hover:text-[var(--text-main)] cursor-pointer"
+              >
+                <CloudSun className="w-3.5 h-3.5 opacity-60" />
+                <span className="text-[11px]">Retry</span>
+              </button>
             )}
           </div>
         )}
@@ -369,6 +347,49 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
             <div className="text-xs font-medium text-[var(--text-muted)] tracking-wide">
               {formatClockDate()}
             </div>
+          </div>
+        )}
+
+        {/* Centered Weather Badge */}
+        {showWeather && (
+          <div
+            className="flex items-center space-x-2 px-3.5 py-1.5 rounded-full border text-xs shadow-xs transition-all select-none backdrop-blur-xs animate-in fade-in duration-200 -mt-2"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              borderColor: 'var(--border-card)',
+            }}
+          >
+            {weatherLoading && !weather ? (
+              <div className="flex items-center space-x-2 text-[var(--text-muted)] animate-pulse">
+                <CloudSun className="w-3.5 h-3.5 animate-spin" />
+                <span className="text-[11px]">Loading local weather...</span>
+              </div>
+            ) : weather ? (
+              <div className="flex items-center space-x-2 text-[var(--text-main)]">
+                {getWeatherIcon(weather.desc)}
+                <span className="font-semibold font-mono">{weather.tempC}°C</span>
+                <span className="text-[var(--text-muted)]">•</span>
+                <span className="text-[var(--text-muted)] capitalize">{weather.desc}</span>
+                {weather.area && (
+                  <>
+                    <span className="text-[var(--text-muted)]">•</span>
+                    <span className="text-[var(--text-muted)]">{weather.area}</span>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2 text-[var(--text-muted)]">
+                <CloudSun className="w-3.5 h-3.5 opacity-50" />
+                <span className="text-[11px]">Weather unavailable</span>
+                <button
+                  type="button"
+                  onClick={fetchWeather}
+                  className="text-[11px] underline hover:text-[var(--text-main)] cursor-pointer ml-1"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
           </div>
         )}
 

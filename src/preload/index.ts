@@ -120,6 +120,7 @@ const api: IpcRendererApi = {
   setTheme: (theme: 'dark' | 'light') => ipcRenderer.invoke('browser:set-theme', theme),
   getSettings: () => ipcRenderer.invoke('browser:get-settings'),
   updateSettings: (settings: Partial<BrowserSettings>) => ipcRenderer.invoke('browser:update-settings', settings),
+  getWeather: () => ipcRenderer.invoke('browser:get-weather'),
 
   openSwitcher: () => ipcRenderer.invoke('browser:open-switcher'),
   closeSwitcher: () => ipcRenderer.invoke('browser:close-switcher'),

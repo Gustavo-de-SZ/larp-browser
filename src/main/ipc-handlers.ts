@@ -133,6 +133,10 @@ export function registerIpcHandlers(window: BrowserWindow, tabManager: TabManage
     return tabManager.updateSettings(settings);
   });
 
+  ipcMain.handle('browser:get-weather', () => {
+    return tabManager.getWeather();
+  });
+
   // Switcher HUD handlers
   ipcMain.handle('browser:open-switcher', () => {
     return tabManager.openSwitcher();

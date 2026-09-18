@@ -11,6 +11,7 @@ import type {
   HistoryItem,
   PasswordEntry,
   ClearBrowsingDataOptions,
+  WeatherData,
 } from '../shared/types';
 
 export const TOP_BAR_HEIGHT = 44;
@@ -82,6 +83,7 @@ export class TabManager {
   private passwords: PasswordEntry[] = [];
   private passwordsPath: string;
   private sessionPath: string;
+  private cachedWeather: { data: WeatherData; timestamp: number } | null = null;
   private onStateChangeCallback?: (state: BrowserState) => void;
 
   constructor(window: BrowserWindow) {
@@ -640,6 +642,46 @@ export class TabManager {
     } catch (err: any) {
       return { success: false, error: err.message || 'Import failed' };
     }
+  }
+
+  public async getWeather(): Promise<WeatherData | null> {
+    const CACHE_TTL = 20 * 60 * 1000; // 20 minutes
+    if (this.cachedWeather && Date.now() - this.cachedWeather.timestamp < CACHE_TTL) {
+      return this.cachedWeather.data;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+      const res = await fetch('https://wttr.in/?format=j1', {
+        signal: controller.signal,
+        headers: { 'User-Agent': 'curl/7.68.0' },
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: any = await res.json();
+      const current = data.current_condition?.[0];
+      const area = data.nearest_area?.[0]?.areaName?.[0]?.value || '';
+
+      if (current) {
+        const weather: WeatherData = {
+          tempC: current.temp_C || '0',
+          tempF: current.temp_F || '32',
+          desc: current.weatherDesc?.[0]?.value || 'Clear',
+          area: area,
+        };
+        this.cachedWeather = {
+          data: weather,
+          timestamp: Date.now(),
+        };
+        return weather;
+      }
+    } catch (err) {
+      console.warn('Failed to fetch weather in main process:', err);
+    }
+
+    return this.cachedWeather ? this.cachedWeather.data : null;
   }
 
   // --- Active Tab Hibernation ---
