@@ -5,6 +5,7 @@ import { NewTabPage } from './components/NewTabPage';
 import { SettingsModal, type SettingsTabType } from './components/SettingsModal';
 import { KeyboardShortcuts } from './components/KeyboardShortcuts';
 import { QuickFavoritesPopover } from './components/QuickFavoritesPopover';
+import { DownloadsPopover } from './components/DownloadsPopover';
 import { FindInPageBar } from './components/FindInPageBar';
 import { ToastContainer, type ToastItem } from './components/Toast';
 import { getPalette, applyPalette } from './theme/palettes';
@@ -19,6 +20,7 @@ export const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
+  const [isDownloadsOpen, setIsDownloadsOpen] = useState(false);
   const [isFindOpen, setIsFindOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTabType>('appearance');
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -148,6 +150,8 @@ export const App: React.FC = () => {
           } else if (modal === 'history') {
             setSettingsTab('history');
             setIsSettingsOpen(true);
+          } else if (modal === 'downloads') {
+            setIsDownloadsOpen((prev) => !prev);
           }
         })
       );
@@ -174,6 +178,25 @@ export const App: React.FC = () => {
     };
   }, []);
 
+  // Download completion notifications
+  useEffect(() => {
+    if (!window.browserApi?.onDownloadDone) return;
+    const unsub = window.browserApi.onDownloadDone((item) => {
+      if (item.state === 'completed') {
+        showToast({
+          type: 'success',
+          message: `Download complete: ${item.filename}`,
+        });
+      } else if (item.state === 'interrupted') {
+        showToast({
+          type: 'danger',
+          message: `Download failed: ${item.filename}`,
+        });
+      }
+    });
+    return () => unsub();
+  }, []);
+
   // Global renderer keyboard shortcuts when focused in shell
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -194,6 +217,11 @@ export const App: React.FC = () => {
       if (e.ctrlKey && (e.key === 'b' || e.key === 'B') && !e.shiftKey) {
         e.preventDefault();
         setIsFavoritesOpen((prev) => !prev);
+        return;
+      }
+      if (e.ctrlKey && (e.key === 'j' || e.key === 'J')) {
+        e.preventDefault();
+        setIsDownloadsOpen((prev) => !prev);
         return;
       }
       if (e.ctrlKey && (e.key === 'f' || e.key === 'F')) {
@@ -243,11 +271,11 @@ export const App: React.FC = () => {
 
   // Synchronize modal open state with Electron main process so native WebContentsView is detached
   useEffect(() => {
-    const isAnyModalOpen = isSettingsOpen || isShortcutsOpen || isFavoritesOpen || isOmnibarOpen;
+    const isAnyModalOpen = isSettingsOpen || isShortcutsOpen || isFavoritesOpen || isOmnibarOpen || isDownloadsOpen;
     if (window.browserApi?.setModalOpen) {
       window.browserApi.setModalOpen(isAnyModalOpen);
     }
-  }, [isSettingsOpen, isShortcutsOpen, isFavoritesOpen, isOmnibarOpen]);
+  }, [isSettingsOpen, isShortcutsOpen, isFavoritesOpen, isOmnibarOpen, isDownloadsOpen]);
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
   const isNewTab = !activeTab || !activeTab.url || activeTab.url === 'about:blank';
@@ -272,6 +300,8 @@ export const App: React.FC = () => {
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
         onToggleFavorites={() => setIsFavoritesOpen((prev) => !prev)}
         isFavoritesOpen={isFavoritesOpen}
+        onToggleDownloads={() => setIsDownloadsOpen((prev) => !prev)}
+        isDownloadsOpen={isDownloadsOpen}
         onShowToast={showToast}
         onOmnibarDropdownChange={setIsOmnibarOpen}
       />
@@ -291,7 +321,7 @@ export const App: React.FC = () => {
         {isNewTab ? (
           <NewTabPage state={state} theme={theme} />
         ) : (
-          (state.isSwitcherOpen || isSettingsOpen || isShortcutsOpen || isFavoritesOpen || isOmnibarOpen) && activeTab?.previewImage ? (
+          (state.isSwitcherOpen || isSettingsOpen || isShortcutsOpen || isFavoritesOpen || isOmnibarOpen || isDownloadsOpen) && activeTab?.previewImage ? (
             <img
               src={activeTab.previewImage}
               alt="Active tab preview"
@@ -310,6 +340,18 @@ export const App: React.FC = () => {
         onOpenSettingsToBookmarks={() => {
           setSettingsTab('bookmarks');
           setIsFavoritesOpen(false);
+          setIsSettingsOpen(true);
+        }}
+        onShowToast={showToast}
+      />
+
+      {/* Downloads Tray Popover */}
+      <DownloadsPopover
+        isOpen={isDownloadsOpen}
+        onClose={() => setIsDownloadsOpen(false)}
+        onOpenSettingsToDownloads={() => {
+          setSettingsTab('downloads');
+          setIsDownloadsOpen(false);
           setIsSettingsOpen(true);
         }}
         onShowToast={showToast}

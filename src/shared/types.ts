@@ -52,6 +52,21 @@ export interface WeatherData {
   area: string;
 }
 
+export interface DownloadItemInfo {
+  id: string;
+  filename: string;
+  savePath: string;
+  totalBytes: number;
+  receivedBytes: number;
+  state: 'progressing' | 'completed' | 'cancelled' | 'interrupted' | 'paused';
+  url: string;
+  mimeType?: string;
+  startTime: number;
+  endTime?: number;
+  paused?: boolean;
+  canResume?: boolean;
+}
+
 export interface FindResult {
   activeMatchOrdinal: number;
   numberOfMatches: number;
@@ -74,6 +89,7 @@ export type ShortcutActionId =
   | 'toggleBookmarksBar'
   | 'openFavorites'
   | 'openHistory'
+  | 'openDownloads'
   | 'findInPage'
   | 'zoomIn'
   | 'zoomOut'
@@ -105,6 +121,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
   { id: 'openSettings', label: 'Open Settings', category: 'Interface', defaultKey: 'Ctrl+,', description: 'Open preferences modal' },
   { id: 'openShortcuts', label: 'Keyboard Cheatsheet', category: 'Interface', defaultKey: 'Ctrl+/', description: 'Show shortcuts reference cheatsheet' },
   { id: 'openHistory', label: 'Browsing History', category: 'Interface', defaultKey: 'Ctrl+H', description: 'Open browsing history' },
+  { id: 'openDownloads', label: 'Downloads', category: 'Interface', defaultKey: 'Ctrl+J', description: 'Open downloads tray and history' },
   { id: 'zoomIn', label: 'Zoom In', category: 'Interface', defaultKey: 'Ctrl+=', description: 'Increase page zoom' },
   { id: 'zoomOut', label: 'Zoom Out', category: 'Interface', defaultKey: 'Ctrl+-', description: 'Decrease page zoom' },
   { id: 'zoomReset', label: 'Reset Zoom', category: 'Interface', defaultKey: 'Ctrl+0', description: 'Reset page zoom to 100%' },
@@ -134,6 +151,8 @@ export interface BrowserSettings {
   newTabClockFormat?: '12h' | '24h';
   newTabShowWeather?: boolean;
   newTabShowQuickLinks?: boolean;
+  downloadsPath?: string;
+  askDownloadLocation?: boolean;
 }
 
 export interface BrowserState {
@@ -151,7 +170,7 @@ export type SwitcherDirection = 'forward' | 'backward';
 export interface IpcRendererApi {
   // State observation
   onStateUpdate: (callback: (state: BrowserState) => void) => () => void;
-  onToggleModal: (callback: (modal: 'settings' | 'shortcuts' | 'history' | 'passwords') => void) => () => void;
+  onToggleModal: (callback: (modal: 'settings' | 'shortcuts' | 'history' | 'passwords' | 'downloads') => void) => () => void;
   onFocusOmnibar: (callback: () => void) => () => void;
   onToggleFind: (callback: () => void) => () => void;
   onToggleFavorites: (callback: () => void) => () => void;
@@ -196,6 +215,20 @@ export interface IpcRendererApi {
   deletePassword: (id: string) => Promise<void>;
   exportPasswords: () => Promise<{ success: boolean; count?: number; path?: string; canceled?: boolean; error?: string }>;
   importPasswords: () => Promise<{ success: boolean; importedCount?: number; totalCount?: number; canceled?: boolean; error?: string }>;
+
+  // Downloads
+  getDownloads: () => Promise<DownloadItemInfo[]>;
+  pauseDownload: (id: string) => Promise<boolean>;
+  resumeDownload: (id: string) => Promise<boolean>;
+  cancelDownload: (id: string) => Promise<boolean>;
+  openDownloadFile: (id: string) => Promise<boolean>;
+  showDownloadInFolder: (id: string) => Promise<boolean>;
+  clearDownloads: () => Promise<void>;
+  deleteDownloadItem: (id: string) => Promise<void>;
+  selectDownloadDirectory: () => Promise<string | null>;
+  onDownloadStarted: (callback: (item: DownloadItemInfo) => void) => () => void;
+  onDownloadProgress: (callback: (item: DownloadItemInfo) => void) => () => void;
+  onDownloadDone: (callback: (item: DownloadItemInfo) => void) => () => void;
 
   // Settings & Theme
   setTheme: (theme: 'dark' | 'light') => Promise<void>;

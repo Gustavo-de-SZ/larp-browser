@@ -1,6 +1,7 @@
 import { app, BrowserWindow, session } from 'electron';
 import path from 'path';
 import { TabManager } from './tab-manager';
+import { DownloadManager } from './download-manager';
 import { registerIpcHandlers } from './ipc-handlers';
 import { registerShortcuts } from './shortcuts';
 
@@ -12,6 +13,7 @@ if (process.platform === 'linux') {
 
 let mainWindow: BrowserWindow | null = null;
 let tabManager: TabManager | null = null;
+let downloadManager: DownloadManager | null = null;
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -52,18 +54,6 @@ function setupSecurityDefaults() {
     }
     return false;
   });
-
-  // Security: Log and track downloads cleanly
-  session.defaultSession.on('will-download', (_event, item) => {
-    console.log(`[Security] Download started: ${item.getFilename()} (${item.getTotalBytes()} bytes)`);
-    item.once('done', (_e, state) => {
-      if (state === 'completed') {
-        console.log(`[Security] Download completed: ${item.getSavePath()}`);
-      } else {
-        console.warn(`[Security] Download ${state}: ${item.getFilename()}`);
-      }
-    });
-  });
 }
 
 async function createWindow() {
@@ -94,6 +84,7 @@ async function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
   tabManager = new TabManager(mainWindow);
+  downloadManager = new DownloadManager(mainWindow, () => tabManager!.getSettings());
 
   // Send state updates to renderer
   tabManager.setOnStateChange((state) => {
@@ -103,7 +94,7 @@ async function createWindow() {
   });
 
   // Register IPC and keyboard shortcuts
-  registerIpcHandlers(mainWindow, tabManager);
+  registerIpcHandlers(mainWindow, tabManager, downloadManager);
   registerShortcuts(mainWindow, tabManager);
 
   // Keep active WebContentsView bounds in sync with window size

@@ -20,6 +20,7 @@ import {
   Globe,
   Bookmark,
   Clock,
+  Download,
 } from 'lucide-react';
 import type { BrowserState, HistoryItem } from '@/shared/types';
 import type { ThemeMode } from '../App';
@@ -39,6 +40,8 @@ interface TopBarProps {
   onToggleFavorites: () => void;
   onOpenFind?: () => void;
   isFavoritesOpen?: boolean;
+  onToggleDownloads?: () => void;
+  isDownloadsOpen?: boolean;
   onShowToast?: (toast: { type: 'success' | 'info' | 'warning' | 'danger'; message: string }) => void;
   onOmnibarDropdownChange?: (isOpen: boolean) => void;
 }
@@ -51,6 +54,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenShortcuts,
   onToggleFavorites,
   isFavoritesOpen = false,
+  onToggleDownloads,
+  isDownloadsOpen = false,
   onShowToast,
   onOmnibarDropdownChange,
 }) => {
@@ -61,9 +66,35 @@ export const TopBar: React.FC<TopBarProps> = ({
   const [suggestions, setSuggestions] = useState<UrlSuggestion[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [activeDownloadCount, setActiveDownloadCount] = useState<number>(0);
   const skipNextAutocompleteRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Track active downloads count
+  useEffect(() => {
+    if (!window.browserApi) return;
+
+    window.browserApi.getDownloads?.().then((items) => {
+      if (items) {
+        const active = items.filter((d) => d.state === 'progressing' || d.state === 'paused').length;
+        setActiveDownloadCount(active);
+      }
+    });
+
+    const unsubStart = window.browserApi.onDownloadStarted?.(() => {
+      setActiveDownloadCount((prev) => prev + 1);
+    });
+
+    const unsubDone = window.browserApi.onDownloadDone?.(() => {
+      setActiveDownloadCount((prev) => Math.max(0, prev - 1));
+    });
+
+    return () => {
+      unsubStart?.();
+      unsubDone?.();
+    };
+  }, []);
 
   const isBookmarked =
     activeTab && activeTab.url && activeTab.url !== 'about:blank'
@@ -580,6 +611,27 @@ export const TopBar: React.FC<TopBarProps> = ({
             title={`Favorites (${favoritesKey})`}
           >
             <Star className={`w-3.5 h-3.5 ${isFavoritesOpen ? 'fill-amber-400' : ''}`} />
+          </button>
+
+          {/* Downloads Tray Button */}
+          <button
+            onClick={onToggleDownloads}
+            className={`p-1.5 rounded-md transition-colors cursor-pointer relative ${
+              isDownloadsOpen
+                ? 'text-[var(--accent-primary)] bg-black/10 dark:bg-white/10'
+                : 'text-[var(--text-muted)] hover:text-[var(--accent-primary)] hover:bg-black/5 dark:hover:bg-white/5'
+            }`}
+            title="Downloads (Ctrl+J)"
+          >
+            <Download className="w-3.5 h-3.5" />
+            {activeDownloadCount > 0 && (
+              <span
+                className="absolute -top-1 -right-1 min-w-3.5 h-3.5 px-0.5 rounded-full text-[9px] font-bold flex items-center justify-center text-white animate-pulse"
+                style={{ backgroundColor: 'var(--accent-primary)' }}
+              >
+                {activeDownloadCount}
+              </span>
+            )}
           </button>
 
           {/* Tab Switcher Trigger Button */}

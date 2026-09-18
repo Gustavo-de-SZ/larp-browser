@@ -260,6 +260,13 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
       return;
     }
 
+    // 16.5. Downloads (Ctrl+J)
+    if (isTriggered('openDownloads', input) || (input.control && input.key.toLowerCase() === 'j')) {
+      event.preventDefault();
+      window.webContents.send('browser:toggle-modal', 'downloads');
+      return;
+    }
+
     // 17. Zoom Controls (In, Out, Reset)
     if (isTriggered('zoomIn', input) || (input.control && (input.key === '+' || input.key === '='))) {
       event.preventDefault();

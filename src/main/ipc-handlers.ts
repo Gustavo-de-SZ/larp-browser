@@ -1,8 +1,13 @@
 import { ipcMain, BrowserWindow } from 'electron';
 import { TabManager } from './tab-manager';
+import { DownloadManager } from './download-manager';
 import type { BrowserSettings, SwitcherDirection } from '../shared/types';
 
-export function registerIpcHandlers(window: BrowserWindow, tabManager: TabManager) {
+export function registerIpcHandlers(
+  window: BrowserWindow,
+  tabManager: TabManager,
+  downloadManager: DownloadManager
+) {
   ipcMain.handle('browser:get-state', () => {
     return tabManager.getState();
   });
@@ -160,6 +165,43 @@ export function registerIpcHandlers(window: BrowserWindow, tabManager: TabManage
 
   ipcMain.handle('browser:set-modal-open', (_event, isOpen: boolean) => {
     return tabManager.setModalOpen(isOpen);
+  });
+
+  // Download handlers
+  ipcMain.handle('browser:get-downloads', () => {
+    return downloadManager.getDownloads();
+  });
+
+  ipcMain.handle('browser:pause-download', (_event, id: string) => {
+    return downloadManager.pauseDownload(id);
+  });
+
+  ipcMain.handle('browser:resume-download', (_event, id: string) => {
+    return downloadManager.resumeDownload(id);
+  });
+
+  ipcMain.handle('browser:cancel-download', (_event, id: string) => {
+    return downloadManager.cancelDownload(id);
+  });
+
+  ipcMain.handle('browser:open-download-file', (_event, id: string) => {
+    return downloadManager.openDownloadFile(id);
+  });
+
+  ipcMain.handle('browser:show-download-in-folder', (_event, id: string) => {
+    return downloadManager.showDownloadInFolder(id);
+  });
+
+  ipcMain.handle('browser:clear-downloads', () => {
+    return downloadManager.clearDownloads();
+  });
+
+  ipcMain.handle('browser:delete-download-item', (_event, id: string) => {
+    return downloadManager.deleteDownloadItem(id);
+  });
+
+  ipcMain.handle('browser:select-download-directory', () => {
+    return downloadManager.selectDownloadDirectory();
   });
 
   // Window operations

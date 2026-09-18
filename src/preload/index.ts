@@ -7,6 +7,7 @@ import type {
   BookmarkItem,
   HistoryItem,
   FindResult,
+  DownloadItemInfo,
 } from '../shared/types';
 
 const api: IpcRendererApi = {
@@ -20,8 +21,8 @@ const api: IpcRendererApi = {
     };
   },
 
-  onToggleModal: (callback: (modal: 'settings' | 'shortcuts' | 'history') => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, modal: 'settings' | 'shortcuts' | 'history') => {
+  onToggleModal: (callback: (modal: 'settings' | 'shortcuts' | 'history' | 'passwords' | 'downloads') => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, modal: 'settings' | 'shortcuts' | 'history' | 'passwords' | 'downloads') => {
       callback(modal);
     };
     ipcRenderer.on('browser:toggle-modal', listener);
@@ -116,6 +117,44 @@ const api: IpcRendererApi = {
   deletePassword: (id: string) => ipcRenderer.invoke('browser:delete-password', id),
   exportPasswords: () => ipcRenderer.invoke('browser:export-passwords'),
   importPasswords: () => ipcRenderer.invoke('browser:import-passwords'),
+
+  // Downloads
+  getDownloads: () => ipcRenderer.invoke('browser:get-downloads'),
+  pauseDownload: (id: string) => ipcRenderer.invoke('browser:pause-download', id),
+  resumeDownload: (id: string) => ipcRenderer.invoke('browser:resume-download', id),
+  cancelDownload: (id: string) => ipcRenderer.invoke('browser:cancel-download', id),
+  openDownloadFile: (id: string) => ipcRenderer.invoke('browser:open-download-file', id),
+  showDownloadInFolder: (id: string) => ipcRenderer.invoke('browser:show-download-in-folder', id),
+  clearDownloads: () => ipcRenderer.invoke('browser:clear-downloads'),
+  deleteDownloadItem: (id: string) => ipcRenderer.invoke('browser:delete-download-item', id),
+  selectDownloadDirectory: () => ipcRenderer.invoke('browser:select-download-directory'),
+  onDownloadStarted: (callback: (item: DownloadItemInfo) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, item: DownloadItemInfo) => {
+      callback(item);
+    };
+    ipcRenderer.on('browser:download-started', listener);
+    return () => {
+      ipcRenderer.removeListener('browser:download-started', listener);
+    };
+  },
+  onDownloadProgress: (callback: (item: DownloadItemInfo) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, item: DownloadItemInfo) => {
+      callback(item);
+    };
+    ipcRenderer.on('browser:download-progress', listener);
+    return () => {
+      ipcRenderer.removeListener('browser:download-progress', listener);
+    };
+  },
+  onDownloadDone: (callback: (item: DownloadItemInfo) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, item: DownloadItemInfo) => {
+      callback(item);
+    };
+    ipcRenderer.on('browser:download-done', listener);
+    return () => {
+      ipcRenderer.removeListener('browser:download-done', listener);
+    };
+  },
 
   setTheme: (theme: 'dark' | 'light') => ipcRenderer.invoke('browser:set-theme', theme),
   getSettings: () => ipcRenderer.invoke('browser:get-settings'),

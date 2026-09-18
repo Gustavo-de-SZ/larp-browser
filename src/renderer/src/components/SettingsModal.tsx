@@ -30,14 +30,22 @@ import {
   Upload,
   Download,
   CloudSun,
+  FolderOpen,
+  FileText,
+  CheckCircle2,
+  AlertCircle,
+  Pause,
+  Play,
 } from 'lucide-react';
 import { DARK_PALETTES, LIGHT_PALETTES, ColorPalette, getPalette } from '../theme/palettes';
 import { ConfirmModal } from './ConfirmModal';
 import type { ToastItem } from './Toast';
+import { formatBytes, getFileIcon } from './DownloadsPopover';
 import {
   BrowserSettings,
   BookmarkItem,
   HistoryItem,
+  DownloadItemInfo,
   PasswordEntry,
   ClearBrowsingDataOptions,
   SHORTCUT_DEFINITIONS,
@@ -51,6 +59,7 @@ export type SettingsTabType =
   | 'bookmarks'
   | 'startup'
   | 'history'
+  | 'downloads'
   | 'passwords'
   | 'switcher'
   | 'search'
@@ -92,6 +101,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   });
   const [historyList, setHistoryList] = useState<HistoryItem[]>([]);
   const [customStartupInput, setCustomStartupInput] = useState('');
+
+  // Downloads state
+  const [downloadsList, setDownloadsList] = useState<DownloadItemInfo[]>([]);
+  const [downloadFilter, setDownloadFilter] = useState('');
 
   // Password Vault state
   const [passwordsList, setPasswordsList] = useState<PasswordEntry[]>([]);
@@ -137,6 +150,54 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         if (items) setHistoryList(items);
       });
     }
+  }, [isOpen, activeTab]);
+
+  // Load downloads when opening downloads tab
+  useEffect(() => {
+    if (isOpen && activeTab === 'downloads' && window.browserApi?.getDownloads) {
+      window.browserApi.getDownloads().then((items) => {
+        if (items) setDownloadsList(items);
+      });
+    }
+  }, [isOpen, activeTab]);
+
+  // Live updates when in downloads tab
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'downloads' || !window.browserApi) return;
+
+    const unsubStart = window.browserApi.onDownloadStarted?.((item) => {
+      setDownloadsList((prev) => [item, ...prev.filter((d) => d.id !== item.id)]);
+    });
+
+    const unsubProgress = window.browserApi.onDownloadProgress?.((item) => {
+      setDownloadsList((prev) => {
+        const idx = prev.findIndex((d) => d.id === item.id);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = item;
+          return next;
+        }
+        return [item, ...prev];
+      });
+    });
+
+    const unsubDone = window.browserApi.onDownloadDone?.((item) => {
+      setDownloadsList((prev) => {
+        const idx = prev.findIndex((d) => d.id === item.id);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = item;
+          return next;
+        }
+        return [item, ...prev];
+      });
+    });
+
+    return () => {
+      unsubStart?.();
+      unsubProgress?.();
+      unsubDone?.();
+    };
   }, [isOpen, activeTab]);
 
   // Load passwords when opening passwords tab
@@ -414,6 +475,81 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  // Downloads filtering & handlers
+  const filteredDownloads = downloadsList.filter(
+    (d) =>
+      d.filename.toLowerCase().includes(downloadFilter.toLowerCase()) ||
+      (d.savePath && d.savePath.toLowerCase().includes(downloadFilter.toLowerCase()))
+  );
+
+  const handleChangeDownloadDirectory = async () => {
+    if (window.browserApi?.selectDownloadDirectory) {
+      const selectedPath = await window.browserApi.selectDownloadDirectory();
+      if (selectedPath) {
+        onUpdateSettings({ downloadsPath: selectedPath });
+        onShowToast?.({
+          type: 'success',
+          message: 'Updated default download directory',
+        });
+      }
+    }
+  };
+
+  const handlePromptClearDownloads = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Clear Download History',
+      variant: 'danger',
+      confirmLabel: 'Clear History',
+      message: (
+        <span>
+          Are you sure you want to clear your download history?
+          <span className="block mt-1 text-xs text-[var(--text-muted)]">
+            Files already downloaded to your disk will not be deleted.
+          </span>
+        </span>
+      ),
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        if (window.browserApi?.clearDownloads) {
+          await window.browserApi.clearDownloads();
+          setDownloadsList((prev) => prev.filter((d) => d.state === 'progressing' || d.state === 'paused'));
+          onShowToast?.({
+            type: 'info',
+            message: 'Cleared download history',
+          });
+        }
+      },
+    });
+  };
+
+  const handleDeleteDownloadItem = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.browserApi?.deleteDownloadItem) {
+      await window.browserApi.deleteDownloadItem(id);
+      setDownloadsList((prev) => prev.filter((d) => d.id !== id));
+    }
+  };
+
+  const handleOpenDownloadFile = async (savePath: string) => {
+    if (window.browserApi?.openDownloadFile) {
+      const ok = await window.browserApi.openDownloadFile(savePath);
+      if (!ok) {
+        onShowToast?.({
+          type: 'warning',
+          message: 'File could not be opened (may have been moved or deleted)',
+        });
+      }
+    }
+  };
+
+  const handleShowDownloadInFolder = async (savePath: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.browserApi?.showDownloadInFolder) {
+      await window.browserApi.showDownloadInFolder(savePath);
+    }
+  };
+
   // Passwords filtering & handlers
   const filteredPasswords = passwordsList.filter(
     (p) =>
@@ -668,6 +804,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </button>
 
             <button
+              onClick={() => setActiveTab('downloads')}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                activeTab === 'downloads'
+                  ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)] font-semibold'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
+            >
+              <Download className="w-4 h-4 text-[var(--text-muted)]" />
+              <span>Downloads</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('passwords')}
               className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                 activeTab === 'passwords'
@@ -737,6 +885,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {activeTab === 'bookmarks' && 'Bookmarks & Favorites'}
               {activeTab === 'startup' && 'Startup Behavior & Default Page'}
               {activeTab === 'history' && 'Browsing History & Clear Data'}
+              {activeTab === 'downloads' && 'Downloads & Storage'}
+              {activeTab === 'passwords' && 'Password Vault'}
               {activeTab === 'switcher' && 'Tab Switcher (Alt-Tab)'}
               {activeTab === 'search' && 'Default Search Engine'}
               {activeTab === 'about' && 'About Larp Browser'}
@@ -1602,6 +1752,289 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Downloads & Storage */}
+            {activeTab === 'downloads' && (
+              <div className="space-y-6">
+                {/* 1. Location & Settings Card */}
+                <div
+                  className="p-4 rounded-xl border space-y-4"
+                  style={{
+                    backgroundColor: 'rgba(128, 128, 128, 0.04)',
+                    borderColor: 'var(--border-subtle)',
+                  }}
+                >
+                  <div className="text-xs font-semibold text-[var(--text-main)] flex items-center space-x-2">
+                    <FolderOpen className="w-4 h-4 text-[var(--accent-primary)]" />
+                    <span>Download Preferences</span>
+                  </div>
+
+                  {/* Default Location */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                    <div>
+                      <div className="text-xs font-medium text-[var(--text-main)]">
+                        Default download location
+                      </div>
+                      <div className="text-[11px] text-[var(--text-muted)] mt-0.5 break-all flex items-center space-x-1.5">
+                        <FolderOpen className="w-3 h-3 flex-shrink-0 opacity-60" />
+                        <span>{settings.downloadsPath || 'System Downloads folder'}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2 flex-shrink-0">
+                      {settings.downloadsPath && (
+                        <button
+                          onClick={() => onUpdateSettings({ downloadsPath: undefined })}
+                          className="px-2.5 py-1 rounded-lg border border-[var(--border-subtle)] text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors"
+                        >
+                          Reset
+                        </button>
+                      )}
+                      <button
+                        onClick={handleChangeDownloadDirectory}
+                        className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-xs text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors font-medium flex items-center space-x-1.5"
+                      >
+                        <FolderOpen className="w-3.5 h-3.5" />
+                        <span>Change...</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Ask where to save toggle */}
+                  <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)]">
+                    <div>
+                      <div className="text-xs font-medium text-[var(--text-main)]">
+                        Ask where to save each file before downloading
+                      </div>
+                      <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                        Open a file picker for every download instead of saving automatically
+                      </div>
+                    </div>
+                    <button
+                      onClick={() =>
+                        onUpdateSettings({
+                          askDownloadLocation: !settings.askDownloadLocation,
+                        })
+                      }
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer ${
+                        settings.askDownloadLocation ? 'bg-[var(--accent-primary)]' : 'bg-zinc-600/40'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                          settings.askDownloadLocation ? 'translate-x-4.5' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Download History Header & Filter */}
+                <div className="space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div className="relative flex-1">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-[var(--text-muted)] pointer-events-none" />
+                      <input
+                        type="text"
+                        value={downloadFilter}
+                        onChange={(e) => setDownloadFilter(e.target.value)}
+                        placeholder="Search downloaded files..."
+                        className="w-full h-8 pl-8 pr-3 rounded-lg text-xs border border-[var(--border-subtle)] bg-[var(--bg-input)] text-[var(--text-main)] focus:outline-none focus:border-[var(--border-selected)]"
+                      />
+                    </div>
+                    <div className="flex items-center space-x-2 flex-shrink-0">
+                      <button
+                        onClick={() => window.browserApi.showDownloadInFolder('')}
+                        className="px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer flex items-center space-x-1.5 transition-colors"
+                        title="Open Downloads Folder"
+                      >
+                        <FolderOpen className="w-3.5 h-3.5" />
+                        <span>Open Folder</span>
+                      </button>
+                      <button
+                        onClick={handlePromptClearDownloads}
+                        disabled={downloadsList.length === 0}
+                        className="px-2.5 py-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 text-xs text-rose-400 hover:bg-rose-500/20 disabled:opacity-30 cursor-pointer disabled:cursor-default flex items-center space-x-1.5 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Clear History</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Downloads list */}
+                  {filteredDownloads.length > 0 ? (
+                    <div className="space-y-2">
+                      {filteredDownloads.map((item) => {
+                        const isProgressing = item.state === 'progressing';
+                        const isPaused = item.state === 'paused';
+                        const isCompleted = item.state === 'completed';
+                        const isInterrupted = item.state === 'interrupted';
+                        const isCancelled = item.state === 'cancelled';
+                        const percent =
+                          item.totalBytes && item.totalBytes > 0
+                            ? Math.min(100, Math.round((item.receivedBytes / item.totalBytes) * 100))
+                            : 0;
+
+                        return (
+                          <div
+                            key={item.id}
+                            onClick={() => isCompleted && item.savePath && handleOpenDownloadFile(item.savePath)}
+                            className={`p-3 rounded-xl border transition-colors flex items-center space-x-3 group ${
+                              isCompleted ? 'cursor-pointer hover:bg-black/5 dark:hover:bg-white/5' : ''
+                            }`}
+                            style={{
+                              borderColor: 'var(--border-subtle)',
+                              backgroundColor: 'rgba(128, 128, 128, 0.02)',
+                            }}
+                          >
+                            <div className="p-2 rounded-lg bg-black/5 dark:bg-white/5 flex-shrink-0">
+                              {getFileIcon(item.filename)}
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center space-x-2">
+                                <span
+                                  className={`text-xs font-medium truncate ${
+                                    isCompleted ? 'text-[var(--text-main)] group-hover:underline' : 'text-[var(--text-main)]'
+                                  }`}
+                                  title={item.filename}
+                                >
+                                  {item.filename}
+                                </span>
+                                {isCompleted && (
+                                  <span className="flex items-center space-x-1 text-[10px] text-emerald-500 font-medium">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span>Done</span>
+                                  </span>
+                                )}
+                                {isProgressing && (
+                                  <span className="text-[10px] text-[var(--accent-primary)] font-medium">
+                                    {percent}%
+                                  </span>
+                                )}
+                                {isPaused && (
+                                  <span className="text-[10px] text-amber-500 font-medium">
+                                    Paused
+                                  </span>
+                                )}
+                                {(isInterrupted || isCancelled) && (
+                                  <span className="flex items-center space-x-1 text-[10px] text-rose-400 font-medium">
+                                    <AlertCircle className="w-3 h-3" />
+                                    <span>{isCancelled ? 'Cancelled' : 'Failed'}</span>
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Progress bar if active */}
+                              {(isProgressing || isPaused) && (
+                                <div className="w-full bg-black/10 dark:bg-white/10 h-1.5 rounded-full overflow-hidden my-1.5">
+                                  <div
+                                    className={`h-full transition-all duration-200 ${
+                                      isPaused ? 'bg-amber-500' : 'bg-[var(--accent-primary)]'
+                                    }`}
+                                    style={{ width: `${percent}%` }}
+                                  />
+                                </div>
+                              )}
+
+                              <div className="text-[11px] text-[var(--text-muted)] flex items-center space-x-2 mt-0.5 truncate">
+                                <span>
+                                  {formatBytes(item.receivedBytes)}
+                                  {item.totalBytes ? ` / ${formatBytes(item.totalBytes)}` : ''}
+                                </span>
+                                <span>•</span>
+                                <span title={new Date(item.startTime).toLocaleString()}>
+                                  {new Date(item.startTime).toLocaleDateString(undefined, {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </span>
+                                {item.savePath && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="truncate max-w-[220px]" title={item.savePath}>
+                                      {item.savePath}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Actions toolbar */}
+                            <div className="flex items-center space-x-1 flex-shrink-0">
+                              {isProgressing && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.browserApi.pauseDownload(item.id);
+                                  }}
+                                  className="p-1.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-[var(--text-muted)] hover:text-[var(--text-main)] cursor-pointer"
+                                  title="Pause"
+                                >
+                                  <Pause className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {isPaused && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.browserApi.resumeDownload(item.id);
+                                  }}
+                                  className="p-1.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-emerald-500 cursor-pointer"
+                                  title="Resume"
+                                >
+                                  <Play className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {(isProgressing || isPaused) && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.browserApi.cancelDownload(item.id);
+                                  }}
+                                  className="p-1.5 rounded-md hover:bg-rose-500/20 text-rose-400 cursor-pointer"
+                                  title="Cancel"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {item.savePath && (
+                                <button
+                                  onClick={(e) => handleShowDownloadInFolder(item.savePath, e)}
+                                  className="p-1.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-[var(--text-muted)] hover:text-[var(--text-main)] cursor-pointer"
+                                  title="Show in folder"
+                                >
+                                  <FolderOpen className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <button
+                                onClick={(e) => handleDeleteDownloadItem(item.id, e)}
+                                className="p-1.5 rounded-md hover:bg-rose-500/20 text-[var(--text-muted)] hover:text-rose-400 cursor-pointer"
+                                title="Remove from list"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-8 rounded-xl border border-dashed border-[var(--border-subtle)] flex flex-col items-center justify-center text-center space-y-2 text-[var(--text-muted)]">
+                      <Download className="w-6 h-6 opacity-40" />
+                      <div className="text-xs font-medium text-[var(--text-main)]">
+                        {downloadFilter ? 'No matching downloads found' : 'No downloads yet'}
+                      </div>
+                      <p className="text-[11px] max-w-xs">
+                        Files you download while browsing will appear here with instant access to open or reveal them.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
