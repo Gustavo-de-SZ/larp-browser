@@ -65,7 +65,7 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
         selectedCard.scrollIntoView({
           behavior: 'smooth',
           block: 'nearest',
-          inline: 'center',
+          inline: 'nearest',
         });
       }
     }
@@ -89,27 +89,46 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
         return;
       }
 
-      if (
-        keyLower === 'arrowright' ||
-        keyLower === 'right' ||
-        keyLower === 'arrowdown' ||
-        keyLower === 'down' ||
-        (keyLower === 'tab' && !e.shiftKey)
-      ) {
+      const getColumns = () => {
+        if (typeof window === 'undefined') return 3;
+        if (window.innerWidth >= 1024) return 4;
+        if (window.innerWidth >= 640) return 3;
+        return 2;
+      };
+
+      if (keyLower === 'arrowright' || (keyLower === 'tab' && !e.shiftKey)) {
         e.preventDefault();
         window.browserApi.cycleSwitcher('forward');
         return;
       }
 
-      if (
-        keyLower === 'arrowleft' ||
-        keyLower === 'left' ||
-        keyLower === 'arrowup' ||
-        keyLower === 'up' ||
-        (keyLower === 'tab' && e.shiftKey)
-      ) {
+      if (keyLower === 'arrowleft' || (keyLower === 'tab' && e.shiftKey)) {
         e.preventDefault();
         window.browserApi.cycleSwitcher('backward');
+        return;
+      }
+
+      if (keyLower === 'arrowdown' || keyLower === 'down') {
+        e.preventDefault();
+        if (isCompact) {
+          window.browserApi.cycleSwitcher('forward');
+        } else {
+          const cols = getColumns();
+          const target = Math.min(filteredTabs.length - 1, selectedIndex + cols);
+          window.browserApi.selectSwitcherIndex(target);
+        }
+        return;
+      }
+
+      if (keyLower === 'arrowup' || keyLower === 'up') {
+        e.preventDefault();
+        if (isCompact) {
+          window.browserApi.cycleSwitcher('backward');
+        } else {
+          const cols = getColumns();
+          const target = Math.max(0, selectedIndex - cols);
+          window.browserApi.selectSwitcherIndex(target);
+        }
         return;
       }
 
@@ -357,7 +376,7 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
         ) : (
           <div
             ref={cardsContainerRef}
-            className="flex items-center space-x-4 overflow-x-auto py-2 px-1 scrollbar-none snap-x"
+            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5 overflow-y-auto max-h-[58vh] py-2 px-1"
           >
             {filteredTabs.map((tab, index) => {
               const isSelected = index === selectedIndex;
@@ -365,7 +384,7 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                 <div
                   key={tab.id}
                   onClick={() => handleCardClick(index)}
-                  className={`flex-shrink-0 w-60 ${showPreviews ? 'h-64' : 'h-32'} rounded-xl border flex flex-col cursor-pointer transition-all duration-150 snap-center relative overflow-hidden group ${
+                  className={`w-full ${showPreviews ? 'h-52' : 'h-28'} rounded-xl border flex flex-col cursor-pointer transition-all duration-150 relative overflow-hidden group ${
                     isSelected
                       ? 'scale-[1.02] shadow-md'
                       : 'opacity-75 hover:opacity-100 hover:scale-[1.01]'
