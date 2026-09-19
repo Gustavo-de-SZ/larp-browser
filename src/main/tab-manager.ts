@@ -1685,6 +1685,12 @@ export class TabManager {
     return this.switcherOpenedWithModifier;
   }
 
+  public async quickFlipMruTab() {
+    if (this.mruTabIds.length > 1) {
+      await this.switchTab(this.mruTabIds[1]);
+    }
+  }
+
   // --- Find in Page ---
 
   public findInPage(text: string, forward = true, findNext = false) {

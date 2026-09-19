@@ -62,6 +62,8 @@ export function matchesInput(input: Electron.Input, parsed: ParsedShortcut): boo
 
 export function registerShortcuts(window: BrowserWindow, tabManager: TabManager) {
   let isCtrlPressed = false;
+  let quickFlipTimer: NodeJS.Timeout | null = null;
+  let isQuickFlipPending = false;
 
   const getShortcutKey = (actionId: ShortcutActionId): string => {
     const settings = tabManager.getSettings();
@@ -84,6 +86,20 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
     if (input.key === 'Control' || input.key === 'Alt' || input.key === 'Meta') {
       if (input.type === 'keyUp') {
         if (input.key === 'Control') isCtrlPressed = false;
+
+        // If quick-flip was pending (user released modifier within 150ms):
+        if (isQuickFlipPending) {
+          if (quickFlipTimer) {
+            clearTimeout(quickFlipTimer);
+            quickFlipTimer = null;
+          }
+          isQuickFlipPending = false;
+          event.preventDefault();
+          tabManager.quickFlipMruTab();
+          return;
+        }
+
+        // If visual switcher HUD is active and was opened with modifier:
         if (tabManager.isSwitcherActive() && tabManager.wasSwitcherOpenedWithModifier()) {
           event.preventDefault();
           tabManager.commitSwitcher(true);
@@ -141,11 +157,32 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
     // 1. Tab Switcher Toggle / Cycle
     if (isTriggered('openSwitcher', input)) {
       event.preventDefault();
-      if (!tabManager.getState().isSwitcherOpen) {
-        const hasModifier = Boolean(input.control || input.alt || input.meta);
-        tabManager.openSwitcher(hasModifier);
-      } else {
+      const hasModifier = Boolean(input.control || input.alt || input.meta);
+
+      if (tabManager.getState().isSwitcherOpen) {
+        // Switcher is already open: cycle forwards/backwards
         tabManager.cycleSwitcher(input.shift ? 'backward' : 'forward');
+      } else if (isQuickFlipPending) {
+        // User pressed Tab AGAIN before the 150ms timer elapsed (e.g. Ctrl+Tab+Tab):
+        // Immediately reveal the switcher HUD and cycle to the next tab
+        if (quickFlipTimer) {
+          clearTimeout(quickFlipTimer);
+          quickFlipTimer = null;
+        }
+        isQuickFlipPending = false;
+        tabManager.openSwitcher(hasModifier);
+        tabManager.cycleSwitcher(input.shift ? 'backward' : 'forward');
+      } else if (hasModifier) {
+        // User pressed Ctrl+Tab with modifier: start 150ms timer for fast flip vs visual HUD
+        isQuickFlipPending = true;
+        quickFlipTimer = setTimeout(() => {
+          quickFlipTimer = null;
+          isQuickFlipPending = false;
+          tabManager.openSwitcher(true);
+        }, 150);
+      } else {
+        // Triggered without modifier (e.g. single key shortcut): open switcher HUD immediately
+        tabManager.openSwitcher(false);
       }
       return;
     }
