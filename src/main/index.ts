@@ -148,6 +148,25 @@ async function createWindow() {
 
 app.whenReady().then(() => {
   setupSecurityDefaults();
+
+  // Configure high-performance built-in host resolver with DNS-over-HTTPS (DoH)
+  // Bypasses unresponsive local DHCP nameservers and eliminates glibc DNS timeout bottlenecks
+  try {
+    app.configureHostResolver({
+      enableBuiltInResolver: true,
+      enableHappyEyeballs: true,
+      secureDnsMode: 'automatic',
+      secureDnsServers: [
+        'https://1.1.1.1/dns-query{?dns}',
+        'https://8.8.8.8/dns-query{?dns}',
+        'https://dns.google/dns-query{?dns}',
+        'https://cloudflare-dns.com/dns-query{?dns}',
+      ],
+    });
+  } catch (err) {
+    console.warn('Failed to configure host resolver:', err);
+  }
+
   createWindow();
 
   app.on('activate', () => {
