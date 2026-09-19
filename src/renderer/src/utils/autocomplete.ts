@@ -1,15 +1,16 @@
-import type { BookmarkItem, HistoryItem } from '@/shared/types';
+import type { BookmarkItem, HistoryItem, TabInfo } from '@/shared/types';
 import { SUPPORTED_BANGS, parseBangQuery } from '@/shared/bangs';
 
 export interface UrlSuggestion {
   id: string;
-  type: 'top-hit' | 'history' | 'bookmark' | 'search' | 'bang';
+  type: 'top-hit' | 'history' | 'bookmark' | 'search' | 'bang' | 'tab';
   title: string;
   url: string;
   displayUrl: string;
   cleanDomain: string;
   favicon?: string;
   visitedAt?: number;
+  tabId?: string;
 }
 
 /**
@@ -45,11 +46,57 @@ export function computeUrlSuggestions(
   query: string,
   history: HistoryItem[] = [],
   bookmarks: BookmarkItem[] = [],
-  defaultSearchEngine: string = 'google'
+  defaultSearchEngine: string = 'google',
+  openTabs: TabInfo[] = [],
+  activeTabId?: string
 ): UrlSuggestion[] {
   const q = query.trim().toLowerCase();
   const results: UrlSuggestion[] = [];
   const seenUrls = new Set<string>();
+
+  // Explicit Tab Search with % or @tabs
+  if (q.startsWith('%') || q.startsWith('@tabs')) {
+    let tabQuery = '';
+    if (q.startsWith('%')) {
+      tabQuery = q.slice(1).trim();
+    } else if (q.startsWith('@tabs')) {
+      tabQuery = q.slice(5).trim();
+    }
+
+    const matched = openTabs.filter((t) => {
+      if (!tabQuery) return true;
+      const titleLower = (t.title || '').toLowerCase();
+      const urlLower = (t.url || '').toLowerCase();
+      return titleLower.includes(tabQuery) || urlLower.includes(tabQuery);
+    });
+
+    for (const t of matched.slice(0, 8)) {
+      const { cleanUrl, cleanDomain } = cleanUrlForMatching(t.url);
+      results.push({
+        id: `tab-${t.id}`,
+        type: 'tab',
+        title: t.title || cleanDomain || 'Untitled Tab',
+        url: t.url,
+        displayUrl: cleanUrl,
+        cleanDomain,
+        favicon: t.favicon,
+        tabId: t.id,
+      });
+    }
+
+    if (results.length === 0) {
+      results.push({
+        id: 'no-tab-matches',
+        type: 'tab',
+        title: `No open tabs matching "${tabQuery}"`,
+        url: '',
+        displayUrl: '',
+        cleanDomain: '',
+      });
+    }
+
+    return results;
+  }
 
   // If query is empty, show recent bookmarks and history items
   if (!q) {
@@ -166,6 +213,38 @@ export function computeUrlSuggestions(
     evaluateItem(h.url, h.title, 'history', h.id, undefined, h.visitedAt);
   }
 
+  // Evaluate other open tabs for "Switch to Tab" suggestion
+  for (const t of openTabs) {
+    if (t.id === activeTabId || !t.url || t.url === 'about:blank') continue;
+    const { cleanUrl, cleanDomain } = cleanUrlForMatching(t.url);
+    const cleanUrlLower = cleanUrl.toLowerCase();
+    const cleanDomainLower = cleanDomain.toLowerCase();
+    const titleLower = (t.title || '').toLowerCase();
+
+    let tabScore = 0;
+    if (titleLower.startsWith(q) || cleanDomainLower.startsWith(q)) {
+      tabScore = 950;
+    } else if (titleLower.includes(q) || cleanUrlLower.includes(q)) {
+      tabScore = 750;
+    }
+
+    if (tabScore > 0) {
+      candidates.push({
+        suggestion: {
+          id: `tab-${t.id}`,
+          type: 'tab',
+          title: t.title || cleanDomain,
+          url: t.url,
+          displayUrl: cleanUrl,
+          cleanDomain,
+          favicon: t.favicon,
+          tabId: t.id,
+        },
+        score: tabScore,
+      });
+    }
+  }
+
   // If query starts with '!', handle bang exploration or execution
   if (q.startsWith('!')) {
     const bangMatch = parseBangQuery(query);
@@ -258,7 +337,14 @@ export function computeInlineAutocomplete(
   query: string,
   topSuggestion?: UrlSuggestion
 ): { fullCompletedText: string; suffix: string } | null {
-  if (!query || !topSuggestion || topSuggestion.type === 'search' || topSuggestion.type === 'bang') return null;
+  if (
+    !query ||
+    !topSuggestion ||
+    topSuggestion.type === 'search' ||
+    topSuggestion.type === 'bang' ||
+    topSuggestion.type === 'tab'
+  )
+    return null;
 
   const qLower = query.toLowerCase();
 

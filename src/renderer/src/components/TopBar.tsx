@@ -163,7 +163,9 @@ export const TopBar: React.FC<TopBarProps> = ({
       urlInput,
       historyList,
       state.bookmarks || [],
-      state.settings?.defaultSearchEngine || 'google'
+      state.settings?.defaultSearchEngine || 'google',
+      state.tabs,
+      state.activeTabId
     );
     setSuggestions(computed);
     setSelectedIndex(-1);
@@ -192,7 +194,9 @@ export const TopBar: React.FC<TopBarProps> = ({
       rawVal,
       historyList,
       state.bookmarks || [],
-      state.settings?.defaultSearchEngine || 'google'
+      state.settings?.defaultSearchEngine || 'google',
+      state.tabs,
+      state.activeTabId
     );
     setSuggestions(computed);
     setIsDropdownOpen(computed.length > 0);
@@ -290,15 +294,33 @@ export const TopBar: React.FC<TopBarProps> = ({
   };
 
   const handleSelectSuggestion = (suggestion: UrlSuggestion) => {
-    if (!activeTab) return;
     setIsDropdownOpen(false);
     setIsFocused(false);
-    window.browserApi.navigateTab(activeTab.id, suggestion.url);
     inputRef.current?.blur();
+
+    if (suggestion.type === 'tab' && suggestion.tabId) {
+      window.browserApi.switchTab(suggestion.tabId);
+      return;
+    }
+
+    if (!activeTab || !suggestion.url) return;
+    window.browserApi.navigateTab(activeTab.id, suggestion.url);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isDropdownOpen && selectedIndex >= 0 && selectedIndex < suggestions.length) {
+      const selected = suggestions[selectedIndex];
+      if (selected.type === 'tab' && selected.tabId) {
+        setIsDropdownOpen(false);
+        setIsFocused(false);
+        inputRef.current?.blur();
+        window.browserApi.switchTab(selected.tabId);
+        return;
+      }
+    }
+
     if (!activeTab) return;
 
     let targetUrl = urlInput.trim();
@@ -554,7 +576,20 @@ export const TopBar: React.FC<TopBarProps> = ({
                     {/* Left: Icon & Text (Title + URL) */}
                     <div className="flex items-center space-x-2.5 min-w-0 flex-1 mr-2">
                       <div className="shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-[var(--text-muted)]">
-                        {item.type === 'bookmark' ? (
+                        {item.type === 'tab' ? (
+                          item.favicon ? (
+                            <img
+                              src={item.favicon}
+                              alt=""
+                              className="w-3.5 h-3.5 rounded-xs"
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <Layers className="w-3.5 h-3.5 text-sky-400" />
+                          )
+                        ) : item.type === 'bookmark' ? (
                           <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
                         ) : item.type === 'bang' ? (
                           <Zap className="w-3.5 h-3.5 text-violet-400 fill-violet-400/20" />
@@ -581,6 +616,11 @@ export const TopBar: React.FC<TopBarProps> = ({
 
                     {/* Right: Badge / Tag */}
                     <div className="shrink-0 flex items-center space-x-1.5">
+                      {item.type === 'tab' && (
+                        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/20">
+                          Switch to Tab
+                        </span>
+                      )}
                       {item.type === 'bang' && (
                         <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-400 border border-violet-500/25 font-mono">
                           !Bang
@@ -622,7 +662,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                 className="px-3 py-1.5 border-t text-[10px] text-[var(--text-muted)] flex items-center justify-between opacity-70 select-none"
                 style={{ borderColor: 'var(--border-subtle)' }}
               >
-                <span>↑↓ Navigate • ↵ Open • Tab Complete</span>
+                <span>↑↓ Navigate • ↵ Open • % Tabs • Tab Complete</span>
                 <span>Esc Dismiss</span>
               </div>
             </div>
