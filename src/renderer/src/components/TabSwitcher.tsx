@@ -19,6 +19,7 @@ interface TabSwitcherProps {
 
 export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
   const [filterQuery, setFilterQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'audio' | 'sleeping' | 'private'>('all');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const cardsContainerRef = useRef<HTMLDivElement>(null);
   const switcherContainerRef = useRef<HTMLDivElement>(null);
@@ -43,14 +44,27 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
           .map((id) => state.tabs.find((t) => t.id === id))
           .filter((t): t is TabInfo => Boolean(t));
 
+  const audioCount = baseTabs.filter((t) => t.audioPlaying || t.isMuted).length;
+  const sleepingCount = baseTabs.filter((t) => t.isHibernated).length;
+  const privateCount = baseTabs.filter((t) => t.isPrivate).length;
+
+  let tabsToDisplay = baseTabs;
+  if (categoryFilter === 'audio') {
+    tabsToDisplay = tabsToDisplay.filter((t) => t.audioPlaying || t.isMuted);
+  } else if (categoryFilter === 'sleeping') {
+    tabsToDisplay = tabsToDisplay.filter((t) => t.isHibernated);
+  } else if (categoryFilter === 'private') {
+    tabsToDisplay = tabsToDisplay.filter((t) => t.isPrivate);
+  }
+
   // Filter tabs based on search query
   const filteredTabs = filterQuery.trim()
-    ? baseTabs.filter(
+    ? tabsToDisplay.filter(
         (t) =>
           t.title.toLowerCase().includes(filterQuery.toLowerCase()) ||
           t.url.toLowerCase().includes(filterQuery.toLowerCase())
       )
-    : baseTabs;
+    : tabsToDisplay;
 
   const selectedIndex = Math.min(
     state.selectedSwitcherIndex,
@@ -79,6 +93,14 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
 
       if (keyLower === 'escape') {
         e.preventDefault();
+        if (document.activeElement === searchInputRef.current) {
+          if (filterQuery) {
+            setFilterQuery('');
+          } else {
+            searchInputRef.current.blur();
+          }
+          return;
+        }
         window.browserApi.closeSwitcher();
         return;
       }
@@ -86,6 +108,33 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
       if (keyLower === 'enter' || keyLower === 'return') {
         e.preventDefault();
         window.browserApi.commitSwitcher();
+        return;
+      }
+
+      // '/' triggers instant search input focus
+      if (keyLower === '/' && document.activeElement !== searchInputRef.current) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+
+      // 'm' toggles mute on highlighted tab
+      if (keyLower === 'm' && document.activeElement !== searchInputRef.current) {
+        e.preventDefault();
+        const currentTab = filteredTabs[selectedIndex];
+        if (currentTab) {
+          window.browserApi.toggleMuteTab(currentTab.id);
+        }
+        return;
+      }
+
+      // 'z' sleeps/hibernates highlighted tab
+      if (keyLower === 'z' && document.activeElement !== searchInputRef.current) {
+        e.preventDefault();
+        const currentTab = filteredTabs[selectedIndex];
+        if (currentTab && !currentTab.isHibernated) {
+          window.browserApi.hibernateTab(currentTab.id);
+        }
         return;
       }
 
@@ -257,28 +306,85 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
             </div>
           </div>
 
-          {/* Quick Filter Search */}
-          <div className="relative w-64">
-            <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-[var(--text-muted)]" />
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={filterQuery}
-              onChange={(e) => setFilterQuery(e.target.value)}
-              placeholder="Search open tabs..."
-              className="w-full h-8 pl-8 pr-3 rounded-lg text-xs focus:outline-none transition-all border"
-              style={{
-                backgroundColor: 'var(--bg-input)',
-                borderColor: 'var(--border-subtle)',
-                color: 'var(--text-main)',
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-selected)';
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-subtle)';
-              }}
-            />
+          {/* Quick Filter Search & Category Chips */}
+          <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1 mr-1">
+              <button
+                onClick={() => setCategoryFilter('all')}
+                className={`px-2 py-1 rounded-md text-[10px] font-medium transition-all cursor-pointer ${
+                  categoryFilter === 'all'
+                    ? 'bg-[var(--accent-primary)] text-[var(--text-on-accent)] shadow-xs'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
+                }`}
+              >
+                All ({baseTabs.length})
+              </button>
+              {audioCount > 0 && (
+                <button
+                  onClick={() => setCategoryFilter(categoryFilter === 'audio' ? 'all' : 'audio')}
+                  className={`flex items-center space-x-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all cursor-pointer ${
+                    categoryFilter === 'audio'
+                      ? 'bg-[var(--accent-primary)] text-[var(--text-on-accent)] shadow-xs'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
+                  }`}
+                  title="Filter tabs with audio"
+                >
+                  <Volume2 className="w-3 h-3" />
+                  <span>Audio ({audioCount})</span>
+                </button>
+              )}
+              {sleepingCount > 0 && (
+                <button
+                  onClick={() => setCategoryFilter(categoryFilter === 'sleeping' ? 'all' : 'sleeping')}
+                  className={`flex items-center space-x-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all cursor-pointer ${
+                    categoryFilter === 'sleeping'
+                      ? 'bg-sky-500 text-white shadow-xs'
+                      : 'text-sky-400 hover:bg-sky-500/10'
+                  }`}
+                  title="Filter sleeping tabs"
+                >
+                  <Moon className="w-3 h-3" />
+                  <span>Sleeping ({sleepingCount})</span>
+                </button>
+              )}
+              {privateCount > 0 && (
+                <button
+                  onClick={() => setCategoryFilter(categoryFilter === 'private' ? 'all' : 'private')}
+                  className={`flex items-center space-x-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all cursor-pointer ${
+                    categoryFilter === 'private'
+                      ? 'bg-purple-500 text-white shadow-xs'
+                      : 'text-purple-400 hover:bg-purple-500/10'
+                  }`}
+                  title="Filter private tabs"
+                >
+                  <VenetianMask className="w-3 h-3" />
+                  <span>Private ({privateCount})</span>
+                </button>
+              )}
+            </div>
+
+            <div className="relative w-56">
+              <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-[var(--text-muted)]" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={filterQuery}
+                onChange={(e) => setFilterQuery(e.target.value)}
+                placeholder="Search tabs (or press /)..."
+                className="w-full h-8 pl-8 pr-3 rounded-lg text-xs focus:outline-none transition-all border"
+                style={{
+                  backgroundColor: 'var(--bg-input)',
+                  borderColor: 'var(--border-subtle)',
+                  color: 'var(--text-main)',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border-selected)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                }}
+              />
+            </div>
           </div>
         </div>
 
@@ -339,24 +445,44 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2 flex-shrink-0">
+                  <div className="flex items-center space-x-1.5 flex-shrink-0">
                     {tab.isPrivate && (
                       <span className="flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-500/15 text-purple-400 border border-purple-500/20">
                         <VenetianMask className="w-2.5 h-2.5" />
                         <span>Private</span>
                       </span>
                     )}
-                    {tab.isHibernated && (
-                      <span className="flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                        <Moon className="w-2.5 h-2.5" />
-                        <span>Sleeping</span>
-                      </span>
-                    )}
-                    {tab.audioPlaying && (
-                      <Volume2 className="w-3 h-3 text-[var(--accent-primary)] animate-pulse" />
-                    )}
-                    {tab.isMuted && (
-                      <VolumeX className="w-3 h-3 text-rose-400" />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!tab.isHibernated) {
+                          window.browserApi.hibernateTab(tab.id);
+                        }
+                      }}
+                      className={`p-1 rounded transition-colors ${
+                        tab.isHibernated
+                          ? 'text-sky-400 bg-sky-500/15'
+                          : 'text-[var(--text-muted)] hover:text-sky-400 hover:bg-sky-500/10'
+                      }`}
+                      title={tab.isHibernated ? 'Tab is sleeping' : 'Put tab to sleep (Z)'}
+                    >
+                      <Moon className="w-3 h-3" />
+                    </button>
+                    {(tab.audioPlaying || tab.isMuted) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.browserApi.toggleMuteTab(tab.id);
+                        }}
+                        className="p-1 rounded transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                        title={tab.isMuted ? 'Unmute Tab (M)' : 'Mute Tab (M)'}
+                      >
+                        {tab.isMuted ? (
+                          <VolumeX className="w-3 h-3 text-rose-400" />
+                        ) : (
+                          <Volume2 className="w-3 h-3 text-[var(--accent-primary)] animate-pulse" />
+                        )}
+                      </button>
                     )}
                     <span className="text-[10px] text-[var(--text-muted)]">
                       {formatLastAccessed(tab.lastAccessed)}
@@ -364,7 +490,7 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                     <button
                       onClick={(e) => handleCloseTab(e, tab.id)}
                       className="p-1 rounded text-[var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
-                      title="Close Tab (W)"
+                      title="Close Tab (W or Middle Click)"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -384,6 +510,11 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                 <div
                   key={tab.id}
                   onClick={() => handleCardClick(index)}
+                  onAuxClick={(e) => {
+                    if (e.button === 1) {
+                      handleCloseTab(e, tab.id);
+                    }
+                  }}
                   className={`w-full ${showPreviews ? 'h-52' : 'h-28'} rounded-xl border flex flex-col cursor-pointer transition-all duration-150 relative overflow-hidden group ${
                     isSelected
                       ? 'scale-[1.02] shadow-md'
@@ -435,21 +566,40 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                           <VenetianMask className="w-3 h-3" />
                         </span>
                       )}
-                      {tab.isHibernated && (
-                        <span title="Tab is sleeping to save memory">
-                          <Moon className="w-3 h-3 text-sky-400" />
-                        </span>
-                      )}
-                      {tab.audioPlaying && (
-                        <Volume2 className="w-3 h-3 text-[var(--accent-primary)] animate-pulse" />
-                      )}
-                      {tab.isMuted && (
-                        <VolumeX className="w-3 h-3 text-rose-400" />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!tab.isHibernated) {
+                            window.browserApi.hibernateTab(tab.id);
+                          }
+                        }}
+                        className={`p-1 rounded transition-colors ${
+                          tab.isHibernated ? 'text-sky-400 bg-sky-500/15' : 'text-[var(--text-muted)] hover:text-sky-400 hover:bg-sky-500/10'
+                        }`}
+                        title={tab.isHibernated ? 'Tab is sleeping' : 'Put tab to sleep (Z)'}
+                      >
+                        <Moon className="w-3 h-3" />
+                      </button>
+                      {(tab.audioPlaying || tab.isMuted) && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.browserApi.toggleMuteTab(tab.id);
+                          }}
+                          className="p-1 rounded transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                          title={tab.isMuted ? 'Unmute Tab (M)' : 'Mute Tab (M)'}
+                        >
+                          {tab.isMuted ? (
+                            <VolumeX className="w-3 h-3 text-rose-400" />
+                          ) : (
+                            <Volume2 className="w-3 h-3 text-[var(--accent-primary)] animate-pulse" />
+                          )}
+                        </button>
                       )}
                       <button
                         onClick={(e) => handleCloseTab(e, tab.id)}
                         className="p-1 rounded transition-colors text-[var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10"
-                        title="Close Tab (W)"
+                        title="Close Tab (W or Middle Click)"
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -533,10 +683,10 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
             color: 'var(--text-muted)',
           }}
         >
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3.5 flex-wrap gap-y-1">
             <span className="flex items-center space-x-1">
               <kbd className="px-1.5 py-0.5 rounded font-mono text-[10px] border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">
-                ← / →
+                ← ↑ → ↓
               </kbd>
               <span>Navigate</span>
             </span>
@@ -560,13 +710,31 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
             </span>
             <span className="flex items-center space-x-1">
               <kbd className="px-1.5 py-0.5 rounded font-mono text-[10px] border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">
+                M
+              </kbd>
+              <span>Mute</span>
+            </span>
+            <span className="flex items-center space-x-1">
+              <kbd className="px-1.5 py-0.5 rounded font-mono text-[10px] border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">
+                Z
+              </kbd>
+              <span>Sleep</span>
+            </span>
+            <span className="flex items-center space-x-1">
+              <kbd className="px-1.5 py-0.5 rounded font-mono text-[10px] border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">
+                /
+              </kbd>
+              <span>Search</span>
+            </span>
+            <span className="flex items-center space-x-1">
+              <kbd className="px-1.5 py-0.5 rounded font-mono text-[10px] border bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--text-main)]">
                 Esc
               </kbd>
               <span>Cancel</span>
             </span>
           </div>
 
-          <div className="text-[11px] font-medium text-[var(--text-muted)]">
+          <div className="text-[11px] font-medium text-[var(--text-muted)] pl-2">
             larp switcher
           </div>
         </div>

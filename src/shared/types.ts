@@ -191,6 +191,7 @@ export interface IpcRendererApi {
   goForward: (tabId: string) => Promise<void>;
   reloadTab: (tabId: string) => Promise<void>;
   toggleMuteTab: (tabId: string) => Promise<void>;
+  hibernateTab: (tabId: string) => Promise<void>;
 
   // Zoom
   setZoomFactor: (tabId: string, factor: number) => Promise<number>;

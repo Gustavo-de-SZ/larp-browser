@@ -44,6 +44,10 @@ export function registerIpcHandlers(
     tabManager.toggleMuteTab(tabId);
   });
 
+  ipcMain.handle('browser:hibernate-tab', async (_event, tabId: string) => {
+    await tabManager.hibernateTab(tabId);
+  });
+
   // Zoom handler
   ipcMain.handle('browser:set-zoom', (_event, tabId: string, factor: number) => {
     return tabManager.setZoomFactor(tabId, factor);

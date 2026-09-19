@@ -81,6 +81,7 @@ const api: IpcRendererApi = {
   goForward: (tabId: string) => ipcRenderer.invoke('browser:go-forward', tabId),
   reloadTab: (tabId: string) => ipcRenderer.invoke('browser:reload-tab', tabId),
   toggleMuteTab: (tabId: string) => ipcRenderer.invoke('browser:toggle-mute-tab', tabId),
+  hibernateTab: (tabId: string) => ipcRenderer.invoke('browser:hibernate-tab', tabId),
 
   // Zoom
   setZoomFactor: (tabId: string, factor: number) =>
