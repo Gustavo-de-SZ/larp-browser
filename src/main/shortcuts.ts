@@ -80,12 +80,16 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
   };
 
   const handleInputEvent = (event: Electron.Event, input: Electron.Input) => {
-    // Track Ctrl modifier state
-    if (input.key === 'Control') {
+    // Track modifier state & commit switcher on modifier release
+    if (input.key === 'Control' || input.key === 'Alt' || input.key === 'Meta') {
       if (input.type === 'keyUp') {
-        isCtrlPressed = false;
+        if (input.key === 'Control') isCtrlPressed = false;
+        if (tabManager.isSwitcherActive() && tabManager.wasSwitcherOpenedWithModifier()) {
+          event.preventDefault();
+          tabManager.commitSwitcher(true);
+        }
       } else if (input.type === 'keyDown') {
-        isCtrlPressed = true;
+        if (input.key === 'Control') isCtrlPressed = true;
       }
       return;
     }
@@ -138,7 +142,8 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
     if (isTriggered('openSwitcher', input)) {
       event.preventDefault();
       if (!tabManager.getState().isSwitcherOpen) {
-        tabManager.openSwitcher();
+        const hasModifier = Boolean(input.control || input.alt || input.meta);
+        tabManager.openSwitcher(hasModifier);
       } else {
         tabManager.cycleSwitcher(input.shift ? 'backward' : 'forward');
       }

@@ -1598,9 +1598,12 @@ export class TabManager {
 
   // --- Alt-Tab / Ctrl-Tab Switcher HUD Controls ---
 
-  public async openSwitcher() {
+  private switcherOpenedWithModifier = false;
+
+  public async openSwitcher(openedWithModifier = false) {
     if (this.tabs.size === 0) return;
 
+    this.switcherOpenedWithModifier = openedWithModifier;
     this.isSwitcherOpen = true;
     // Set index to the next tab in MRU order (index 1 if available, otherwise 0)
     this.selectedSwitcherIndex = this.mruTabIds.length > 1 ? 1 : 0;
@@ -1628,6 +1631,7 @@ export class TabManager {
 
   public closeSwitcher() {
     if (!this.isSwitcherOpen) return;
+    this.switcherOpenedWithModifier = false;
     this.isSwitcherOpen = false;
     this.attachActiveTabView();
     this.notifyStateChange();
@@ -1658,8 +1662,10 @@ export class TabManager {
     }
   }
 
-  public async commitSwitcher() {
+  public async commitSwitcher(onlyIfModifier = false) {
     if (!this.isSwitcherOpen) return;
+    if (onlyIfModifier && !this.switcherOpenedWithModifier) return;
+    this.switcherOpenedWithModifier = false;
     const targetTabId = this.mruTabIds[this.selectedSwitcherIndex];
     this.isSwitcherOpen = false;
 
@@ -1669,6 +1675,14 @@ export class TabManager {
       this.attachActiveTabView();
       this.notifyStateChange();
     }
+  }
+
+  public isSwitcherActive(): boolean {
+    return this.isSwitcherOpen;
+  }
+
+  public wasSwitcherOpenedWithModifier(): boolean {
+    return this.switcherOpenedWithModifier;
   }
 
   // --- Find in Page ---

@@ -246,7 +246,7 @@ export interface IpcRendererApi {
   closeSwitcher: () => Promise<void>;
   cycleSwitcher: (direction: SwitcherDirection) => Promise<void>;
   selectSwitcherIndex: (index: number) => Promise<void>;
-  commitSwitcher: () => Promise<void>;
+  commitSwitcher: (onlyIfModifier?: boolean) => Promise<void>;
   setModalOpen: (isOpen: boolean) => Promise<void>;
 
   // Window operations

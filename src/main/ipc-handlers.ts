@@ -159,8 +159,8 @@ export function registerIpcHandlers(
     tabManager.selectSwitcherIndex(index);
   });
 
-  ipcMain.handle('browser:commit-switcher', () => {
-    return tabManager.commitSwitcher();
+  ipcMain.handle('browser:commit-switcher', (_e, onlyIfModifier = false) => {
+    return tabManager.commitSwitcher(onlyIfModifier);
   });
 
   ipcMain.handle('browser:set-modal-open', (_event, isOpen: boolean) => {

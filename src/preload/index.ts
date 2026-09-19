@@ -165,7 +165,7 @@ const api: IpcRendererApi = {
   closeSwitcher: () => ipcRenderer.invoke('browser:close-switcher'),
   cycleSwitcher: (direction: SwitcherDirection) => ipcRenderer.invoke('browser:cycle-switcher', direction),
   selectSwitcherIndex: (index: number) => ipcRenderer.invoke('browser:select-switcher-index', index),
-  commitSwitcher: () => ipcRenderer.invoke('browser:commit-switcher'),
+  commitSwitcher: (onlyIfModifier?: boolean) => ipcRenderer.invoke('browser:commit-switcher', onlyIfModifier),
   setModalOpen: (isOpen: boolean) => ipcRenderer.invoke('browser:set-modal-open', isOpen),
 
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),

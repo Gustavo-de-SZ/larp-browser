@@ -144,8 +144,19 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
       }
     };
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (!state.isSwitcherOpen) return;
+      if (e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') {
+        window.browserApi.commitSwitcher(true);
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
   }, [state.isSwitcherOpen, selectedIndex, filteredTabs]);
 
   const handleCardClick = (index: number) => {
