@@ -1,8 +1,9 @@
 import type { BookmarkItem, HistoryItem } from '@/shared/types';
+import { SUPPORTED_BANGS, parseBangQuery } from '@/shared/bangs';
 
 export interface UrlSuggestion {
   id: string;
-  type: 'top-hit' | 'history' | 'bookmark' | 'search';
+  type: 'top-hit' | 'history' | 'bookmark' | 'search' | 'bang';
   title: string;
   url: string;
   displayUrl: string;
@@ -165,6 +166,42 @@ export function computeUrlSuggestions(
     evaluateItem(h.url, h.title, 'history', h.id, undefined, h.visitedAt);
   }
 
+  // If query starts with '!', handle bang exploration or execution
+  if (q.startsWith('!')) {
+    const bangMatch = parseBangQuery(query);
+    if (bangMatch && bangMatch.cleanQuery) {
+      results.push({
+        id: `bang-${bangMatch.bangDef.bang}`,
+        type: 'bang',
+        title: `Search ${bangMatch.bangDef.name} for "${bangMatch.cleanQuery}"`,
+        url: bangMatch.targetUrl,
+        displayUrl: `${bangMatch.bangDef.bang} ${bangMatch.cleanQuery}`,
+        cleanDomain: bangMatch.bangDef.homeUrl.replace(/^https?:\/\//, ''),
+      });
+      // Also include any bookmarks/history that match
+      for (const c of candidates.slice(0, 4)) {
+        results.push(c.suggestion);
+      }
+      return results;
+    }
+
+    // Exploring bangs (e.g. "!" or "!y" or "!g")
+    const matchingBangs = SUPPORTED_BANGS.filter(
+      (b) => b.bang.startsWith(q) || b.aliases?.some((a) => a.startsWith(q))
+    );
+    for (const b of matchingBangs.slice(0, 6)) {
+      results.push({
+        id: `bang-help-${b.bang}`,
+        type: 'bang',
+        title: `${b.bang} — Search ${b.name}`,
+        url: b.homeUrl,
+        displayUrl: `${b.bang} <query>`,
+        cleanDomain: b.homeUrl.replace(/^https?:\/\//, ''),
+      });
+    }
+    return results;
+  }
+
   // Sort by score descending
   candidates.sort((a, b) => b.score - a.score);
 
@@ -176,14 +213,24 @@ export function computeUrlSuggestions(
   };
   const engineName = engines[defaultSearchEngine] || 'Google';
 
-  const searchSuggestion: UrlSuggestion = {
-    id: 'search-fallback',
-    type: 'search',
-    title: `Search ${engineName} for "${query}"`,
-    url: query,
-    displayUrl: query,
-    cleanDomain: '',
-  };
+  const bangMatch = parseBangQuery(query);
+  const searchSuggestion: UrlSuggestion = bangMatch
+    ? {
+        id: 'search-bang',
+        type: 'bang',
+        title: `Search ${bangMatch.bangDef.name} for "${bangMatch.cleanQuery || '...'}"`,
+        url: bangMatch.targetUrl,
+        displayUrl: query,
+        cleanDomain: bangMatch.bangDef.homeUrl.replace(/^https?:\/\//, ''),
+      }
+    : {
+        id: 'search-fallback',
+        type: 'search',
+        title: `Search ${engineName} for "${query}"`,
+        url: query,
+        displayUrl: query,
+        cleanDomain: '',
+      };
 
   const hasTopHit = candidates.length > 0 && candidates[0].suggestion.type === 'top-hit';
 
@@ -211,7 +258,7 @@ export function computeInlineAutocomplete(
   query: string,
   topSuggestion?: UrlSuggestion
 ): { fullCompletedText: string; suffix: string } | null {
-  if (!query || !topSuggestion || topSuggestion.type === 'search') return null;
+  if (!query || !topSuggestion || topSuggestion.type === 'search' || topSuggestion.type === 'bang') return null;
 
   const qLower = query.toLowerCase();
 

@@ -22,6 +22,7 @@ import {
   Clock,
   Download,
   VenetianMask,
+  Zap,
 } from 'lucide-react';
 import type { BrowserState, HistoryItem } from '@/shared/types';
 import type { ThemeMode } from '../App';
@@ -555,6 +556,8 @@ export const TopBar: React.FC<TopBarProps> = ({
                       <div className="shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-[var(--text-muted)]">
                         {item.type === 'bookmark' ? (
                           <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
+                        ) : item.type === 'bang' ? (
+                          <Zap className="w-3.5 h-3.5 text-violet-400 fill-violet-400/20" />
                         ) : item.type === 'search' ? (
                           <Search className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
                         ) : item.type === 'top-hit' ? (
@@ -578,6 +581,11 @@ export const TopBar: React.FC<TopBarProps> = ({
 
                     {/* Right: Badge / Tag */}
                     <div className="shrink-0 flex items-center space-x-1.5">
+                      {item.type === 'bang' && (
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-400 border border-violet-500/25 font-mono">
+                          !Bang
+                        </span>
+                      )}
                       {item.type === 'top-hit' && (
                         <span
                           className="text-[9px] font-semibold px-1.5 py-0.5 rounded"

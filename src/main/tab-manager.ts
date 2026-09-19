@@ -13,6 +13,7 @@ import type {
   ClearBrowsingDataOptions,
   WeatherData,
 } from '../shared/types';
+import { parseBangQuery } from '../shared/bangs';
 import type { DownloadManager } from './download-manager';
 
 export const TOP_BAR_HEIGHT = 44;
@@ -1488,22 +1489,14 @@ export class TabManager {
     if (!tab) return;
 
     let targetUrl = input.trim();
-    // Security: Disallow dangerous schemes (javascript:, data:, file:, shell:) from direct Omnibar entry
-    // If entered, treat them safely as a web search query
-    const isDangerousScheme = /^(javascript|data|file|vbscript|shell):/i.test(targetUrl);
-    if (isDangerousScheme) {
-      const engines = {
-        google: 'https://www.google.com/search?q=',
-        duckduckgo: 'https://duckduckgo.com/?q=',
-        brave: 'https://search.brave.com/search?q=',
-        bing: 'https://www.bing.com/search?q=',
-      };
-      const base = engines[this.settings.defaultSearchEngine] || engines.google;
-      targetUrl = `${base}${encodeURIComponent(targetUrl)}`;
-    } else if (!/^https?:\/\//i.test(targetUrl) && !/^about:/i.test(targetUrl)) {
-      if (targetUrl.includes('.') && !targetUrl.includes(' ')) {
-        targetUrl = 'https://' + targetUrl;
-      } else {
+    const bangMatch = parseBangQuery(targetUrl);
+    if (bangMatch) {
+      targetUrl = bangMatch.targetUrl;
+    } else {
+      // Security: Disallow dangerous schemes (javascript:, data:, file:, shell:) from direct Omnibar entry
+      // If entered, treat them safely as a web search query
+      const isDangerousScheme = /^(javascript|data|file|vbscript|shell):/i.test(targetUrl);
+      if (isDangerousScheme) {
         const engines = {
           google: 'https://www.google.com/search?q=',
           duckduckgo: 'https://duckduckgo.com/?q=',
@@ -1512,6 +1505,19 @@ export class TabManager {
         };
         const base = engines[this.settings.defaultSearchEngine] || engines.google;
         targetUrl = `${base}${encodeURIComponent(targetUrl)}`;
+      } else if (!/^https?:\/\//i.test(targetUrl) && !/^about:/i.test(targetUrl)) {
+        if (targetUrl.includes('.') && !targetUrl.includes(' ')) {
+          targetUrl = 'https://' + targetUrl;
+        } else {
+          const engines = {
+            google: 'https://www.google.com/search?q=',
+            duckduckgo: 'https://duckduckgo.com/?q=',
+            brave: 'https://search.brave.com/search?q=',
+            bing: 'https://www.bing.com/search?q=',
+          };
+          const base = engines[this.settings.defaultSearchEngine] || engines.google;
+          targetUrl = `${base}${encodeURIComponent(targetUrl)}`;
+        }
       }
     }
 
