@@ -21,6 +21,7 @@ import {
   VenetianMask,
   ShieldCheck,
   Eye,
+  Loader2,
 } from 'lucide-react';
 import type { BrowserState, WeatherData, HistoryItem } from '@/shared/types';
 import type { ThemeMode } from '../App';
@@ -753,7 +754,11 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
         {/* Center Search Input */}
         <form onSubmit={handleSearch} className="w-full relative">
           <div className="absolute left-3.5 top-3 flex items-center pointer-events-none text-[var(--text-muted)]">
-            <Search className="w-4 h-4" />
+            {activeTab?.isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin text-[var(--accent-primary)]" />
+            ) : (
+              <Search className="w-4 h-4" />
+            )}
           </div>
           <input
             ref={searchInputRef}

@@ -915,6 +915,13 @@ export class TabManager {
     if (!tab || !tab.view || tab.view.webContents.isDestroyed()) return;
 
     try {
+      const themeBg = this.settings.theme === 'dark' ? '#121214' : '#fafafa';
+      tab.view.setBackgroundColor(themeBg);
+    } catch {
+      // Ignore
+    }
+
+    try {
       // Clean previous custom CSS
       if (tab.cssKey) {
         await tab.view.webContents.removeInsertedCSS(tab.cssKey).catch(() => {});
@@ -951,6 +958,13 @@ export class TabManager {
         partition: tab.info.isPrivate ? 'incognito' : undefined,
       },
     });
+
+    try {
+      const themeBg = this.settings.theme === 'dark' ? '#121214' : '#fafafa';
+      view.setBackgroundColor(themeBg);
+    } catch {
+      // Ignore
+    }
 
     tab.view = view;
     tab.info.isHibernated = false;
@@ -1001,11 +1015,19 @@ export class TabManager {
       },
     });
 
+    try {
+      const themeBg = this.settings.theme === 'dark' ? '#121214' : '#fafafa';
+      view.setBackgroundColor(themeBg);
+    } catch {
+      // Ignore
+    }
+
     const info: TabInfo = {
       id,
       url: initialUrl,
       title: initialUrl === 'about:blank' ? (isPrivate ? 'Private Tab' : 'New Tab') : initialUrl,
-      isLoading: false,
+      isLoading: initialUrl !== 'about:blank',
+      hasLoadedPage: false,
       canGoBack: false,
       canGoForward: false,
       lastAccessed: Date.now(),
@@ -1093,8 +1115,11 @@ export class TabManager {
         const tab = this.tabs.get(tabId);
         if (tab) {
           tab.info.url = url;
+          if (url === 'about:blank') {
+            tab.info.hasLoadedPage = false;
+          }
           if (tabId === this.activeTabId && !this.isSwitcherOpen && !this.isModalOpen) {
-            if (url && url !== 'about:blank') {
+            if (tab.info.hasLoadedPage && url && url !== 'about:blank') {
               this.attachActiveTabView();
             } else {
               this.detachActiveTabView();
@@ -1111,15 +1136,30 @@ export class TabManager {
         tab.info.url = url;
         tab.info.canGoBack = wc.navigationHistory ? wc.navigationHistory.canGoBack() : wc.canGoBack();
         tab.info.canGoForward = wc.navigationHistory ? wc.navigationHistory.canGoForward() : wc.canGoForward();
-        if (tabId === this.activeTabId && !this.isSwitcherOpen && !this.isModalOpen) {
-          if (url && url !== 'about:blank') {
+        if (url && url !== 'about:blank') {
+          tab.info.hasLoadedPage = true;
+          if (tabId === this.activeTabId && !this.isSwitcherOpen && !this.isModalOpen) {
             this.attachActiveTabView();
-          } else {
+          }
+        } else {
+          tab.info.hasLoadedPage = false;
+          if (tabId === this.activeTabId && !this.isSwitcherOpen && !this.isModalOpen) {
             this.detachActiveTabView();
           }
         }
         this.addHistory(tab.info.title, url, tab.info.isPrivate);
         this.saveSession();
+        this.notifyStateChange();
+      }
+    });
+
+    wc.on('dom-ready', () => {
+      const tab = this.tabs.get(tabId);
+      if (tab && tab.info.url && tab.info.url !== 'about:blank') {
+        tab.info.hasLoadedPage = true;
+        if (tabId === this.activeTabId && !this.isSwitcherOpen && !this.isModalOpen) {
+          this.attachActiveTabView();
+        }
         this.notifyStateChange();
       }
     });
@@ -1134,10 +1174,14 @@ export class TabManager {
         tab.info.canGoForward = wc.navigationHistory ? wc.navigationHistory.canGoForward() : wc.canGoForward();
 
         // Ensure active tab view is attached when page finishes loading
-        if (tabId === this.activeTabId && !this.isSwitcherOpen) {
-          if (tab.info.url && tab.info.url !== 'about:blank') {
+        if (tab.info.url && tab.info.url !== 'about:blank') {
+          tab.info.hasLoadedPage = true;
+          if (tabId === this.activeTabId && !this.isSwitcherOpen) {
             this.attachActiveTabView();
-          } else {
+          }
+        } else {
+          tab.info.hasLoadedPage = false;
+          if (tabId === this.activeTabId && !this.isSwitcherOpen) {
             this.detachActiveTabView();
           }
         }
@@ -1159,6 +1203,12 @@ export class TabManager {
       const tab = this.tabs.get(tabId);
       if (tab) {
         tab.info.isLoading = false;
+        if (tab.info.url && tab.info.url !== 'about:blank') {
+          tab.info.hasLoadedPage = true;
+          if (tabId === this.activeTabId && !this.isSwitcherOpen) {
+            this.attachActiveTabView();
+          }
+        }
         this.notifyStateChange();
       }
     });
@@ -1282,8 +1332,8 @@ export class TabManager {
     if (this.isSwitcherOpen || this.isModalOpen) return;
     const tab = this.tabs.get(this.activeTabId)!;
 
-    // If active tab is about:blank, keep detached so the New Tab React dashboard is visible
-    if (!tab.info.url || tab.info.url === 'about:blank') {
+    // If active tab is about:blank or has not loaded a webpage yet, keep detached so the New Tab React dashboard is visible
+    if (!tab.info.url || tab.info.url === 'about:blank' || !tab.info.hasLoadedPage) {
       this.detachActiveTabView();
       return;
     }
@@ -1468,11 +1518,15 @@ export class TabManager {
     tab.info.url = targetUrl;
     tab.info.isLoading = true;
 
+    if (targetUrl === 'about:blank') {
+      tab.info.hasLoadedPage = false;
+    }
+
     const view = this.ensureTabView(tabId);
 
-    // Immediately attach the view if this is the active tab and it is not about:blank
+    // Only attach immediately if this active tab already has a loaded page (in-place navigation)
     if (tabId === this.activeTabId && !this.isSwitcherOpen) {
-      if (targetUrl && targetUrl !== 'about:blank') {
+      if (tab.info.hasLoadedPage && targetUrl !== 'about:blank') {
         this.attachActiveTabView();
       } else {
         this.detachActiveTabView();

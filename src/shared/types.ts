@@ -5,6 +5,7 @@ export interface TabInfo {
   favicon?: string;
   previewImage?: string; // base64 data URL for live Alt-Tab card thumbnail
   isLoading: boolean;
+  hasLoadedPage?: boolean;
   canGoBack: boolean;
   canGoForward: boolean;
   lastAccessed: number;

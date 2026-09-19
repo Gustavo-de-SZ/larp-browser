@@ -278,7 +278,7 @@ export const App: React.FC = () => {
   }, [isSettingsOpen, isShortcutsOpen, isFavoritesOpen, isOmnibarOpen, isDownloadsOpen]);
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
-  const isNewTab = !activeTab || !activeTab.url || activeTab.url === 'about:blank';
+  const isNewTab = !activeTab || !activeTab.url || activeTab.url === 'about:blank' || !activeTab.hasLoadedPage;
 
   return (
     <div
