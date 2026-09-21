@@ -50,6 +50,9 @@ const DEFAULT_SETTINGS: BrowserSettings = {
   showFavoritesOnNewTab: true,
   startupBehavior: 'new-tab',
   startupCustomUrl: 'https://www.google.com',
+  restoreSessionOnStartup: false,
+  newTabBehavior: 'dashboard',
+  newTabCustomUrl: 'https://www.google.com',
   newTabShowClock: true,
   newTabClockFormat: '12h',
   newTabShowWeather: true,
@@ -157,8 +160,17 @@ export class TabManager {
     if (!['new-tab', 'continue', 'custom-url'].includes(this.settings.startupBehavior)) {
       this.settings.startupBehavior = 'new-tab';
     }
+    if (typeof this.settings.restoreSessionOnStartup !== 'boolean') {
+      this.settings.restoreSessionOnStartup = this.settings.startupBehavior === 'continue';
+    }
+    if (!['dashboard', 'custom-url', 'blank'].includes(this.settings.newTabBehavior || '')) {
+      this.settings.newTabBehavior = this.settings.startupBehavior === 'custom-url' ? 'custom-url' : 'dashboard';
+    }
     if (!this.settings.startupCustomUrl) {
       this.settings.startupCustomUrl = getSearchEngineHomeUrl(this.settings.defaultSearchEngine);
+    }
+    if (!this.settings.newTabCustomUrl) {
+      this.settings.newTabCustomUrl = this.settings.startupCustomUrl || getSearchEngineHomeUrl(this.settings.defaultSearchEngine);
     }
     this.saveSettings();
   }
@@ -797,8 +809,10 @@ export class TabManager {
   }
 
   public async initializeSession() {
-    const behavior = this.settings.startupBehavior || 'new-tab';
-    if (behavior === 'continue' && fs.existsSync(this.sessionPath)) {
+    const shouldRestore =
+      this.settings.restoreSessionOnStartup ?? (this.settings.startupBehavior === 'continue');
+
+    if (shouldRestore && fs.existsSync(this.sessionPath)) {
       try {
         const raw = fs.readFileSync(this.sessionPath, 'utf8');
         const data = JSON.parse(raw);
@@ -815,13 +829,22 @@ export class TabManager {
           if (targetActiveId) {
             await this.switchTab(targetActiveId);
           }
-          return;
+          if (this.tabs.size > 0) {
+            return;
+          }
         }
       } catch (err) {
         console.error('Failed to restore session:', err);
       }
-    } else if (behavior === 'custom-url' && this.settings.startupCustomUrl) {
-      await this.createTab(this.settings.startupCustomUrl);
+    }
+
+    const mode =
+      this.settings.newTabBehavior ||
+      (this.settings.startupBehavior === 'custom-url' ? 'custom-url' : 'dashboard');
+    const customUrl = this.settings.newTabCustomUrl || this.settings.startupCustomUrl;
+
+    if (mode === 'custom-url' && customUrl) {
+      await this.createTab(customUrl);
       return;
     }
 
@@ -1004,7 +1027,22 @@ export class TabManager {
     return view;
   }
 
-  public async createTab(initialUrl = 'about:blank', isPrivate = false): Promise<string> {
+  public async createTab(initialUrl?: string, isPrivate = false): Promise<string> {
+    let effectiveUrl = initialUrl;
+    if (!effectiveUrl && !isPrivate) {
+      const mode =
+        this.settings.newTabBehavior ||
+        (this.settings.startupBehavior === 'custom-url' ? 'custom-url' : 'dashboard');
+      const customUrl = this.settings.newTabCustomUrl || this.settings.startupCustomUrl;
+      if (mode === 'custom-url' && customUrl) {
+        effectiveUrl = customUrl;
+      } else {
+        effectiveUrl = 'about:blank';
+      }
+    } else if (!effectiveUrl) {
+      effectiveUrl = 'about:blank';
+    }
+
     const id = 'tab-' + Math.random().toString(36).substring(2, 9);
     const view = new WebContentsView({
       webPreferences: {
@@ -1025,9 +1063,9 @@ export class TabManager {
 
     const info: TabInfo = {
       id,
-      url: initialUrl,
-      title: initialUrl === 'about:blank' ? (isPrivate ? 'Private Tab' : 'New Tab') : initialUrl,
-      isLoading: initialUrl !== 'about:blank',
+      url: effectiveUrl,
+      title: effectiveUrl === 'about:blank' ? (isPrivate ? 'Private Tab' : 'New Tab') : effectiveUrl,
+      isLoading: effectiveUrl !== 'about:blank',
       hasLoadedPage: false,
       canGoBack: false,
       canGoForward: false,
@@ -1045,11 +1083,11 @@ export class TabManager {
     this.setupTabEvents(id, view);
 
     // Load initial URL
-    if (initialUrl && initialUrl !== 'about:blank') {
-      view.webContents?.loadURL(initialUrl).catch(err => {
+    if (effectiveUrl && effectiveUrl !== 'about:blank') {
+      view.webContents?.loadURL(effectiveUrl).catch(err => {
         try {
           if (view?.webContents && !view.webContents.isDestroyed() && err?.code !== 'ERR_ABORTED') {
-            console.error(`Failed to load ${initialUrl}:`, err);
+            console.error(`Failed to load ${effectiveUrl}:`, err);
           }
         } catch {
           // Ignore
@@ -1061,7 +1099,7 @@ export class TabManager {
     await this.switchTab(id);
     this.saveSession();
 
-    if (initialUrl === 'about:blank') {
+    if (effectiveUrl === 'about:blank') {
       setTimeout(() => {
         try {
           this.window.focus();

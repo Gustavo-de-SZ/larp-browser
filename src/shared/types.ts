@@ -151,6 +151,9 @@ export interface BrowserSettings {
   showFavoritesOnNewTab: boolean;
   startupBehavior: 'new-tab' | 'continue' | 'custom-url';
   startupCustomUrl?: string;
+  restoreSessionOnStartup?: boolean;
+  newTabBehavior?: 'dashboard' | 'custom-url' | 'blank';
+  newTabCustomUrl?: string;
   customShortcuts?: Record<string, string> | null;
   newTabShowClock?: boolean;
   newTabClockFormat?: '12h' | '24h';

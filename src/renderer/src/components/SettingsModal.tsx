@@ -316,7 +316,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     showBookmarksBar: false,
     showFavoritesOnNewTab: true,
     startupBehavior: 'new-tab',
-    startupCustomUrl: 'https://duckduckgo.com',
+    startupCustomUrl: 'https://www.google.com',
+    restoreSessionOnStartup: false,
+    newTabBehavior: 'dashboard',
+    newTabCustomUrl: 'https://www.google.com',
   };
 
   const currentPalettes = paletteModeTab === 'dark' ? DARK_PALETTES : LIGHT_PALETTES;
@@ -1501,40 +1504,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
 
-            {/* 4. Startup & Session Preferences */}
+            {/* 4. Startup & New Tab Preferences */}
             {activeTab === 'startup' && (
-              <div className="space-y-4">
-                <label className="text-xs font-medium block text-[var(--text-main)]">
-                  On Startup
-                </label>
+              <div className="space-y-6">
+                {/* Section A: Startup Session (Continue where you left off) */}
                 <div className="space-y-2.5">
-                  {/* Option 1: New Tab Page */}
-                  <button
-                    onClick={() => onUpdateSettings({ startupBehavior: 'new-tab' })}
-                    className={`w-full p-3 rounded-xl border flex items-center justify-between transition-all text-left cursor-pointer ${
-                      safeSettings.startupBehavior === 'new-tab'
-                        ? 'border-[var(--border-selected)] bg-[var(--bg-card-selected)] ring-1 ring-[var(--accent-primary)]/20 shadow-xs'
-                        : 'border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/40 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
-                    }`}
-                  >
-                    <div className="space-y-0.5">
-                      <div className="text-xs font-medium text-[var(--text-main)]">
-                        Open the New Tab page
-                      </div>
-                      <div className="text-[10px] text-[var(--text-muted)]">
-                        Start with a fresh, clean search canvas and quick links (Default)
-                      </div>
-                    </div>
-                    {safeSettings.startupBehavior === 'new-tab' && (
-                      <Check className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                    )}
-                  </button>
+                  <div>
+                    <h4 className="text-xs font-semibold text-[var(--text-main)]">On Browser Launch</h4>
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      Choose whether to restore your previous tabs or start fresh when opening Larp Browser.
+                    </p>
+                  </div>
 
-                  {/* Option 2: Continue where you left off */}
+                  {/* Option: Continue where you left off */}
                   <button
-                    onClick={() => onUpdateSettings({ startupBehavior: 'continue' })}
+                    type="button"
+                    onClick={() => {
+                      const next = !(safeSettings.restoreSessionOnStartup ?? (safeSettings.startupBehavior === 'continue'));
+                      onUpdateSettings({
+                        restoreSessionOnStartup: next,
+                        startupBehavior: next ? 'continue' : (safeSettings.newTabBehavior === 'custom-url' ? 'custom-url' : 'new-tab'),
+                      });
+                    }}
                     className={`w-full p-3 rounded-xl border flex items-center justify-between transition-all text-left cursor-pointer ${
-                      safeSettings.startupBehavior === 'continue'
+                      (safeSettings.restoreSessionOnStartup ?? (safeSettings.startupBehavior === 'continue'))
                         ? 'border-[var(--border-selected)] bg-[var(--bg-card-selected)] ring-1 ring-[var(--accent-primary)]/20 shadow-xs'
                         : 'border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/40 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
                     }`}
@@ -1544,114 +1537,196 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         Continue where you left off
                       </div>
                       <div className="text-[10px] text-[var(--text-muted)]">
-                        Automatically restore all tabs and active tab from your previous session
+                        Automatically restore all tabs and active tab from your previous session upon launch
                       </div>
                     </div>
-                    {safeSettings.startupBehavior === 'continue' && (
-                      <Check className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                    {(safeSettings.restoreSessionOnStartup ?? (safeSettings.startupBehavior === 'continue')) ? (
+                      <Check className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-primary)' }} />
+                    ) : (
+                      <div className="w-4 h-4 rounded-md border border-[var(--border-subtle)] shrink-0" />
                     )}
                   </button>
+                </div>
 
-                  {/* Option 3: Open a specific page */}
-                  <div
-                    className={`w-full p-3 rounded-xl border transition-all text-left ${
-                      safeSettings.startupBehavior === 'custom-url'
-                        ? 'border-[var(--border-selected)] bg-[var(--bg-card-selected)] ring-1 ring-[var(--accent-primary)]/20 shadow-xs'
-                        : 'border-[var(--border-card)] bg-[var(--bg-card)]'
-                    }`}
-                  >
-                    <div
-                      onClick={() => onUpdateSettings({ startupBehavior: 'custom-url' })}
-                      className="flex items-center justify-between cursor-pointer"
+                {/* Section B: New Tab Page & Fresh Session */}
+                <div className="space-y-2.5 pt-4 border-t border-[var(--border-subtle)]">
+                  <div>
+                    <h4 className="text-xs font-semibold text-[var(--text-main)]">New Tab Page</h4>
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      Choose what page opens when you create a new tab (Ctrl+T / +) or launch a fresh session:
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    {/* Option 1: Default Larp Dashboard */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onUpdateSettings({
+                          newTabBehavior: 'dashboard',
+                          startupBehavior: (safeSettings.restoreSessionOnStartup ?? (safeSettings.startupBehavior === 'continue')) ? 'continue' : 'new-tab',
+                        });
+                      }}
+                      className={`w-full p-3 rounded-xl border flex items-center justify-between transition-all text-left cursor-pointer ${
+                        (safeSettings.newTabBehavior === 'dashboard' || (!safeSettings.newTabBehavior && safeSettings.startupBehavior !== 'custom-url'))
+                          ? 'border-[var(--border-selected)] bg-[var(--bg-card-selected)] ring-1 ring-[var(--accent-primary)]/20 shadow-xs'
+                          : 'border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/40 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                      }`}
                     >
                       <div className="space-y-0.5">
                         <div className="text-xs font-medium text-[var(--text-main)]">
-                          Open a specific page
+                          Larp Dashboard (Default)
                         </div>
                         <div className="text-[10px] text-[var(--text-muted)]">
-                          Always open a specified URL upon launch
+                          Clean, distraction-free search canvas with quick links, clock & weather
                         </div>
                       </div>
-                      {safeSettings.startupBehavior === 'custom-url' && (
-                        <Check className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                      {(safeSettings.newTabBehavior === 'dashboard' || (!safeSettings.newTabBehavior && safeSettings.startupBehavior !== 'custom-url')) && (
+                        <Check className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-primary)' }} />
+                      )}
+                    </button>
+
+                    {/* Option 2: Custom Specific URL */}
+                    <div
+                      className={`w-full p-3 rounded-xl border transition-all text-left ${
+                        (safeSettings.newTabBehavior === 'custom-url' || (!safeSettings.newTabBehavior && safeSettings.startupBehavior === 'custom-url'))
+                          ? 'border-[var(--border-selected)] bg-[var(--bg-card-selected)] ring-1 ring-[var(--accent-primary)]/20 shadow-xs'
+                          : 'border-[var(--border-card)] bg-[var(--bg-card)]'
+                      }`}
+                    >
+                      <div
+                        onClick={() => {
+                          onUpdateSettings({
+                            newTabBehavior: 'custom-url',
+                            startupBehavior: (safeSettings.restoreSessionOnStartup ?? (safeSettings.startupBehavior === 'continue')) ? 'continue' : 'custom-url',
+                            newTabCustomUrl: customStartupInput || safeSettings.newTabCustomUrl || 'https://www.google.com',
+                            startupCustomUrl: customStartupInput || safeSettings.startupCustomUrl || 'https://www.google.com',
+                          });
+                        }}
+                        className="flex items-center justify-between cursor-pointer"
+                      >
+                        <div className="space-y-0.5">
+                          <div className="text-xs font-medium text-[var(--text-main)]">
+                            Open a specific page
+                          </div>
+                          <div className="text-[10px] text-[var(--text-muted)]">
+                            Always open a custom web page or search engine
+                          </div>
+                        </div>
+                        {(safeSettings.newTabBehavior === 'custom-url' || (!safeSettings.newTabBehavior && safeSettings.startupBehavior === 'custom-url')) && (
+                          <Check className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-primary)' }} />
+                        )}
+                      </div>
+
+                      {(safeSettings.newTabBehavior === 'custom-url' || (!safeSettings.newTabBehavior && safeSettings.startupBehavior === 'custom-url')) && (
+                        <div className="mt-3 pt-3 border-t border-[var(--border-subtle)] space-y-2.5">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="text"
+                              value={customStartupInput}
+                              onChange={(e) => setCustomStartupInput(e.target.value)}
+                              placeholder="https://..."
+                              className="flex-1 h-7 text-xs px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-input)] text-[var(--text-main)] focus:outline-none focus:border-[var(--border-selected)]"
+                            />
+                            <button
+                              onClick={() => {
+                                const val = customStartupInput.trim();
+                                if (val) {
+                                  onUpdateSettings({
+                                    newTabCustomUrl: val,
+                                    startupCustomUrl: val,
+                                  });
+                                  onShowToast?.({ type: 'success', message: 'Custom page URL saved' });
+                                }
+                              }}
+                              className="px-3 py-1 text-xs rounded-lg text-[var(--text-on-accent)] font-medium shadow-xs hover:opacity-90 cursor-pointer"
+                              style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' }}
+                            >
+                              Save
+                            </button>
+                          </div>
+                          <div className="flex items-center space-x-1.5 flex-wrap pt-0.5 text-[10px] text-[var(--text-muted)]">
+                            <span>Quick presets:</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const engine = safeSettings.defaultSearchEngine || 'google';
+                                const urls: Record<string, string> = {
+                                  google: 'https://www.google.com',
+                                  duckduckgo: 'https://duckduckgo.com',
+                                  brave: 'https://search.brave.com',
+                                  bing: 'https://www.bing.com',
+                                };
+                                const target = urls[engine] || 'https://www.google.com';
+                                setCustomStartupInput(target);
+                                onUpdateSettings({ newTabCustomUrl: target, startupCustomUrl: target });
+                              }}
+                              className="px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-black/5 dark:bg-white/5 hover:border-[var(--accent-primary)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
+                            >
+                              Sync with Search Engine
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCustomStartupInput('https://www.google.com');
+                                onUpdateSettings({ newTabCustomUrl: 'https://www.google.com', startupCustomUrl: 'https://www.google.com' });
+                              }}
+                              className="px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-black/5 dark:bg-white/5 hover:border-[var(--accent-primary)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
+                            >
+                              Google
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCustomStartupInput('https://duckduckgo.com');
+                                onUpdateSettings({ newTabCustomUrl: 'https://duckduckgo.com', startupCustomUrl: 'https://duckduckgo.com' });
+                              }}
+                              className="px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-black/5 dark:bg-white/5 hover:border-[var(--accent-primary)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
+                            >
+                              DuckDuckGo
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCustomStartupInput('https://search.brave.com');
+                                onUpdateSettings({ newTabCustomUrl: 'https://search.brave.com', startupCustomUrl: 'https://search.brave.com' });
+                              }}
+                              className="px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-black/5 dark:bg-white/5 hover:border-[var(--accent-primary)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
+                            >
+                              Brave
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
 
-                    {safeSettings.startupBehavior === 'custom-url' && (
-                      <div className="mt-3 pt-3 border-t border-[var(--border-subtle)] space-y-2.5">
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="text"
-                            value={customStartupInput}
-                            onChange={(e) => setCustomStartupInput(e.target.value)}
-                            placeholder="https://..."
-                            className="flex-1 h-7 text-xs px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-input)] text-[var(--text-main)] focus:outline-none focus:border-[var(--border-selected)]"
-                          />
-                          <button
-                            onClick={() => {
-                              if (customStartupInput.trim()) {
-                                onUpdateSettings({ startupCustomUrl: customStartupInput.trim() });
-                              }
-                            }}
-                            className="px-3 py-1 text-xs rounded-lg text-[var(--text-on-accent)] font-medium shadow-xs hover:opacity-90 cursor-pointer"
-                            style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' }}
-                          >
-                            Save
-                          </button>
+                    {/* Option 3: Blank Page */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onUpdateSettings({
+                          newTabBehavior: 'blank',
+                          startupBehavior: (safeSettings.restoreSessionOnStartup ?? (safeSettings.startupBehavior === 'continue')) ? 'continue' : 'new-tab',
+                        });
+                      }}
+                      className={`w-full p-3 rounded-xl border flex items-center justify-between transition-all text-left cursor-pointer ${
+                        safeSettings.newTabBehavior === 'blank'
+                          ? 'border-[var(--border-selected)] bg-[var(--bg-card-selected)] ring-1 ring-[var(--accent-primary)]/20 shadow-xs'
+                          : 'border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/40 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                      }`}
+                    >
+                      <div className="space-y-0.5">
+                        <div className="text-xs font-medium text-[var(--text-main)]">
+                          Minimalist Blank Canvas
                         </div>
-                        <div className="flex items-center space-x-1.5 flex-wrap pt-0.5 text-[10px] text-[var(--text-muted)]">
-                          <span>Quick presets:</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const engine = safeSettings.defaultSearchEngine || 'google';
-                              const urls: Record<string, string> = {
-                                google: 'https://www.google.com',
-                                duckduckgo: 'https://duckduckgo.com',
-                                brave: 'https://search.brave.com',
-                                bing: 'https://www.bing.com',
-                              };
-                              const target = urls[engine] || 'https://www.google.com';
-                              setCustomStartupInput(target);
-                              onUpdateSettings({ startupCustomUrl: target });
-                            }}
-                            className="px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-black/5 dark:bg-white/5 hover:border-[var(--accent-primary)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
-                          >
-                            Sync with Search Engine
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCustomStartupInput('https://www.google.com');
-                              onUpdateSettings({ startupCustomUrl: 'https://www.google.com' });
-                            }}
-                            className="px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-black/5 dark:bg-white/5 hover:border-[var(--accent-primary)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
-                          >
-                            Google
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCustomStartupInput('https://duckduckgo.com');
-                              onUpdateSettings({ startupCustomUrl: 'https://duckduckgo.com' });
-                            }}
-                            className="px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-black/5 dark:bg-white/5 hover:border-[var(--accent-primary)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
-                          >
-                            DuckDuckGo
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCustomStartupInput('https://search.brave.com');
-                              onUpdateSettings({ startupCustomUrl: 'https://search.brave.com' });
-                            }}
-                            className="px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-black/5 dark:bg-white/5 hover:border-[var(--accent-primary)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
-                          >
-                            Brave
-                          </button>
+                        <div className="text-[10px] text-[var(--text-muted)]">
+                          Empty blank canvas without quick links or dashboard widgets
                         </div>
                       </div>
-                    )}
+                      {safeSettings.newTabBehavior === 'blank' && (
+                        <Check className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-primary)' }} />
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>

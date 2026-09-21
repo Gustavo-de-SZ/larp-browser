@@ -53,6 +53,9 @@ export const App: React.FC = () => {
       showFavoritesOnNewTab: true,
       startupBehavior: 'new-tab',
       startupCustomUrl: 'https://www.google.com',
+      restoreSessionOnStartup: false,
+      newTabBehavior: 'dashboard',
+      newTabCustomUrl: 'https://www.google.com',
     },
   });
 
