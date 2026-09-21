@@ -122,25 +122,13 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
         return;
       }
 
-      if (
-        keyLower === 'arrowright' ||
-        keyLower === 'right' ||
-        keyLower === 'arrowdown' ||
-        keyLower === 'down' ||
-        (keyLower === 'tab' && !input.shift)
-      ) {
+      if (keyLower === 'tab' && !input.shift) {
         event.preventDefault();
         tabManager.cycleSwitcher('forward');
         return;
       }
 
-      if (
-        keyLower === 'arrowleft' ||
-        keyLower === 'left' ||
-        keyLower === 'arrowup' ||
-        keyLower === 'up' ||
-        (keyLower === 'tab' && input.shift)
-      ) {
+      if (keyLower === 'tab' && input.shift) {
         event.preventDefault();
         tabManager.cycleSwitcher('backward');
         return;

@@ -138,33 +138,73 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
         return;
       }
 
+      // If typing in search input, ArrowDown jumps into the card grid, while other keys type normally
+      if (document.activeElement === searchInputRef.current) {
+        if (keyLower === 'arrowdown' || keyLower === 'down') {
+          e.preventDefault();
+          searchInputRef.current?.blur();
+          if (filteredTabs.length > 0) {
+            window.browserApi.selectSwitcherIndex(0);
+          }
+        }
+        return;
+      }
+
+      // Calculate actual rendered column count from DOM or viewport width
       const getColumns = () => {
-        if (typeof window === 'undefined') return 3;
-        if (window.innerWidth >= 1024) return 4;
-        if (window.innerWidth >= 640) return 3;
+        if (cardsContainerRef.current && cardsContainerRef.current.children.length >= 2) {
+          const first = (cardsContainerRef.current.children[0] as HTMLElement).offsetTop;
+          for (let i = 1; i < cardsContainerRef.current.children.length; i++) {
+            if ((cardsContainerRef.current.children[i] as HTMLElement).offsetTop > first) {
+              return i;
+            }
+          }
+          return cardsContainerRef.current.children.length;
+        }
+        if (typeof window !== 'undefined') {
+          if (window.innerWidth >= 768) return 4;
+          if (window.innerWidth >= 640) return 3;
+        }
         return 2;
       };
 
       if (keyLower === 'arrowright' || (keyLower === 'tab' && !e.shiftKey)) {
         e.preventDefault();
-        window.browserApi.cycleSwitcher('forward');
+        const next = (selectedIndex + 1) % filteredTabs.length;
+        window.browserApi.selectSwitcherIndex(next);
         return;
       }
 
       if (keyLower === 'arrowleft' || (keyLower === 'tab' && e.shiftKey)) {
         e.preventDefault();
-        window.browserApi.cycleSwitcher('backward');
+        const prev = (selectedIndex - 1 + filteredTabs.length) % filteredTabs.length;
+        window.browserApi.selectSwitcherIndex(prev);
         return;
       }
+
+      if (filteredTabs.length === 0) return;
 
       if (keyLower === 'arrowdown' || keyLower === 'down') {
         e.preventDefault();
         if (isCompact) {
-          window.browserApi.cycleSwitcher('forward');
+          const next = (selectedIndex + 1) % filteredTabs.length;
+          window.browserApi.selectSwitcherIndex(next);
         } else {
-          const cols = getColumns();
-          const target = Math.min(filteredTabs.length - 1, selectedIndex + cols);
-          window.browserApi.selectSwitcherIndex(target);
+          const cols = Math.max(1, getColumns());
+          if (selectedIndex + cols < filteredTabs.length) {
+            window.browserApi.selectSwitcherIndex(selectedIndex + cols);
+          } else {
+            const currentRow = Math.floor(selectedIndex / cols);
+            const totalRows = Math.ceil(filteredTabs.length / cols);
+            if (currentRow < totalRows - 1) {
+              // Target slot in bottom row doesn't exist; drop to last available tab
+              window.browserApi.selectSwitcherIndex(filteredTabs.length - 1);
+            } else {
+              // Wrap to top row in the same column
+              const sameColTop = selectedIndex % cols;
+              window.browserApi.selectSwitcherIndex(sameColTop);
+            }
+          }
         }
         return;
       }
@@ -172,11 +212,20 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
       if (keyLower === 'arrowup' || keyLower === 'up') {
         e.preventDefault();
         if (isCompact) {
-          window.browserApi.cycleSwitcher('backward');
+          const prev = (selectedIndex - 1 + filteredTabs.length) % filteredTabs.length;
+          window.browserApi.selectSwitcherIndex(prev);
         } else {
-          const cols = getColumns();
-          const target = Math.max(0, selectedIndex - cols);
-          window.browserApi.selectSwitcherIndex(target);
+          const cols = Math.max(1, getColumns());
+          if (selectedIndex - cols >= 0) {
+            window.browserApi.selectSwitcherIndex(selectedIndex - cols);
+          } else {
+            // Wrap to bottom row in the same column
+            const col = selectedIndex % cols;
+            const lastRowStart = Math.floor((filteredTabs.length - 1) / cols) * cols;
+            const candidate = lastRowStart + col;
+            const target = candidate < filteredTabs.length ? candidate : filteredTabs.length - 1;
+            window.browserApi.selectSwitcherIndex(Math.max(0, target));
+          }
         }
         return;
       }
