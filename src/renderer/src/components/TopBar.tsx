@@ -23,8 +23,9 @@ import {
   Download,
   VenetianMask,
   Zap,
+  Sparkles,
 } from 'lucide-react';
-import type { BrowserState, HistoryItem } from '@/shared/types';
+import type { BrowserState, HistoryItem, UpdateCheckResult } from '@/shared/types';
 import type { ThemeMode } from '../App';
 import {
   computeUrlSuggestions,
@@ -69,9 +70,31 @@ export const TopBar: React.FC<TopBarProps> = ({
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [activeDownloadCount, setActiveDownloadCount] = useState<number>(0);
+  const [updateAvailable, setUpdateAvailable] = useState<UpdateCheckResult | null>(null);
   const skipNextAutocompleteRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Check for app updates
+  useEffect(() => {
+    if (!window.browserApi) return;
+
+    window.browserApi.getUpdateInfo?.().then((info) => {
+      if (info && info.available) {
+        setUpdateAvailable(info);
+      }
+    }).catch(() => {});
+
+    const unsubUpdate = window.browserApi.onUpdateAvailable?.((info) => {
+      if (info && info.available) {
+        setUpdateAvailable(info);
+      }
+    });
+
+    return () => {
+      unsubUpdate?.();
+    };
+  }, []);
 
   // Track active downloads count
   useEffect(() => {
@@ -752,13 +775,28 @@ export const TopBar: React.FC<TopBarProps> = ({
             <VenetianMask className="w-3.5 h-3.5" />
           </button>
 
+          {/* Update Available Badge */}
+          {updateAvailable && (
+            <button
+              onClick={() => onOpenSettings('about')}
+              className="flex items-center space-x-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25 transition-all cursor-pointer animate-in fade-in"
+              title={`Update available: v${updateAvailable.latestVersion}. Click to view & update.`}
+            >
+              <Sparkles className="w-3 h-3 text-emerald-400 animate-pulse" />
+              <span>Update</span>
+            </button>
+          )}
+
           {/* Settings Button */}
           <button
             onClick={() => onOpenSettings()}
-            className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+            className="relative p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
             title="Settings (Ctrl+,)"
           >
             <Settings className="w-3.5 h-3.5" />
+            {updateAvailable && (
+              <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-400 ring-2 ring-[var(--bg-topbar)]" />
+            )}
           </button>
 
           {/* Keyboard Shortcuts Button */}

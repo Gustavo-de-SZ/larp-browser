@@ -1,12 +1,14 @@
 import { ipcMain, BrowserWindow, app } from 'electron';
 import { TabManager } from './tab-manager';
 import { DownloadManager } from './download-manager';
+import { UpdateManager } from './update-manager';
 import type { BrowserSettings, SwitcherDirection } from '../shared/types';
 
 export function registerIpcHandlers(
   window: BrowserWindow,
   tabManager: TabManager,
-  downloadManager: DownloadManager
+  downloadManager: DownloadManager,
+  updateManager: UpdateManager
 ) {
   ipcMain.handle('browser:get-state', () => {
     return tabManager.getState();
@@ -227,5 +229,18 @@ export function registerIpcHandlers(
 
   ipcMain.handle('window:close', () => {
     window.close();
+  });
+
+  // Updates
+  ipcMain.handle('browser:check-for-updates', (_event, manual?: boolean) => {
+    return updateManager.checkForUpdates(manual);
+  });
+
+  ipcMain.handle('browser:get-update-info', () => {
+    return updateManager.getLatestResult();
+  });
+
+  ipcMain.handle('browser:download-update-asset', (_event, url: string) => {
+    updateManager.downloadUpdate(url);
   });
 }

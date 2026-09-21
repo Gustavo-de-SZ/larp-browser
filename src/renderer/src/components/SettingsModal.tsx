@@ -36,6 +36,10 @@ import {
   AlertCircle,
   Pause,
   Play,
+  Sparkles,
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { DARK_PALETTES, LIGHT_PALETTES, ColorPalette, getPalette } from '../theme/palettes';
 import { ConfirmModal } from './ConfirmModal';
@@ -50,6 +54,7 @@ import {
   ClearBrowsingDataOptions,
   SHORTCUT_DEFINITIONS,
   ShortcutActionId,
+  UpdateCheckResult,
 } from '@/shared/types';
 import type { ThemeMode } from '../App';
 
@@ -113,7 +118,58 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         if (v) setAppVersion(v);
       }).catch(() => {});
     }
+
+    if (window.browserApi?.getUpdateInfo) {
+      window.browserApi.getUpdateInfo().then((res) => {
+        if (res) setUpdateInfo(res);
+      }).catch(() => {});
+    }
+
+    const unsubUpdate = window.browserApi?.onUpdateAvailable?.((info) => {
+      setUpdateInfo(info);
+    });
+
+    return () => {
+      unsubUpdate?.();
+    };
   }, []);
+
+  // Updates state
+  const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [showReleaseNotes, setShowReleaseNotes] = useState(false);
+
+  const handleCheckForUpdates = async () => {
+    if (isCheckingUpdate || !window.browserApi?.checkForUpdates) return;
+    setIsCheckingUpdate(true);
+    try {
+      const res = await window.browserApi.checkForUpdates(true);
+      setUpdateInfo(res);
+      if (res.hasUpdate) {
+        onShowToast?.({
+          type: 'success',
+          message: `Update available: v${res.latestVersion}!`,
+        });
+      } else if (res.status === 'up-to-date') {
+        onShowToast?.({
+          type: 'info',
+          message: `Larp Browser is up to date (v${res.currentVersion}).`,
+        });
+      } else if (res.status === 'error') {
+        onShowToast?.({
+          type: 'error',
+          message: res.errorMessage || 'Could not check for updates.',
+        });
+      }
+    } catch {
+      onShowToast?.({
+        type: 'error',
+        message: 'Could not connect to update server.',
+      });
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
 
   // Downloads state
   const [downloadsList, setDownloadsList] = useState<DownloadItemInfo[]>([]);
@@ -2540,22 +2596,160 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
 
-            {/* 8. About */}
+            {/* 8. About & Updates */}
             {activeTab === 'about' && (
               <div className="space-y-4">
+                {/* App Info Header & Update Checker */}
                 <div
-                  className="flex items-center space-x-3 p-3.5 rounded-xl border"
+                  className="p-4 rounded-xl border space-y-3.5"
                   style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-card)' }}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-[var(--accent-primary)]/10 flex items-center justify-center">
-                    <Info className="w-5 h-5 text-[var(--accent-primary)]" />
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-xl bg-[var(--accent-primary)]/10 flex items-center justify-center">
+                        <Info className="w-5 h-5 text-[var(--accent-primary)]" />
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <h4 className="text-sm font-semibold text-[var(--text-main)]">Larp Browser</h4>
+                          {updateInfo?.hasUpdate ? (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                              Update Available
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-black/5 dark:bg-white/5 border border-[var(--border-subtle)] text-[var(--text-muted)]">
+                              v{appVersion}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-[var(--text-muted)]">
+                          Fast, keyboard-driven desktop web browser
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleCheckForUpdates}
+                      disabled={isCheckingUpdate}
+                      className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer disabled:opacity-50"
+                      style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-main)' }}
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
+                      <span>{isCheckingUpdate ? 'Checking...' : 'Check for Updates'}</span>
+                    </button>
                   </div>
-                  <div>
-                    <h4 className="text-xs font-semibold text-[var(--text-main)]">Larp Browser</h4>
-                    <p className="text-[11px] text-[var(--text-muted)]">Version {appVersion}</p>
-                  </div>
+
+                  {/* Status Banner */}
+                  {updateInfo?.hasUpdate ? (
+                    <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 space-y-2.5">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start space-x-2">
+                          <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                          <div>
+                            <div className="text-xs font-semibold text-emerald-400">
+                              New version available: v{updateInfo.latestVersion}
+                            </div>
+                            <div className="text-[11px] text-[var(--text-muted)]">
+                              {updateInfo.releaseName || `Release v${updateInfo.latestVersion}`}
+                            </div>
+                          </div>
+                        </div>
+
+                        {updateInfo.matchedAsset && (
+                          <span className="text-[10px] font-mono text-[var(--text-muted)] opacity-70">
+                            {formatBytes(updateInfo.matchedAsset.size)}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center space-x-2 pt-1">
+                        {updateInfo.matchedAsset ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (updateInfo.matchedAsset?.downloadUrl) {
+                                window.browserApi.downloadUpdateAsset(updateInfo.matchedAsset.downloadUrl);
+                                onShowToast?.({
+                                  type: 'success',
+                                  message: `Downloading ${updateInfo.matchedAsset.name}... Track in Downloads (Ctrl+J)`,
+                                });
+                              }
+                            }}
+                            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--text-on-accent)] shadow-xs transition-opacity hover:opacity-90 cursor-pointer"
+                            style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' }}
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Download {updateInfo.matchedAsset.format === 'exe' ? 'Installer (.exe)' : updateInfo.matchedAsset.format === 'appimage' ? 'AppImage' : 'Update'}</span>
+                          </button>
+                        ) : null}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            window.browserApi.createTab(updateInfo.releaseUrl);
+                            onClose();
+                          }}
+                          className="flex items-center space-x-1 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                          style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-main)' }}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>View on GitHub</span>
+                        </button>
+                      </div>
+
+                      {/* Platform instructions note */}
+                      <p className="text-[10px] text-[var(--text-muted)] pt-1 border-t border-emerald-500/15">
+                        {navigator.userAgent.includes('Windows')
+                          ? 'Run the downloaded installer to update Larp Browser in place. All settings and tabs are preserved.'
+                          : 'Linux AppImage users can replace the executable file; Arch Linux users can update with yay -S larp-browser-bin.'}
+                      </p>
+
+                      {/* Release notes collapsible */}
+                      {updateInfo.releaseNotes && (
+                        <div className="pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setShowReleaseNotes(!showReleaseNotes)}
+                            className="flex items-center space-x-1 text-[11px] text-[var(--accent-primary)] hover:underline cursor-pointer"
+                          >
+                            <span>{showReleaseNotes ? 'Hide' : 'View'} release notes</span>
+                            {showReleaseNotes ? (
+                              <ChevronUp className="w-3 h-3" />
+                            ) : (
+                              <ChevronDown className="w-3 h-3" />
+                            )}
+                          </button>
+                          {showReleaseNotes && (
+                            <div
+                              className="mt-2 p-2.5 rounded-md border text-[11px] leading-relaxed max-h-40 overflow-y-auto whitespace-pre-wrap font-mono select-text"
+                              style={{
+                                backgroundColor: 'var(--bg-input)',
+                                borderColor: 'var(--border-subtle)',
+                                color: 'var(--text-main)',
+                              }}
+                            >
+                              {updateInfo.releaseNotes}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : updateInfo?.status === 'up-to-date' ? (
+                    <div className="flex items-center space-x-2 text-xs text-emerald-400 bg-emerald-500/10 p-2.5 rounded-lg border border-emerald-500/20">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      <span>Larp Browser is up to date (v{appVersion}).</span>
+                    </div>
+                  ) : updateInfo?.status === 'error' ? (
+                    <div className="flex items-center space-x-2 text-xs text-amber-400 bg-amber-500/10 p-2.5 rounded-lg border border-amber-500/20">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{updateInfo.errorMessage}</span>
+                    </div>
+                  ) : null}
                 </div>
 
+                {/* About Browser Details */}
                 <div
                   className="p-4 rounded-xl border space-y-2 text-xs leading-relaxed"
                   style={{

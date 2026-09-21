@@ -173,6 +173,20 @@ const api: IpcRendererApi = {
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
   maximizeWindow: () => ipcRenderer.invoke('window:maximize'),
   closeWindow: () => ipcRenderer.invoke('window:close'),
+
+  // Updates
+  checkForUpdates: (manual?: boolean) => ipcRenderer.invoke('browser:check-for-updates', manual),
+  getUpdateInfo: () => ipcRenderer.invoke('browser:get-update-info'),
+  downloadUpdateAsset: (url: string) => ipcRenderer.invoke('browser:download-update-asset', url),
+  onUpdateAvailable: (callback: (info: any) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, info: any) => {
+      callback(info);
+    };
+    ipcRenderer.on('browser:update-available', listener);
+    return () => {
+      ipcRenderer.removeListener('browser:update-available', listener);
+    };
+  },
 };
 
 contextBridge.exposeInMainWorld('browserApi', api);

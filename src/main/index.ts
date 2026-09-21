@@ -2,6 +2,7 @@ import { app, BrowserWindow, session } from 'electron';
 import path from 'path';
 import { TabManager } from './tab-manager';
 import { DownloadManager } from './download-manager';
+import { UpdateManager } from './update-manager';
 import { registerIpcHandlers } from './ipc-handlers';
 import { registerShortcuts } from './shortcuts';
 
@@ -15,6 +16,7 @@ const appStartTime = performance.now();
 let mainWindow: BrowserWindow | null = null;
 let tabManager: TabManager | null = null;
 let downloadManager: DownloadManager | null = null;
+let updateManager: UpdateManager | null = null;
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -87,6 +89,7 @@ async function createWindow() {
   tabManager = new TabManager(mainWindow);
   downloadManager = new DownloadManager(mainWindow, () => tabManager!.getSettings());
   tabManager.setDownloadManager(downloadManager);
+  updateManager = new UpdateManager(mainWindow);
 
   // Send state updates to renderer
   tabManager.setOnStateChange((state) => {
@@ -96,8 +99,9 @@ async function createWindow() {
   });
 
   // Register IPC and keyboard shortcuts
-  registerIpcHandlers(mainWindow, tabManager, downloadManager);
+  registerIpcHandlers(mainWindow, tabManager, downloadManager, updateManager);
   registerShortcuts(mainWindow, tabManager);
+  updateManager.startPeriodicChecks();
 
   // Keep active WebContentsView bounds in sync with window size
   mainWindow.on('resize', () => {
@@ -137,6 +141,7 @@ async function createWindow() {
   }
 
   mainWindow.on('close', () => {
+    updateManager?.stopPeriodicChecks();
     tabManager?.saveSession();
   });
 

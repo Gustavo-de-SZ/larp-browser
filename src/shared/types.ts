@@ -161,6 +161,30 @@ export interface BrowserSettings {
   newTabShowQuickLinks?: boolean;
   downloadsPath?: string;
   askDownloadLocation?: boolean;
+  autoCheckUpdates?: boolean;
+}
+
+export interface UpdateAssetInfo {
+  name: string;
+  downloadUrl: string;
+  size: number;
+  platform: 'windows' | 'linux' | 'all';
+  format: 'exe' | 'zip' | 'appimage' | 'pacman' | 'other';
+}
+
+export interface UpdateCheckResult {
+  currentVersion: string;
+  latestVersion: string;
+  hasUpdate: boolean;
+  releaseName: string;
+  releaseNotes: string;
+  releaseUrl: string;
+  publishedAt: string;
+  matchedAsset?: UpdateAssetInfo;
+  allAssets: UpdateAssetInfo[];
+  checkedAt: number;
+  status: 'idle' | 'checking' | 'up-to-date' | 'available' | 'error';
+  errorMessage?: string;
 }
 
 export interface BrowserState {
@@ -258,6 +282,12 @@ export interface IpcRendererApi {
   minimizeWindow: () => Promise<void>;
   maximizeWindow: () => Promise<void>;
   closeWindow: () => Promise<void>;
+
+  // Updates
+  checkForUpdates: (manual?: boolean) => Promise<UpdateCheckResult>;
+  getUpdateInfo: () => Promise<UpdateCheckResult | null>;
+  downloadUpdateAsset: (url: string) => Promise<void>;
+  onUpdateAvailable: (callback: (info: UpdateCheckResult) => void) => () => void;
 }
 
 declare global {
