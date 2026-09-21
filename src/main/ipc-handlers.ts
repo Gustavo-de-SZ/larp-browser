@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain, BrowserWindow, app } from 'electron';
 import { TabManager } from './tab-manager';
 import { DownloadManager } from './download-manager';
 import type { BrowserSettings, SwitcherDirection } from '../shared/types';
@@ -10,6 +10,10 @@ export function registerIpcHandlers(
 ) {
   ipcMain.handle('browser:get-state', () => {
     return tabManager.getState();
+  });
+
+  ipcMain.handle('browser:get-app-version', () => {
+    return app.getVersion();
   });
 
   ipcMain.handle('browser:create-tab', (_event, url?: string, isPrivate?: boolean) => {

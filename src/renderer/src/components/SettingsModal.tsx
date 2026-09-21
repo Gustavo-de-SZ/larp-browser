@@ -65,6 +65,8 @@ export type SettingsTabType =
   | 'search'
   | 'about';
 
+declare const __APP_VERSION__: string | undefined;
+
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -101,6 +103,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   });
   const [historyList, setHistoryList] = useState<HistoryItem[]>([]);
   const [customStartupInput, setCustomStartupInput] = useState('');
+  const [appVersion, setAppVersion] = useState<string>(
+    typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.5.8'
+  );
+
+  useEffect(() => {
+    if (window.browserApi?.getAppVersion) {
+      window.browserApi.getAppVersion().then((v) => {
+        if (v) setAppVersion(v);
+      }).catch(() => {});
+    }
+  }, []);
 
   // Downloads state
   const [downloadsList, setDownloadsList] = useState<DownloadItemInfo[]>([]);
@@ -2464,7 +2477,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                   <div>
                     <h4 className="text-xs font-semibold text-[var(--text-main)]">Larp Browser</h4>
-                    <p className="text-[11px] text-[var(--text-muted)]">Version 1.5.5</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">Version {appVersion}</p>
                   </div>
                 </div>
 

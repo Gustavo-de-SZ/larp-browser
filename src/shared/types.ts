@@ -181,6 +181,7 @@ export interface IpcRendererApi {
   onToggleFavorites: (callback: () => void) => () => void;
   onFindResult: (callback: (result: FindResult) => void) => () => void;
   getState: () => Promise<BrowserState>;
+  getAppVersion: () => Promise<string>;
 
   // Tab Operations
   createTab: (url?: string, isPrivate?: boolean) => Promise<string>;
