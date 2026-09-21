@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session, shell, dialog, DownloadItem } from 'electron';
+import { app, BrowserWindow, session, shell, dialog, DownloadItem, Notification } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import type { DownloadItemInfo, BrowserSettings } from '../shared/types';
@@ -152,6 +152,25 @@ export class DownloadManager {
         this.activeItems.delete(id);
         this.saveHistory();
         this.broadcast('browser:download-done', info);
+
+        // Native OS desktop notification on completion
+        if (state === 'completed' && Notification.isSupported()) {
+          try {
+            const notif = new Notification({
+              title: 'Download Complete',
+              body: info.filename,
+              silent: false,
+            });
+            notif.on('click', () => {
+              if (info.savePath && fs.existsSync(info.savePath)) {
+                shell.openPath(info.savePath);
+              }
+            });
+            notif.show();
+          } catch (notifErr) {
+            console.warn('Could not display download notification:', notifErr);
+          }
+        }
       });
     });
   }

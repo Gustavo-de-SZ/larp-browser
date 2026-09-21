@@ -24,8 +24,10 @@ import {
   VenetianMask,
   Zap,
   Sparkles,
+  CheckCircle2,
+  FolderOpen,
 } from 'lucide-react';
-import type { BrowserState, HistoryItem, UpdateCheckResult } from '@/shared/types';
+import type { BrowserState, HistoryItem, UpdateCheckResult, DownloadItemInfo } from '@/shared/types';
 import type { ThemeMode } from '../App';
 import {
   computeUrlSuggestions,
@@ -35,6 +37,7 @@ import {
 } from '../utils/autocomplete';
 
 import type { ToastType } from './Toast';
+import { formatBytes } from './DownloadsPopover';
 
 interface TopBarProps {
   state: BrowserState;
@@ -72,6 +75,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [activeDownloadCount, setActiveDownloadCount] = useState<number>(0);
+  const [recentCompletedDownload, setRecentCompletedDownload] = useState<DownloadItemInfo | null>(null);
+  const completedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState<UpdateCheckResult | null>(null);
   const skipNextAutocompleteRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -98,7 +103,7 @@ export const TopBar: React.FC<TopBarProps> = ({
     };
   }, []);
 
-  // Track active downloads count
+  // Track active downloads count and completion notifications
   useEffect(() => {
     if (!window.browserApi) return;
 
@@ -113,13 +118,25 @@ export const TopBar: React.FC<TopBarProps> = ({
       setActiveDownloadCount((prev) => prev + 1);
     });
 
-    const unsubDone = window.browserApi.onDownloadDone?.(() => {
+    const unsubDone = window.browserApi.onDownloadDone?.((item) => {
       setActiveDownloadCount((prev) => Math.max(0, prev - 1));
+      if (item && item.state === 'completed') {
+        setRecentCompletedDownload(item);
+        if (completedTimerRef.current) {
+          clearTimeout(completedTimerRef.current);
+        }
+        completedTimerRef.current = setTimeout(() => {
+          setRecentCompletedDownload(null);
+        }, 8000);
+      }
     });
 
     return () => {
       unsubStart?.();
       unsubDone?.();
+      if (completedTimerRef.current) {
+        clearTimeout(completedTimerRef.current);
+      }
     };
   }, []);
 
@@ -727,25 +744,69 @@ export const TopBar: React.FC<TopBarProps> = ({
             <Star className={`w-3.5 h-3.5 ${isFavoritesOpen ? 'fill-amber-400' : ''}`} />
           </button>
 
+          {/* Recent Download Completion Banner */}
+          {recentCompletedDownload && (
+            <div
+              className="flex items-center space-x-1.5 px-2 py-0.5 rounded-lg border bg-emerald-500/10 border-emerald-500/30 text-emerald-400 text-xs animate-in slide-in-from-right-3 fade-in duration-150"
+              title={`Downloaded: ${recentCompletedDownload.filename}`}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="max-w-[110px] sm:max-w-[150px] truncate font-medium text-[11px] text-[var(--text-main)]">
+                {recentCompletedDownload.filename}
+              </span>
+              <span className="text-[10px] text-[var(--text-muted)] font-mono hidden md:inline">
+                {formatBytes(recentCompletedDownload.totalBytes)}
+              </span>
+              <button
+                type="button"
+                onClick={() => window.browserApi.openDownloadFile(recentCompletedDownload.id)}
+                className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 transition-colors cursor-pointer"
+                title="Open downloaded file"
+              >
+                Open
+              </button>
+              <button
+                type="button"
+                onClick={() => window.browserApi.showDownloadInFolder(recentCompletedDownload.id)}
+                className="p-1 rounded hover:bg-emerald-500/20 text-emerald-300 transition-colors cursor-pointer"
+                title="Show in folder"
+              >
+                <FolderOpen className="w-3 h-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setRecentCompletedDownload(null)}
+                className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
+                title="Dismiss"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+
           {/* Downloads Tray Button */}
           <button
             onClick={onToggleDownloads}
             className={`p-1.5 rounded-md transition-colors cursor-pointer relative ${
               isDownloadsOpen
                 ? 'text-[var(--accent-primary)] bg-black/10 dark:bg-white/10'
+                : recentCompletedDownload
+                ? 'text-emerald-400 bg-emerald-500/15 border border-emerald-500/30'
                 : 'text-[var(--text-muted)] hover:text-[var(--accent-primary)] hover:bg-black/5 dark:hover:bg-white/5'
             }`}
             title="Downloads (Ctrl+J)"
           >
-            <Download className="w-3.5 h-3.5" />
-            {activeDownloadCount > 0 && (
+            <Download className={`w-3.5 h-3.5 ${activeDownloadCount > 0 ? 'animate-bounce' : ''}`} />
+            {activeDownloadCount > 0 ? (
               <span
                 className="absolute -top-1 -right-1 min-w-3.5 h-3.5 px-0.5 rounded-full text-[9px] font-bold flex items-center justify-center text-[var(--text-on-accent)] animate-pulse"
                 style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' }}
               >
                 {activeDownloadCount}
               </span>
-            )}
+            ) : recentCompletedDownload ? (
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[var(--bg-topbar)] animate-ping" />
+            ) : null}
           </button>
 
           {/* Tab Switcher Trigger Button */}
