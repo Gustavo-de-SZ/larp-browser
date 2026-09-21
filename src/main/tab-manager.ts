@@ -1192,6 +1192,28 @@ export class TabManager {
       }
     });
 
+    wc.on('did-navigate-in-page', (_event, url, isMainFrame) => {
+      if (isMainFrame) {
+        const tab = this.tabs.get(tabId);
+        if (tab) {
+          tab.info.url = url;
+          tab.info.title = wc.getTitle() || tab.info.title;
+          tab.info.canGoBack = wc.navigationHistory ? wc.navigationHistory.canGoBack() : wc.canGoBack();
+          tab.info.canGoForward = wc.navigationHistory ? wc.navigationHistory.canGoForward() : wc.canGoForward();
+          if (url && url !== 'about:blank') {
+            tab.info.hasLoadedPage = true;
+          }
+          this.addHistory(tab.info.title, url, tab.info.isPrivate);
+          this.saveSession();
+          this.notifyStateChange();
+          // Update preview in background for SPA navigation
+          this.capturePreview(tabId).then((img) => {
+            if (img) this.notifyStateChange();
+          }).catch(() => {});
+        }
+      }
+    });
+
     wc.on('dom-ready', () => {
       const tab = this.tabs.get(tabId);
       if (tab && tab.info.url && tab.info.url !== 'about:blank') {
@@ -1317,8 +1339,8 @@ export class TabManager {
       const timeoutPromise = new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), 400));
       const image = await Promise.race([capturePromise, timeoutPromise]);
       if (!image || (image as any).isEmpty?.()) return tab.info.previewImage;
-      // High-performance downscale for thumbnail card: drops payload and encoding time by 99%
-      const thumbnail = (image as any).resize({ width: 360, quality: 'good' });
+      // High-performance downscale for thumbnail card and modal background: crisp 1280px resolution
+      const thumbnail = (image as any).resize({ width: 1280, quality: 'good' });
       const preview = thumbnail.toDataURL();
       tab.info.previewImage = preview;
       return preview;
@@ -1449,14 +1471,24 @@ export class TabManager {
   public async setModalOpen(isOpen: boolean) {
     this.isModalOpen = isOpen;
     if (isOpen) {
+      // Capture live page preview BEFORE detaching while view is still attached and rendered
+      if (this.activeTabId && this.tabs.has(this.activeTabId)) {
+        const tab = this.tabs.get(this.activeTabId)!;
+        if (tab.view && !tab.view.webContents.isDestroyed() && tab.info.hasLoadedPage) {
+          try {
+            const img = await tab.view.webContents.capturePage();
+            if (img && !(img as any).isEmpty?.()) {
+              tab.info.previewImage = img.toDataURL();
+            }
+          } catch {
+            // Ignore if frame is busy
+          }
+        }
+      }
       this.detachActiveTabView();
       // Ensure shell window has immediate keyboard focus for shortcuts and escape handling
       this.window.focus();
       this.window.webContents.focus();
-      // Capture preview in background without blocking modal appearance
-      if (this.activeTabId) {
-        this.capturePreview(this.activeTabId).then(() => this.notifyStateChange()).catch(() => {});
-      }
     } else {
       if (!this.isSwitcherOpen) {
         this.attachActiveTabView();

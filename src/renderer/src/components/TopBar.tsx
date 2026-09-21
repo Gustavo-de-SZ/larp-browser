@@ -143,12 +143,28 @@ export const TopBar: React.FC<TopBarProps> = ({
     loadHistory();
   }, []);
 
+  const prevActiveTabIdRef = useRef<string | null>(state.activeTabId);
+
+  // When active tab ID changes (tab closed with Ctrl+W, switched via Ctrl+Tab, or clicked),
+  // cleanly reset omnibar focus and suggestions dropdown
   useEffect(() => {
-    if (activeTab && !isFocused) {
+    if (state.activeTabId !== prevActiveTabIdRef.current) {
+      prevActiveTabIdRef.current = state.activeTabId;
+
+      setIsFocused(false);
+      setIsDropdownOpen(false);
+      inputRef.current?.blur();
+
+      if (activeTab) {
+        setUrlInput(activeTab.url === 'about:blank' ? '' : activeTab.url);
+      } else {
+        setUrlInput('');
+      }
+    } else if (activeTab && !isFocused) {
       setUrlInput(activeTab.url === 'about:blank' ? '' : activeTab.url);
       setIsDropdownOpen(false);
     }
-  }, [activeTab, isFocused]);
+  }, [state.activeTabId, activeTab, isFocused]);
 
   useEffect(() => {
     onOmnibarDropdownChange?.(isDropdownOpen);
@@ -257,16 +273,15 @@ export const TopBar: React.FC<TopBarProps> = ({
     }
 
     if (e.key === 'Escape') {
-      if (isDropdownOpen) {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDropdownOpen(false);
-        if (activeTab) {
-          setUrlInput(activeTab.url === 'about:blank' ? '' : activeTab.url);
-        }
-        inputRef.current?.blur();
-        return;
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDropdownOpen(false);
+      setIsFocused(false);
+      if (activeTab) {
+        setUrlInput(activeTab.url === 'about:blank' ? '' : activeTab.url);
       }
+      inputRef.current?.blur();
+      return;
     }
 
     if (e.key === 'Tab' || e.key === 'ArrowRight') {

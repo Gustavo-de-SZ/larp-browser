@@ -272,6 +272,11 @@ export const App: React.FC = () => {
 
   const [isOmnibarOpen, setIsOmnibarOpen] = useState(false);
 
+  // Guarantee omnibar dropdown state resets when switching or closing tabs
+  useEffect(() => {
+    setIsOmnibarOpen(false);
+  }, [state.activeTabId]);
+
   // Synchronize modal open state with Electron main process so native WebContentsView is detached
   useEffect(() => {
     const isAnyModalOpen = isSettingsOpen || isShortcutsOpen || isFavoritesOpen || isOmnibarOpen || isDownloadsOpen;
