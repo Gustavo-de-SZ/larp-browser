@@ -97,7 +97,7 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
           if (filterQuery) {
             setFilterQuery('');
           } else {
-            searchInputRef.current.blur();
+            searchInputRef.current?.blur();
           }
           return;
         }

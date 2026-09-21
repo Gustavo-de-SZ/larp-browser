@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
-import { CheckCircle2, Info, AlertTriangle, Trash2, X } from 'lucide-react';
+import { CheckCircle2, Info, AlertTriangle, AlertCircle, Trash2, X } from 'lucide-react';
 
-export type ToastType = 'success' | 'info' | 'warning' | 'danger';
+export type ToastType = 'success' | 'info' | 'warning' | 'danger' | 'error';
 
 export interface ToastItem {
   id: string;
@@ -39,6 +39,8 @@ const ToastCard: React.FC<{ toast: ToastItem; onDismiss: () => void }> = ({ toas
     switch (toast.type) {
       case 'success':
         return <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />;
+      case 'error':
+        return <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />;
       case 'danger':
         return <Trash2 className="w-4 h-4 text-rose-400 flex-shrink-0" />;
       case 'warning':
@@ -54,6 +56,7 @@ const ToastCard: React.FC<{ toast: ToastItem; onDismiss: () => void }> = ({ toas
       case 'success':
         return 'border-emerald-500/30';
       case 'danger':
+      case 'error':
         return 'border-rose-500/30';
       case 'warning':
         return 'border-amber-500/30';

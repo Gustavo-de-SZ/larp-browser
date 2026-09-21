@@ -34,6 +34,8 @@ import {
   type UrlSuggestion,
 } from '../utils/autocomplete';
 
+import type { ToastType } from './Toast';
+
 interface TopBarProps {
   state: BrowserState;
   theme: ThemeMode;
@@ -45,7 +47,7 @@ interface TopBarProps {
   isFavoritesOpen?: boolean;
   onToggleDownloads?: () => void;
   isDownloadsOpen?: boolean;
-  onShowToast?: (toast: { type: 'success' | 'info' | 'warning' | 'danger'; message: string }) => void;
+  onShowToast?: (toast: { type: ToastType; message: string }) => void;
   onOmnibarDropdownChange?: (isOpen: boolean) => void;
 }
 
@@ -80,13 +82,13 @@ export const TopBar: React.FC<TopBarProps> = ({
     if (!window.browserApi) return;
 
     window.browserApi.getUpdateInfo?.().then((info) => {
-      if (info && info.available) {
+      if (info && (info.hasUpdate || info.status === 'available')) {
         setUpdateAvailable(info);
       }
     }).catch(() => {});
 
     const unsubUpdate = window.browserApi.onUpdateAvailable?.((info) => {
-      if (info && info.available) {
+      if (info && (info.hasUpdate || info.status === 'available')) {
         setUpdateAvailable(info);
       }
     });
@@ -188,7 +190,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       state.bookmarks || [],
       state.settings?.defaultSearchEngine || 'google',
       state.tabs,
-      state.activeTabId
+      state.activeTabId || undefined
     );
     setSuggestions(computed);
     setSelectedIndex(-1);
@@ -219,7 +221,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       state.bookmarks || [],
       state.settings?.defaultSearchEngine || 'google',
       state.tabs,
-      state.activeTabId
+      state.activeTabId || undefined
     );
     setSuggestions(computed);
     setIsDropdownOpen(computed.length > 0);

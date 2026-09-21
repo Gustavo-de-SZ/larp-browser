@@ -157,13 +157,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         });
       } else if (res.status === 'error') {
         onShowToast?.({
-          type: 'error',
+          type: 'danger',
           message: res.errorMessage || 'Could not check for updates.',
         });
       }
     } catch {
       onShowToast?.({
-        type: 'error',
+        type: 'danger',
         message: 'Could not connect to update server.',
       });
     } finally {
