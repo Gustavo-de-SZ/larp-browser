@@ -1,4 +1,16 @@
-import { app, BrowserWindow, WebContentsView, nativeTheme, safeStorage, dialog, session } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  WebContentsView,
+  nativeTheme,
+  safeStorage,
+  dialog,
+  session,
+  Menu,
+  MenuItem,
+  clipboard,
+  shell,
+} from 'electron';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -33,6 +45,17 @@ export function getSearchEngineHomeUrl(engine: string): string {
     default:
       return 'https://www.google.com';
   }
+}
+
+export function getSearchUrl(engine: string, query: string): string {
+  const engines: Record<string, string> = {
+    google: 'https://www.google.com/search?q=',
+    duckduckgo: 'https://duckduckgo.com/?q=',
+    brave: 'https://search.brave.com/search?q=',
+    bing: 'https://www.bing.com/search?q=',
+  };
+  const base = engines[engine] || engines.google;
+  return `${base}${encodeURIComponent(query)}`;
 }
 
 const DEFAULT_SETTINGS: BrowserSettings = {
@@ -79,6 +102,7 @@ export class TabManager {
   private isSwitcherOpen = false;
   private isModalOpen = false;
   private isFindOpen = false;
+  private isHtmlFullscreen = false;
   private selectedSwitcherIndex = 0;
   private settings: BrowserSettings = { ...DEFAULT_SETTINGS };
   private settingsPath: string;
@@ -1352,7 +1376,7 @@ export class TabManager {
     wc.on('will-navigate', (event, url) => {
       try {
         const parsed = new URL(url);
-        if (!['http:', 'https:', 'about:'].includes(parsed.protocol)) {
+        if (!['http:', 'https:', 'about:', 'view-source:'].includes(parsed.protocol)) {
           console.warn(`[Security] Blocked unsafe navigation in tab ${tabId} to: ${url}`);
           event.preventDefault();
         }
@@ -1530,7 +1554,7 @@ export class TabManager {
     wc.setWindowOpenHandler((details) => {
       try {
         const parsed = new URL(details.url);
-        if (['http:', 'https:', 'about:'].includes(parsed.protocol)) {
+        if (['http:', 'https:', 'about:', 'view-source:'].includes(parsed.protocol)) {
           const currentTab = this.tabs.get(tabId);
           this.createTab(details.url, currentTab?.info.isPrivate || false);
         } else {
@@ -1541,6 +1565,309 @@ export class TabManager {
       }
       return { action: 'deny' };
     });
+
+    // In-Page Context Menu
+    wc.on('context-menu', (_event, params) => {
+      this.showContextMenu(tabId, params);
+    });
+
+    // HTML5 Fullscreen for embedded videos (YouTube, Netflix, Twitch)
+    wc.on('enter-html-full-screen', () => {
+      if (tabId === this.activeTabId) {
+        this.isHtmlFullscreen = true;
+        this.updateActiveViewBounds();
+        this.window.webContents.send('browser:html-fullscreen', true);
+      }
+    });
+
+    wc.on('leave-html-full-screen', () => {
+      if (tabId === this.activeTabId) {
+        this.isHtmlFullscreen = false;
+        this.updateActiveViewBounds();
+        this.window.webContents.send('browser:html-fullscreen', false);
+      }
+    });
+  }
+
+  private showContextMenu(tabId: string, params: Electron.ContextMenuParams) {
+    const tab = this.tabs.get(tabId);
+    if (!tab || !tab.view || tab.view.webContents.isDestroyed()) return;
+    const wc = tab.view.webContents;
+    const menu = new Menu();
+
+    // 1. Misspelled Word Suggestions (Spellcheck)
+    if (params.misspelledWord && params.dictionarySuggestions && params.dictionarySuggestions.length > 0) {
+      for (const suggestion of params.dictionarySuggestions) {
+        menu.append(
+          new MenuItem({
+            label: suggestion,
+            click: () => wc.replaceMisspelling(suggestion),
+          })
+        );
+      }
+      menu.append(
+        new MenuItem({
+          label: `Add to Dictionary`,
+          click: () => wc.session.addWordToSpellCheckerDictionary(params.misspelledWord),
+        })
+      );
+      menu.append(new MenuItem({ type: 'separator' }));
+    }
+
+    // 2. Link Context Menu
+    if (params.linkURL) {
+      menu.append(
+        new MenuItem({
+          label: 'Open Link in New Tab',
+          click: () => this.createTab(params.linkURL, false),
+        })
+      );
+      menu.append(
+        new MenuItem({
+          label: 'Open Link in New Private Tab',
+          click: () => this.createTab(params.linkURL, true),
+        })
+      );
+      menu.append(new MenuItem({ type: 'separator' }));
+      menu.append(
+        new MenuItem({
+          label: 'Copy Link Address',
+          click: () => clipboard.writeText(params.linkURL),
+        })
+      );
+      menu.append(new MenuItem({ type: 'separator' }));
+    }
+
+    // 3. Image / Media Context Menu
+    if (params.hasImageContents || params.mediaType === 'image') {
+      if (params.srcURL) {
+        menu.append(
+          new MenuItem({
+            label: 'Open Image in New Tab',
+            click: () => this.createTab(params.srcURL, false),
+          })
+        );
+        menu.append(
+          new MenuItem({
+            label: 'Save Image As...',
+            click: () => wc.downloadURL(params.srcURL),
+          })
+        );
+      }
+      menu.append(
+        new MenuItem({
+          label: 'Copy Image',
+          click: () => wc.copyImageAt(params.x, params.y),
+        })
+      );
+      if (params.srcURL) {
+        menu.append(
+          new MenuItem({
+            label: 'Copy Image Address',
+            click: () => clipboard.writeText(params.srcURL),
+          })
+        );
+      }
+      menu.append(new MenuItem({ type: 'separator' }));
+    } else if (params.mediaType === 'video' || params.mediaType === 'audio') {
+      if (params.srcURL) {
+        menu.append(
+          new MenuItem({
+            label: `Open ${params.mediaType === 'video' ? 'Video' : 'Audio'} in New Tab`,
+            click: () => this.createTab(params.srcURL, false),
+          })
+        );
+        menu.append(
+          new MenuItem({
+            label: `Save ${params.mediaType === 'video' ? 'Video' : 'Audio'} As...`,
+            click: () => wc.downloadURL(params.srcURL),
+          })
+        );
+        menu.append(
+          new MenuItem({
+            label: 'Copy Media Address',
+            click: () => clipboard.writeText(params.srcURL),
+          })
+        );
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+    }
+
+    // 4. Selection Text Menu
+    if (params.selectionText && params.selectionText.trim()) {
+      const selected = params.selectionText.trim();
+      const truncated = selected.length > 25 ? selected.substring(0, 25) + '…' : selected;
+      const engineName =
+        this.settings.defaultSearchEngine.charAt(0).toUpperCase() + this.settings.defaultSearchEngine.slice(1);
+
+      menu.append(
+        new MenuItem({
+          label: 'Copy',
+          role: 'copy',
+        })
+      );
+      menu.append(
+        new MenuItem({
+          label: `Search ${engineName} for "${truncated}"`,
+          click: () => {
+            const searchUrl = getSearchUrl(this.settings.defaultSearchEngine, selected);
+            this.createTab(searchUrl, tab.info.isPrivate);
+          },
+        })
+      );
+      menu.append(new MenuItem({ type: 'separator' }));
+    }
+
+    // 5. Editable Area (Inputs, Textareas)
+    if (params.isEditable) {
+      menu.append(new MenuItem({ label: 'Undo', role: 'undo', enabled: params.editFlags.canUndo }));
+      menu.append(new MenuItem({ label: 'Redo', role: 'redo', enabled: params.editFlags.canRedo }));
+      menu.append(new MenuItem({ type: 'separator' }));
+      menu.append(new MenuItem({ label: 'Cut', role: 'cut', enabled: params.editFlags.canCut }));
+      menu.append(new MenuItem({ label: 'Copy', role: 'copy', enabled: params.editFlags.canCopy }));
+      menu.append(new MenuItem({ label: 'Paste', role: 'paste', enabled: params.editFlags.canPaste }));
+      menu.append(
+        new MenuItem({
+          label: 'Paste and Match Style',
+          role: 'pasteAndMatchStyle',
+          enabled: params.editFlags.canPaste,
+        })
+      );
+      menu.append(new MenuItem({ label: 'Select All', role: 'selectAll', enabled: params.editFlags.canSelectAll }));
+      menu.append(new MenuItem({ type: 'separator' }));
+    }
+
+    // 6. Navigation & Page Controls (when not clicking on an editable or link)
+    if (!params.linkURL && !params.isEditable) {
+      const canGoBack = wc.navigationHistory ? wc.navigationHistory.canGoBack() : wc.canGoBack();
+      const canGoForward = wc.navigationHistory ? wc.navigationHistory.canGoForward() : wc.canGoForward();
+
+      menu.append(
+        new MenuItem({
+          label: 'Back',
+          enabled: canGoBack,
+          click: () => {
+            if (wc.navigationHistory) wc.navigationHistory.goBack();
+            else wc.goBack();
+          },
+        })
+      );
+      menu.append(
+        new MenuItem({
+          label: 'Forward',
+          enabled: canGoForward,
+          click: () => {
+            if (wc.navigationHistory) wc.navigationHistory.goForward();
+            else wc.goForward();
+          },
+        })
+      );
+      menu.append(
+        new MenuItem({
+          label: 'Reload',
+          click: () => wc.reload(),
+        })
+      );
+      menu.append(new MenuItem({ type: 'separator' }));
+
+      // Bookmark page
+      if (tab.info.url && tab.info.url !== 'about:blank') {
+        menu.append(
+          new MenuItem({
+            label: 'Bookmark Page...',
+            click: () => {
+              this.addBookmark({
+                title: tab.info.title || tab.info.url,
+                url: tab.info.url,
+                favicon: tab.info.favicon,
+              });
+            },
+          })
+        );
+      }
+
+      menu.append(
+        new MenuItem({
+          label: 'Print...',
+          accelerator: 'Ctrl+P',
+          click: () => wc.print(),
+        })
+      );
+
+      if (tab.info.url && tab.info.url.startsWith('http')) {
+        menu.append(
+          new MenuItem({
+            label: 'View Page Source',
+            accelerator: 'Ctrl+U',
+            click: () => this.createTab('view-source:' + tab.info.url, tab.info.isPrivate),
+          })
+        );
+      }
+      menu.append(new MenuItem({ type: 'separator' }));
+    }
+
+    // 7. Developer Inspection Tools
+    menu.append(
+      new MenuItem({
+        label: 'Inspect Element',
+        click: () => {
+          wc.inspectElement(params.x, params.y);
+          if (!wc.isDevToolsOpened()) {
+            wc.openDevTools({ mode: 'right' });
+          }
+        },
+      })
+    );
+
+    menu.popup({ window: this.window });
+  }
+
+  public async duplicateTab(tabId?: string): Promise<string | null> {
+    const targetId = tabId || this.activeTabId;
+    if (!targetId || !this.tabs.has(targetId)) return null;
+    const tab = this.tabs.get(targetId)!;
+    const newTabId = await this.createTab(tab.info.url, tab.info.isPrivate);
+    return newTabId;
+  }
+
+  public closeOtherTabs(tabId: string) {
+    const toClose = Array.from(this.tabs.keys()).filter((id) => id !== tabId);
+    for (const id of toClose) {
+      this.closeTab(id);
+    }
+  }
+
+  public closeTabsToRight(tabId: string) {
+    const keys = Array.from(this.tabs.keys());
+    const targetIndex = keys.indexOf(tabId);
+    if (targetIndex !== -1) {
+      const toClose = keys.slice(targetIndex + 1);
+      for (const id of toClose) {
+        this.closeTab(id);
+      }
+    }
+  }
+
+  public print(tabId?: string) {
+    const targetId = tabId || this.activeTabId;
+    if (!targetId || !this.tabs.has(targetId)) return;
+    const tab = this.tabs.get(targetId)!;
+    if (tab.view && !tab.view.webContents.isDestroyed()) {
+      tab.view.webContents.print();
+    }
+  }
+
+  public toggleDevTools(tabId?: string) {
+    const targetId = tabId || this.activeTabId;
+    if (!targetId || !this.tabs.has(targetId)) return;
+    const tab = this.tabs.get(targetId)!;
+    if (tab.view && !tab.view.webContents.isDestroyed()) {
+      if (tab.view.webContents.isDevToolsOpened()) {
+        tab.view.webContents.closeDevTools();
+      } else {
+        tab.view.webContents.openDevTools({ mode: 'right' });
+      }
+    }
   }
 
   public async capturePreview(tabId: string): Promise<string | undefined> {
@@ -1670,11 +1997,21 @@ export class TabManager {
     const tab = this.tabs.get(this.activeTabId);
     if (!tab || !tab.view || !tab.info.url || tab.info.url === 'about:blank') return;
 
+    const [width, height] = this.window.getContentSize();
+    if (this.isHtmlFullscreen) {
+      tab.view.setBounds({
+        x: 0,
+        y: 0,
+        width,
+        height,
+      });
+      return;
+    }
+
     const topOffset =
       TOP_BAR_HEIGHT +
       (this.settings.showBookmarksBar ? BOOKMARKS_BAR_HEIGHT : 0) +
       (this.isFindOpen ? FIND_BAR_HEIGHT : 0);
-    const [width, height] = this.window.getContentSize();
     tab.view.setBounds({
       x: 0,
       y: topOffset,
@@ -1795,7 +2132,7 @@ export class TabManager {
         };
         const base = engines[this.settings.defaultSearchEngine] || engines.google;
         targetUrl = `${base}${encodeURIComponent(targetUrl)}`;
-      } else if (!/^https?:\/\//i.test(targetUrl) && !/^about:/i.test(targetUrl)) {
+      } else if (!/^https?:\/\//i.test(targetUrl) && !/^about:/i.test(targetUrl) && !/^view-source:/i.test(targetUrl)) {
         if (targetUrl.includes('.') && !targetUrl.includes(' ')) {
           targetUrl = 'https://' + targetUrl;
         } else {

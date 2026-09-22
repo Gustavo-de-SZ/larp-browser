@@ -200,14 +200,7 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
     // 4. Duplicate Tab
     if (isTriggered('duplicateTab', input)) {
       event.preventDefault();
-      const { activeTabId, tabs } = tabManager.getState();
-      const current = tabs.find((t) => t.id === activeTabId);
-      const isPrivate = current?.isPrivate || false;
-      if (current && current.url && current.url !== 'about:blank') {
-        tabManager.createTab(current.url, isPrivate);
-      } else {
-        tabManager.createTab('about:blank', isPrivate);
-      }
+      tabManager.duplicateTab();
       return;
     }
 
@@ -362,6 +355,41 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
         window.unmaximize();
       } else {
         window.maximize();
+      }
+      return;
+    }
+
+    // 19. Developer Tools (F12 or Ctrl+Shift+I)
+    if (
+      isTriggered('openDevTools', input) ||
+      (!input.control && !input.alt && !input.shift && input.key === 'F12') ||
+      (input.control && input.shift && !input.alt && input.key.toLowerCase() === 'i')
+    ) {
+      event.preventDefault();
+      tabManager.toggleDevTools();
+      return;
+    }
+
+    // 20. Print Page (Ctrl+P)
+    if (
+      isTriggered('printPage', input) ||
+      (input.control && !input.shift && !input.alt && input.key.toLowerCase() === 'p')
+    ) {
+      event.preventDefault();
+      tabManager.print();
+      return;
+    }
+
+    // 21. View Page Source (Ctrl+U)
+    if (
+      isTriggered('viewSource', input) ||
+      (input.control && !input.shift && !input.alt && input.key.toLowerCase() === 'u')
+    ) {
+      event.preventDefault();
+      const { activeTabId, tabs } = tabManager.getState();
+      const current = tabs.find((t) => t.id === activeTabId);
+      if (current && current.url && current.url.startsWith('http')) {
+        tabManager.createTab('view-source:' + current.url, current.isPrivate);
       }
       return;
     }

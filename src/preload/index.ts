@@ -71,6 +71,16 @@ const api: IpcRendererApi = {
     };
   },
 
+  onHtmlFullscreen: (callback: (isFullscreen: boolean) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, isFullscreen: boolean) => {
+      callback(isFullscreen);
+    };
+    ipcRenderer.on('browser:html-fullscreen', listener);
+    return () => {
+      ipcRenderer.removeListener('browser:html-fullscreen', listener);
+    };
+  },
+
   getState: () => ipcRenderer.invoke('browser:get-state'),
   getAppVersion: () => ipcRenderer.invoke('browser:get-app-version'),
 
@@ -83,6 +93,11 @@ const api: IpcRendererApi = {
   reloadTab: (tabId: string) => ipcRenderer.invoke('browser:reload-tab', tabId),
   toggleMuteTab: (tabId: string) => ipcRenderer.invoke('browser:toggle-mute-tab', tabId),
   hibernateTab: (tabId: string) => ipcRenderer.invoke('browser:hibernate-tab', tabId),
+  duplicateTab: (tabId?: string) => ipcRenderer.invoke('browser:duplicate-tab', tabId),
+  closeOtherTabs: (tabId: string) => ipcRenderer.invoke('browser:close-other-tabs', tabId),
+  closeTabsToRight: (tabId: string) => ipcRenderer.invoke('browser:close-tabs-to-right', tabId),
+  print: (tabId?: string) => ipcRenderer.invoke('browser:print', tabId),
+  openDevTools: (tabId?: string) => ipcRenderer.invoke('browser:open-devtools', tabId),
 
   // Zoom
   setZoomFactor: (tabId: string, factor: number) =>

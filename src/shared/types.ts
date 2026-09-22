@@ -111,7 +111,10 @@ export type ShortcutActionId =
   | 'zoomIn'
   | 'zoomOut'
   | 'zoomReset'
-  | 'toggleMaximize';
+  | 'toggleMaximize'
+  | 'openDevTools'
+  | 'printPage'
+  | 'viewSource';
 
 export interface ShortcutDefinition {
   id: ShortcutActionId;
@@ -132,6 +135,8 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
   { id: 'goForward', label: 'Go Forward', category: 'Navigation', defaultKey: 'Alt+Right', description: 'Navigate forward in history' },
   { id: 'focusOmnibar', label: 'Focus Address Bar', category: 'Navigation', defaultKey: 'Ctrl+L', description: 'Focus and select omnibar URL' },
   { id: 'findInPage', label: 'Find in Page', category: 'Navigation', defaultKey: 'Ctrl+F', description: 'Search text on active page' },
+  { id: 'printPage', label: 'Print Page', category: 'Navigation', defaultKey: 'Ctrl+P', description: 'Print active page or save as PDF' },
+  { id: 'viewSource', label: 'View Page Source', category: 'Navigation', defaultKey: 'Ctrl+U', description: 'View HTML source of current page' },
   { id: 'openSwitcher', label: 'Tab Switcher', category: 'Tabs', defaultKey: 'Ctrl+Tab', description: 'Open visual Alt-Tab switcher HUD' },
   { id: 'toggleBookmark', label: 'Bookmark Page', category: 'Bookmarks', defaultKey: 'Ctrl+D', description: 'Add or remove bookmark for current page' },
   { id: 'toggleBookmarksBar', label: 'Toggle Bookmarks Bar', category: 'Bookmarks', defaultKey: 'Ctrl+Shift+B', description: 'Show or hide the bookmarks bar' },
@@ -140,6 +145,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
   { id: 'openShortcuts', label: 'Keyboard Cheatsheet', category: 'Interface', defaultKey: 'Ctrl+/', description: 'Show shortcuts reference cheatsheet' },
   { id: 'openHistory', label: 'Browsing History', category: 'Interface', defaultKey: 'Ctrl+H', description: 'Open browsing history' },
   { id: 'openDownloads', label: 'Downloads', category: 'Interface', defaultKey: 'Ctrl+J', description: 'Open downloads tray and history' },
+  { id: 'openDevTools', label: 'Developer Tools', category: 'Interface', defaultKey: 'F12', description: 'Toggle Chrome Developer Tools' },
   { id: 'zoomIn', label: 'Zoom In', category: 'Interface', defaultKey: 'Ctrl+=', description: 'Increase page zoom' },
   { id: 'zoomOut', label: 'Zoom Out', category: 'Interface', defaultKey: 'Ctrl+-', description: 'Decrease page zoom' },
   { id: 'zoomReset', label: 'Reset Zoom', category: 'Interface', defaultKey: 'Ctrl+0', description: 'Reset page zoom to 100%' },
@@ -222,6 +228,7 @@ export interface IpcRendererApi {
   onToggleFind: (callback: () => void) => () => void;
   onToggleFavorites: (callback: () => void) => () => void;
   onFindResult: (callback: (result: FindResult) => void) => () => void;
+  onHtmlFullscreen: (callback: (isFullscreen: boolean) => void) => () => void;
   getState: () => Promise<BrowserState>;
   getAppVersion: () => Promise<string>;
 
@@ -235,6 +242,11 @@ export interface IpcRendererApi {
   reloadTab: (tabId: string) => Promise<void>;
   toggleMuteTab: (tabId: string) => Promise<void>;
   hibernateTab: (tabId: string) => Promise<void>;
+  duplicateTab: (tabId?: string) => Promise<string | null>;
+  closeOtherTabs: (tabId: string) => Promise<void>;
+  closeTabsToRight: (tabId: string) => Promise<void>;
+  print: (tabId?: string) => Promise<void>;
+  openDevTools: (tabId?: string) => Promise<void>;
 
   // Zoom
   setZoomFactor: (tabId: string, factor: number) => Promise<number>;

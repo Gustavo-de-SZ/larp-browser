@@ -8,6 +8,10 @@ import {
   ArrowLeftRight,
   Moon,
   VenetianMask,
+  Copy,
+  RotateCw,
+  ArrowRightToLine,
+  Layers,
 } from 'lucide-react';
 import type { BrowserState, TabInfo } from '@/shared/types';
 import type { ThemeMode } from '../App';
@@ -20,6 +24,11 @@ interface TabSwitcherProps {
 export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
   const [filterQuery, setFilterQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'audio' | 'sleeping' | 'private'>('all');
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    tab: TabInfo;
+  } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const cardsContainerRef = useRef<HTMLDivElement>(null);
   const switcherContainerRef = useRef<HTMLDivElement>(null);
@@ -85,6 +94,18 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
     }
   }, [selectedIndex]);
 
+  // Dismiss context menu on click outside or right-click outside
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handleClose = () => setContextMenu(null);
+    window.addEventListener('click', handleClose);
+    window.addEventListener('contextmenu', handleClose);
+    return () => {
+      window.removeEventListener('click', handleClose);
+      window.removeEventListener('contextmenu', handleClose);
+    };
+  }, [contextMenu]);
+
   // Keyboard navigation within HUD
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -93,6 +114,10 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
 
       if (keyLower === 'escape') {
         e.preventDefault();
+        if (contextMenu) {
+          setContextMenu(null);
+          return;
+        }
         if (document.activeElement === searchInputRef.current) {
           if (filterQuery) {
             setFilterQuery('');
@@ -281,8 +306,18 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
     window.browserApi.commitSwitcher();
   };
 
-  const handleCloseTab = (e: React.MouseEvent, tabId: string) => {
+  const handleTabContextMenu = (e: React.MouseEvent, tab: TabInfo) => {
+    e.preventDefault();
     e.stopPropagation();
+    const menuWidth = 210;
+    const menuHeight = 280;
+    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
+    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
+    setContextMenu({ x, y, tab });
+  };
+
+  const handleCloseTab = (e: React.MouseEvent | undefined, tabId: string) => {
+    if (e) e.stopPropagation();
     window.browserApi.closeTab(tabId);
   };
 
@@ -449,6 +484,7 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                 <div
                   key={tab.id}
                   onClick={() => handleCardClick(index)}
+                  onContextMenu={(e) => handleTabContextMenu(e, tab)}
                   className={`flex items-center justify-between p-2.5 px-3 rounded-xl border cursor-pointer transition-all duration-100 ${
                     isSelected
                       ? 'scale-[1.005] shadow-xs'
@@ -559,6 +595,7 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                 <div
                   key={tab.id}
                   onClick={() => handleCardClick(index)}
+                  onContextMenu={(e) => handleTabContextMenu(e, tab)}
                   onAuxClick={(e) => {
                     if (e.button === 1) {
                       handleCloseTab(e, tab.id);
@@ -788,6 +825,121 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
           </div>
         </div>
       </div>
+
+      {/* Tab Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed z-50 py-1.5 rounded-xl border shadow-xl backdrop-blur-md min-w-[210px] flex flex-col text-xs transition-opacity duration-100"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+            backgroundColor: 'var(--bg-card-selected)',
+            borderColor: 'var(--border-subtle)',
+            color: 'var(--text-main)',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-3 py-1.5 border-b mb-1 flex items-center space-x-2" style={{ borderColor: 'var(--border-subtle)' }}>
+            {contextMenu.tab.favicon ? (
+              <img src={contextMenu.tab.favicon} alt="" className="w-3.5 h-3.5 rounded-xs" />
+            ) : (
+              <Globe className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+            )}
+            <span className="truncate font-semibold text-[11px] text-[var(--text-muted)] max-w-[150px]">
+              {contextMenu.tab.title || 'Tab'}
+            </span>
+          </div>
+
+          <button
+            onClick={() => {
+              window.browserApi.duplicateTab(contextMenu.tab.id);
+              setContextMenu(null);
+            }}
+            className="flex items-center px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-left space-x-2.5 cursor-pointer"
+          >
+            <Copy className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+            <span className="flex-1">Duplicate Tab</span>
+            <span className="text-[10px] text-[var(--text-muted)] font-mono">Ctrl+Shift+D</span>
+          </button>
+
+          <button
+            onClick={() => {
+              window.browserApi.reloadTab(contextMenu.tab.id);
+              setContextMenu(null);
+            }}
+            className="flex items-center px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-left space-x-2.5 cursor-pointer"
+          >
+            <RotateCw className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+            <span className="flex-1">Reload Tab</span>
+            <span className="text-[10px] text-[var(--text-muted)] font-mono">Ctrl+R</span>
+          </button>
+
+          <button
+            onClick={() => {
+              window.browserApi.toggleMuteTab(contextMenu.tab.id);
+              setContextMenu(null);
+            }}
+            className="flex items-center px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-left space-x-2.5 cursor-pointer"
+          >
+            {contextMenu.tab.isMuted ? (
+              <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+            ) : (
+              <VolumeX className="w-3.5 h-3.5 text-rose-400" />
+            )}
+            <span className="flex-1">{contextMenu.tab.isMuted ? 'Unmute Tab' : 'Mute Tab'}</span>
+            <span className="text-[10px] text-[var(--text-muted)] font-mono">M</span>
+          </button>
+
+          <button
+            onClick={() => {
+              window.browserApi.hibernateTab(contextMenu.tab.id);
+              setContextMenu(null);
+            }}
+            className="flex items-center px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-left space-x-2.5 cursor-pointer"
+          >
+            <Moon className="w-3.5 h-3.5 text-sky-400" />
+            <span className="flex-1">{contextMenu.tab.isHibernated ? 'Wake Tab' : 'Put Tab to Sleep'}</span>
+            <span className="text-[10px] text-[var(--text-muted)] font-mono">Z</span>
+          </button>
+
+          <div className="my-1 border-t" style={{ borderColor: 'var(--border-subtle)' }} />
+
+          <button
+            onClick={() => {
+              handleCloseTab(undefined, contextMenu.tab.id);
+              setContextMenu(null);
+            }}
+            className="flex items-center px-3 py-1.5 hover:bg-rose-500/15 text-rose-400 transition-colors text-left space-x-2.5 cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+            <span className="flex-1">Close Tab</span>
+            <span className="text-[10px] opacity-70 font-mono">Ctrl+W</span>
+          </button>
+
+          <button
+            onClick={() => {
+              window.browserApi.closeOtherTabs(contextMenu.tab.id);
+              setContextMenu(null);
+            }}
+            className="flex items-center px-3 py-1.5 hover:bg-rose-500/15 text-rose-400 transition-colors text-left space-x-2.5 cursor-pointer"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span className="flex-1">Close Other Tabs</span>
+          </button>
+
+          <button
+            onClick={() => {
+              window.browserApi.closeTabsToRight(contextMenu.tab.id);
+              setContextMenu(null);
+            }}
+            className="flex items-center px-3 py-1.5 hover:bg-rose-500/15 text-rose-400 transition-colors text-left space-x-2.5 cursor-pointer"
+          >
+            <ArrowRightToLine className="w-3.5 h-3.5" />
+            <span className="flex-1">Close Tabs to the Right</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

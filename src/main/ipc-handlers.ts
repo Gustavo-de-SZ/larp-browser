@@ -54,6 +54,26 @@ export function registerIpcHandlers(
     await tabManager.hibernateTab(tabId);
   });
 
+  ipcMain.handle('browser:duplicate-tab', (_event, tabId?: string) => {
+    return tabManager.duplicateTab(tabId);
+  });
+
+  ipcMain.handle('browser:close-other-tabs', (_event, tabId: string) => {
+    tabManager.closeOtherTabs(tabId);
+  });
+
+  ipcMain.handle('browser:close-tabs-to-right', (_event, tabId: string) => {
+    tabManager.closeTabsToRight(tabId);
+  });
+
+  ipcMain.handle('browser:print', (_event, tabId?: string) => {
+    tabManager.print(tabId);
+  });
+
+  ipcMain.handle('browser:open-devtools', (_event, tabId?: string) => {
+    tabManager.toggleDevTools(tabId);
+  });
+
   // Zoom handler
   ipcMain.handle('browser:set-zoom', (_event, tabId: string, factor: number) => {
     return tabManager.setZoomFactor(tabId, factor);

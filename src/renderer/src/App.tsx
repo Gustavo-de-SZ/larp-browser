@@ -24,6 +24,7 @@ export const App: React.FC = () => {
   const [isDownloadsOpen, setIsDownloadsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isFindOpen, setIsFindOpen] = useState(false);
+  const [isHtmlFullscreen, setIsHtmlFullscreen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTabType>('appearance');
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
@@ -202,6 +203,15 @@ export const App: React.FC = () => {
     return () => unsub();
   }, []);
 
+  // Listen for HTML5 Fullscreen (video playback e.g. YouTube)
+  useEffect(() => {
+    if (!window.browserApi?.onHtmlFullscreen) return;
+    const unsub = window.browserApi.onHtmlFullscreen((fullscreen) => {
+      setIsHtmlFullscreen(fullscreen);
+    });
+    return () => unsub();
+  }, []);
+
   // Global renderer keyboard shortcuts when focused in shell
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -305,31 +315,35 @@ export const App: React.FC = () => {
       }}
     >
       {/* Top Bar with Omnibar, Star Bookmark, Controls, and optional Bookmarks Bar */}
-      <TopBar
-        state={state}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-        onOpenSettings={(tab) => {
-          if (tab) setSettingsTab(tab as SettingsTabType);
-          setIsSettingsOpen(true);
-        }}
-        onOpenShortcuts={() => setIsShortcutsOpen(true)}
-        onToggleFavorites={() => setIsFavoritesOpen((prev) => !prev)}
-        isFavoritesOpen={isFavoritesOpen}
-        onToggleDownloads={() => setIsDownloadsOpen((prev) => !prev)}
-        isDownloadsOpen={isDownloadsOpen}
-        onToggleProfile={() => setIsProfileOpen((prev) => !prev)}
-        isProfileOpen={isProfileOpen}
-        onShowToast={showToast}
-        onOmnibarDropdownChange={setIsOmnibarOpen}
-      />
+      {!isHtmlFullscreen && (
+        <>
+          <TopBar
+            state={state}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            onOpenSettings={(tab) => {
+              if (tab) setSettingsTab(tab as SettingsTabType);
+              setIsSettingsOpen(true);
+            }}
+            onOpenShortcuts={() => setIsShortcutsOpen(true)}
+            onToggleFavorites={() => setIsFavoritesOpen((prev) => !prev)}
+            isFavoritesOpen={isFavoritesOpen}
+            onToggleDownloads={() => setIsDownloadsOpen((prev) => !prev)}
+            isDownloadsOpen={isDownloadsOpen}
+            onToggleProfile={() => setIsProfileOpen((prev) => !prev)}
+            isProfileOpen={isProfileOpen}
+            onShowToast={showToast}
+            onOmnibarDropdownChange={setIsOmnibarOpen}
+          />
 
-      {/* Docked In-Page Find Bar */}
-      <FindInPageBar
-        isOpen={isFindOpen}
-        onClose={() => setIsFindOpen(false)}
-        theme={theme}
-      />
+          {/* Docked In-Page Find Bar */}
+          <FindInPageBar
+            isOpen={isFindOpen}
+            onClose={() => setIsFindOpen(false)}
+            theme={theme}
+          />
+        </>
+      )}
 
       {/* Main Content Area */}
       <main
