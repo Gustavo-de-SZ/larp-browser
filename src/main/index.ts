@@ -6,10 +6,14 @@ import { UpdateManager } from './update-manager';
 import { registerIpcHandlers } from './ipc-handlers';
 import { registerShortcuts } from './shortcuts';
 
+// Silence Electron internal desktop security warnings in dev mode (web tabs load external 3rd-party sites)
+process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
+
 // Ensure app identity and version are explicitly set (prevents dev/unbundled fallback to Electron engine version)
 app.setName(process.env.APP_NAME || 'Larp Browser');
 if (process.env.APP_VERSION) {
-  app.setVersion(process.env.APP_VERSION);
+  const version = process.env.APP_VERSION;
+  app.getVersion = () => version;
 }
 
 // Linux performance, display backend, and hardware GPU acceleration flags
