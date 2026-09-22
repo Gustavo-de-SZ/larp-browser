@@ -26,6 +26,7 @@ import {
   Sparkles,
   CheckCircle2,
   FolderOpen,
+  User,
 } from 'lucide-react';
 import type { BrowserState, HistoryItem, UpdateCheckResult, DownloadItemInfo } from '@/shared/types';
 import type { ThemeMode } from '../App';
@@ -909,11 +910,13 @@ export const TopBar: React.FC<TopBarProps> = ({
             {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
           </button>
 
-          {/* User Profile & Account Avatar Button */}
+          {/* User Profile & Account Button */}
           <button
             onClick={onToggleProfile}
-            className={`p-1 rounded-full transition-all cursor-pointer flex items-center justify-center relative ml-0.5 ${
-              isProfileOpen ? 'ring-2 ring-[var(--accent-primary)]' : 'hover:opacity-90'
+            className={`relative p-1.5 rounded-md transition-colors cursor-pointer flex items-center justify-center ${
+              isProfileOpen
+                ? 'text-[var(--accent-primary)] bg-black/10 dark:bg-white/10'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
             }`}
             title={`Profile: ${activeProfile.name}${activeProfile.email ? ` (${activeProfile.email})` : ''}`}
           >
@@ -921,18 +924,13 @@ export const TopBar: React.FC<TopBarProps> = ({
               <img
                 src={activeProfile.avatarUrl}
                 alt={activeProfile.name}
-                className="w-5 h-5 rounded-full object-cover border border-black/10 dark:border-white/10"
+                className="w-3.5 h-3.5 rounded-full object-cover"
               />
             ) : (
-              <div
-                className="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] text-white shadow-xs"
-                style={{ backgroundColor: activeProfile.color || '#6366f1' }}
-              >
-                {activeProfile.name ? activeProfile.name.charAt(0).toUpperCase() : 'P'}
-              </div>
+              <User className="w-3.5 h-3.5" />
             )}
             {activeProfile.email && (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 absolute -bottom-0.5 -right-0.5 ring-1 ring-[var(--bg-topbar)]" />
+              <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-400 ring-2 ring-[var(--bg-topbar)]" />
             )}
           </button>
 

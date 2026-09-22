@@ -1376,31 +1376,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       style={{
                         borderColor: 'var(--border-subtle)',
                         backgroundColor: 'var(--bg-card)',
-                        background: `linear-gradient(135deg, ${currentActive.color}15, transparent 65%)`,
                       }}
                     >
                       <div className="flex items-center space-x-3.5">
-                        <div
-                          className="w-14 h-14 rounded-full p-0.5 flex-shrink-0 flex items-center justify-center shadow-sm"
-                          style={{
-                            background: `linear-gradient(135deg, ${currentActive.color}, ${currentActive.color}88)`,
-                          }}
-                        >
-                          {currentActive.avatarUrl ? (
-                            <img
-                              src={currentActive.avatarUrl}
-                              alt={currentActive.name}
-                              className="w-full h-full rounded-full object-cover bg-[var(--bg-card)]"
-                            />
-                          ) : (
-                            <div
-                              className="w-full h-full rounded-full flex items-center justify-center font-bold text-lg text-white"
-                              style={{ backgroundColor: currentActive.color }}
-                            >
-                              {currentActive.name.charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                        </div>
+                        {currentActive.avatarUrl ? (
+                          <img
+                            src={currentActive.avatarUrl}
+                            alt={currentActive.name}
+                            className="w-12 h-12 rounded-full object-cover border border-[var(--border-subtle)] shrink-0"
+                          />
+                        ) : (
+                          <div
+                            className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-base shrink-0 border"
+                            style={{
+                              backgroundColor: 'var(--bg-input)',
+                              borderColor: 'var(--border-subtle)',
+                              color: 'var(--accent-primary)',
+                            }}
+                          >
+                            {currentActive.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
 
                         <div className="space-y-1">
                           <div className="flex items-center space-x-2">
@@ -1410,8 +1406,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             <span
                               className="text-[10px] px-2 py-0.5 rounded-full font-medium"
                               style={{
-                                backgroundColor: `${currentActive.color}20`,
-                                color: currentActive.color,
+                                backgroundColor: 'var(--accent-primary)',
+                                color: 'var(--text-on-accent)',
                               }}
                             >
                               Active Profile
@@ -1527,7 +1523,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               }
                             }}
                             disabled={isDetectingGoogle}
-                            className="px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-modal)] text-xs font-medium text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center space-x-2 shadow-xs cursor-pointer"
+                            className="px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-input)] text-xs font-medium text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center space-x-2 shadow-xs cursor-pointer"
                           >
                             <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24">
                               <path
@@ -1685,20 +1681,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           }`}
                         >
                           <div className="flex items-center space-x-3 min-w-0">
-                            <div
-                              className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs text-white flex-shrink-0"
-                              style={{ backgroundColor: profile.color }}
-                            >
-                              {profile.avatarUrl ? (
-                                <img
-                                  src={profile.avatarUrl}
-                                  alt={profile.name}
-                                  className="w-full h-full rounded-full object-cover"
-                                />
-                              ) : (
-                                profile.name.charAt(0).toUpperCase()
-                              )}
-                            </div>
+                            {profile.avatarUrl ? (
+                              <img
+                                src={profile.avatarUrl}
+                                alt={profile.name}
+                                className="w-9 h-9 rounded-full object-cover border border-[var(--border-subtle)] shrink-0"
+                              />
+                            ) : (
+                              <div
+                                className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 border"
+                                style={{
+                                  backgroundColor: isActive ? 'var(--accent-primary)' : 'var(--bg-input)',
+                                  borderColor: 'var(--border-subtle)',
+                                  color: isActive ? 'var(--text-on-accent)' : 'var(--text-main)',
+                                }}
+                              >
+                                {profile.name.charAt(0).toUpperCase()}
+                              </div>
+                            )}
                             <div className="min-w-0">
                               <div className="flex items-center space-x-2">
                                 <span className="text-xs font-semibold text-[var(--text-main)] truncate">
