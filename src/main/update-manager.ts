@@ -38,7 +38,7 @@ export class UpdateManager {
     }
 
     this.isChecking = true;
-    const currentVersion = app.getVersion();
+    const currentVersion = process.env.APP_VERSION || app.getVersion();
 
     try {
       const response = await fetch(

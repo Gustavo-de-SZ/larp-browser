@@ -6,6 +6,12 @@ import { UpdateManager } from './update-manager';
 import { registerIpcHandlers } from './ipc-handlers';
 import { registerShortcuts } from './shortcuts';
 
+// Ensure app identity and version are explicitly set (prevents dev/unbundled fallback to Electron engine version)
+app.setName(process.env.APP_NAME || 'Larp Browser');
+if (process.env.APP_VERSION) {
+  app.setVersion(process.env.APP_VERSION);
+}
+
 // Linux performance, display backend, and hardware GPU acceleration flags
 if (process.platform === 'linux') {
   // Prevent multithreaded Mesa driver sandbox crash on Intel Iris Xe / Linux

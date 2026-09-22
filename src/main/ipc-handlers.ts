@@ -15,7 +15,7 @@ export function registerIpcHandlers(
   });
 
   ipcMain.handle('browser:get-app-version', () => {
-    return app.getVersion();
+    return process.env.APP_VERSION || app.getVersion();
   });
 
   ipcMain.handle('browser:create-tab', (_event, url?: string, isPrivate?: boolean) => {

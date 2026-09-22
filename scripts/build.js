@@ -1,10 +1,18 @@
 import * as esbuild from 'esbuild';
+import fs from 'fs';
+import path from 'path';
 
 const isDev = process.env.NODE_ENV === 'development';
+const pkg = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'));
 
 async function build() {
   console.log('Building Electron main and preload processes as CommonJS (.cjs)...');
   try {
+    const define = {
+      'process.env.APP_VERSION': JSON.stringify(pkg.version),
+      'process.env.APP_NAME': JSON.stringify(pkg.productName || 'Larp Browser'),
+    };
+
     // 1. Build Main Process (.cjs so Node treats as CommonJS despite "type": "module")
     await esbuild.build({
       entryPoints: ['src/main/index.ts'],
@@ -16,6 +24,7 @@ async function build() {
       external: ['electron'],
       sourcemap: isDev,
       minify: !isDev,
+      define,
     });
 
     // 2. Build Preload Process
@@ -29,6 +38,7 @@ async function build() {
       external: ['electron'],
       sourcemap: isDev,
       minify: !isDev,
+      define,
     });
 
     console.log('Main and preload build complete!');
