@@ -135,6 +135,35 @@ export function registerIpcHandlers(
     return tabManager.importPasswords();
   });
 
+  // Profile & Account handlers
+  ipcMain.handle('browser:get-profiles', () => {
+    return tabManager.getProfiles();
+  });
+
+  ipcMain.handle('browser:get-active-profile', () => {
+    return tabManager.getActiveProfile();
+  });
+
+  ipcMain.handle('browser:set-active-profile', (_event, id: string) => {
+    return tabManager.setActiveProfile(id);
+  });
+
+  ipcMain.handle('browser:save-profile', (_event, profile: any) => {
+    return tabManager.saveProfile(profile);
+  });
+
+  ipcMain.handle('browser:delete-profile', (_event, id: string) => {
+    return tabManager.deleteProfile(id);
+  });
+
+  ipcMain.handle('browser:detect-google-account', () => {
+    return tabManager.detectGoogleAccount();
+  });
+
+  ipcMain.handle('browser:link-google-account', (_event, account: { email: string; name?: string; avatarUrl?: string }) => {
+    return tabManager.linkGoogleAccount(account);
+  });
+
   // Settings & Theme handlers
   ipcMain.handle('browser:set-theme', (_event, theme: 'dark' | 'light') => {
     return tabManager.setTheme(theme);

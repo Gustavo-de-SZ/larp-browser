@@ -14,6 +14,7 @@ export interface TabInfo {
   zoomFactor?: number;
   isHibernated?: boolean;
   isPrivate?: boolean;
+  profileId?: string;
 }
 
 export interface BookmarkItem {
@@ -36,6 +37,18 @@ export interface ClearBrowsingDataOptions {
   clearHistory: boolean;
   clearCookies: boolean;
   clearCache: boolean;
+}
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email?: string;
+  avatarUrl?: string;
+  color: string;
+  partition?: string;
+  isDefault?: boolean;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface PasswordEntry {
@@ -195,6 +208,8 @@ export interface BrowserState {
   mruTabIds: string[];
   bookmarks: BookmarkItem[];
   settings: BrowserSettings;
+  profiles?: UserProfile[];
+  activeProfileId?: string;
 }
 
 export type SwitcherDirection = 'forward' | 'backward';
@@ -282,6 +297,15 @@ export interface IpcRendererApi {
   minimizeWindow: () => Promise<void>;
   maximizeWindow: () => Promise<void>;
   closeWindow: () => Promise<void>;
+
+  // Profiles & Accounts
+  getProfiles: () => Promise<UserProfile[]>;
+  getActiveProfile: () => Promise<UserProfile>;
+  setActiveProfile: (id: string) => Promise<void>;
+  saveProfile: (profile: Partial<UserProfile>) => Promise<UserProfile>;
+  deleteProfile: (id: string) => Promise<boolean>;
+  detectGoogleAccount: () => Promise<{ email?: string; name?: string; avatarUrl?: string } | null>;
+  linkGoogleAccount: (account: { email: string; name?: string; avatarUrl?: string }) => Promise<UserProfile>;
 
   // Updates
   checkForUpdates: (manual?: boolean) => Promise<UpdateCheckResult>;

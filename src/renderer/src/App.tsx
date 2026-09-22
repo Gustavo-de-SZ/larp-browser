@@ -6,6 +6,7 @@ import { SettingsModal, type SettingsTabType } from './components/SettingsModal'
 import { KeyboardShortcuts } from './components/KeyboardShortcuts';
 import { QuickFavoritesPopover } from './components/QuickFavoritesPopover';
 import { DownloadsPopover } from './components/DownloadsPopover';
+import { ProfilePopover } from './components/ProfilePopover';
 import { FindInPageBar } from './components/FindInPageBar';
 import { ToastContainer, type ToastItem } from './components/Toast';
 import { getPalette, applyPalette } from './theme/palettes';
@@ -21,6 +22,7 @@ export const App: React.FC = () => {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const [isDownloadsOpen, setIsDownloadsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isFindOpen, setIsFindOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTabType>('appearance');
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -279,11 +281,17 @@ export const App: React.FC = () => {
 
   // Synchronize modal open state with Electron main process so native WebContentsView is detached
   useEffect(() => {
-    const isAnyModalOpen = isSettingsOpen || isShortcutsOpen || isFavoritesOpen || isOmnibarOpen || isDownloadsOpen;
+    const isAnyModalOpen =
+      isSettingsOpen ||
+      isShortcutsOpen ||
+      isFavoritesOpen ||
+      isOmnibarOpen ||
+      isDownloadsOpen ||
+      isProfileOpen;
     if (window.browserApi?.setModalOpen) {
       window.browserApi.setModalOpen(isAnyModalOpen);
     }
-  }, [isSettingsOpen, isShortcutsOpen, isFavoritesOpen, isOmnibarOpen, isDownloadsOpen]);
+  }, [isSettingsOpen, isShortcutsOpen, isFavoritesOpen, isOmnibarOpen, isDownloadsOpen, isProfileOpen]);
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
   const isNewTab = !activeTab || !activeTab.url || activeTab.url === 'about:blank' || !activeTab.hasLoadedPage;
@@ -310,6 +318,8 @@ export const App: React.FC = () => {
         isFavoritesOpen={isFavoritesOpen}
         onToggleDownloads={() => setIsDownloadsOpen((prev) => !prev)}
         isDownloadsOpen={isDownloadsOpen}
+        onToggleProfile={() => setIsProfileOpen((prev) => !prev)}
+        isProfileOpen={isProfileOpen}
         onShowToast={showToast}
         onOmnibarDropdownChange={setIsOmnibarOpen}
       />
@@ -329,7 +339,7 @@ export const App: React.FC = () => {
         {isNewTab ? (
           <NewTabPage state={state} theme={theme} />
         ) : (
-          (state.isSwitcherOpen || isSettingsOpen || isShortcutsOpen || isFavoritesOpen || isOmnibarOpen || isDownloadsOpen) && activeTab?.previewImage ? (
+          (state.isSwitcherOpen || isSettingsOpen || isShortcutsOpen || isFavoritesOpen || isOmnibarOpen || isDownloadsOpen || isProfileOpen) && activeTab?.previewImage ? (
             <img
               src={activeTab.previewImage}
               alt="Active tab preview"
@@ -360,6 +370,20 @@ export const App: React.FC = () => {
         onOpenSettingsToDownloads={() => {
           setSettingsTab('downloads');
           setIsDownloadsOpen(false);
+          setIsSettingsOpen(true);
+        }}
+        onShowToast={showToast}
+      />
+
+      {/* User Profile & Account Popover */}
+      <ProfilePopover
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        state={state}
+        theme={theme}
+        onOpenSettingsToProfiles={() => {
+          setSettingsTab('profiles');
+          setIsProfileOpen(false);
           setIsSettingsOpen(true);
         }}
         onShowToast={showToast}

@@ -50,6 +50,8 @@ interface TopBarProps {
   isFavoritesOpen?: boolean;
   onToggleDownloads?: () => void;
   isDownloadsOpen?: boolean;
+  onToggleProfile?: () => void;
+  isProfileOpen?: boolean;
   onShowToast?: (toast: { type: ToastType; message: string }) => void;
   onOmnibarDropdownChange?: (isOpen: boolean) => void;
 }
@@ -64,9 +66,21 @@ export const TopBar: React.FC<TopBarProps> = ({
   isFavoritesOpen = false,
   onToggleDownloads,
   isDownloadsOpen = false,
+  onToggleProfile,
+  isProfileOpen = false,
   onShowToast,
   onOmnibarDropdownChange,
 }) => {
+  const activeProfile =
+    state.profiles?.find((p) => p.id === state.activeProfileId) ||
+    state.profiles?.[0] || {
+      id: 'default',
+      name: 'Personal',
+      color: '#6366f1',
+      isDefault: true,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
   const [urlInput, setUrlInput] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -893,6 +907,33 @@ export const TopBar: React.FC<TopBarProps> = ({
             title={isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
           >
             {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+          </button>
+
+          {/* User Profile & Account Avatar Button */}
+          <button
+            onClick={onToggleProfile}
+            className={`p-1 rounded-full transition-all cursor-pointer flex items-center justify-center relative ml-0.5 ${
+              isProfileOpen ? 'ring-2 ring-[var(--accent-primary)]' : 'hover:opacity-90'
+            }`}
+            title={`Profile: ${activeProfile.name}${activeProfile.email ? ` (${activeProfile.email})` : ''}`}
+          >
+            {activeProfile.avatarUrl ? (
+              <img
+                src={activeProfile.avatarUrl}
+                alt={activeProfile.name}
+                className="w-5 h-5 rounded-full object-cover border border-black/10 dark:border-white/10"
+              />
+            ) : (
+              <div
+                className="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] text-white shadow-xs"
+                style={{ backgroundColor: activeProfile.color || '#6366f1' }}
+              >
+                {activeProfile.name ? activeProfile.name.charAt(0).toUpperCase() : 'P'}
+              </div>
+            )}
+            {activeProfile.email && (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 absolute -bottom-0.5 -right-0.5 ring-1 ring-[var(--bg-topbar)]" />
+            )}
           </button>
 
           {/* Window Controls (Minimize, Maximize, Close) */}

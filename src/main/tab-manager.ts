@@ -1,4 +1,4 @@
-import { app, BrowserWindow, WebContentsView, nativeTheme, safeStorage, dialog } from 'electron';
+import { app, BrowserWindow, WebContentsView, nativeTheme, safeStorage, dialog, session } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -12,6 +12,7 @@ import type {
   PasswordEntry,
   ClearBrowsingDataOptions,
   WeatherData,
+  UserProfile,
 } from '../shared/types';
 import { parseBangQuery } from '../shared/bangs';
 import type { DownloadManager } from './download-manager';
@@ -87,6 +88,9 @@ export class TabManager {
   private historyPath: string;
   private passwords: PasswordEntry[] = [];
   private passwordsPath: string;
+  private profiles: UserProfile[] = [];
+  private activeProfileId: string = 'default';
+  private profilesPath: string;
   private sessionPath: string;
   private cachedWeather: { data: WeatherData; timestamp: number } | null = null;
   private downloadManager?: DownloadManager;
@@ -102,8 +106,10 @@ export class TabManager {
     this.bookmarksPath = path.join(app.getPath('userData'), 'larp-bookmarks.json');
     this.historyPath = path.join(app.getPath('userData'), 'larp-history.json');
     this.passwordsPath = path.join(app.getPath('userData'), 'larp-passwords.json');
+    this.profilesPath = path.join(app.getPath('userData'), 'larp-profiles.json');
     this.sessionPath = path.join(app.getPath('userData'), 'larp-session.json');
     this.loadSettings();
+    this.loadProfiles();
     this.loadBookmarks();
     this.loadHistory();
     this.loadPasswords();
@@ -664,6 +670,210 @@ export class TabManager {
     }
   }
 
+  // --- Profiles & Accounts Management ---
+
+  private loadProfiles() {
+    try {
+      if (fs.existsSync(this.profilesPath)) {
+        const raw = fs.readFileSync(this.profilesPath, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.profiles) && parsed.profiles.length > 0) {
+          this.profiles = parsed.profiles;
+          this.activeProfileId = parsed.activeProfileId || this.profiles[0].id || 'default';
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load profiles:', err);
+    }
+
+    if (this.profiles.length === 0) {
+      this.profiles = [
+        {
+          id: 'default',
+          name: 'Personal',
+          color: '#6366f1',
+          isDefault: true,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+      ];
+      this.activeProfileId = 'default';
+      this.saveProfiles();
+    }
+  }
+
+  private saveProfiles() {
+    try {
+      const data = {
+        activeProfileId: this.activeProfileId,
+        profiles: this.profiles,
+      };
+      fs.promises.writeFile(this.profilesPath, JSON.stringify(data, null, 2), 'utf8').catch((err) => {
+        console.error('Failed to save profiles:', err);
+      });
+    } catch (err) {
+      console.error('Failed to serialize profiles:', err);
+    }
+  }
+
+  public getProfiles(): UserProfile[] {
+    return [...this.profiles];
+  }
+
+  public getActiveProfile(): UserProfile {
+    return (
+      this.profiles.find((p) => p.id === this.activeProfileId) ||
+      this.profiles[0] || {
+        id: 'default',
+        name: 'Personal',
+        color: '#6366f1',
+        isDefault: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }
+    );
+  }
+
+  public async setActiveProfile(profileId: string) {
+    const target = this.profiles.find((p) => p.id === profileId);
+    if (!target || target.id === this.activeProfileId) return;
+
+    this.activeProfileId = target.id;
+    this.saveProfiles();
+    this.notifyStateChange();
+  }
+
+  public saveProfile(profileData: Partial<UserProfile>): UserProfile {
+    if (profileData.id) {
+      const idx = this.profiles.findIndex((p) => p.id === profileData.id);
+      if (idx !== -1) {
+        this.profiles[idx] = {
+          ...this.profiles[idx],
+          ...profileData,
+          updatedAt: Date.now(),
+        };
+        this.saveProfiles();
+        this.notifyStateChange();
+        return this.profiles[idx];
+      }
+    }
+
+    // Create new profile
+    const id = 'prof-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+    const newProfile: UserProfile = {
+      id,
+      name: profileData.name?.trim() || 'Work',
+      email: profileData.email?.trim() || '',
+      avatarUrl: profileData.avatarUrl?.trim() || '',
+      color: profileData.color || '#3b82f6',
+      partition: `persist:profile_${id}`,
+      isDefault: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    this.profiles.push(newProfile);
+    this.saveProfiles();
+    this.notifyStateChange();
+    return newProfile;
+  }
+
+  public deleteProfile(profileId: string): boolean {
+    if (profileId === 'default') return false;
+    const target = this.profiles.find((p) => p.id === profileId);
+    if (!target || target.isDefault) return false;
+
+    this.profiles = this.profiles.filter((p) => p.id !== profileId);
+    if (this.activeProfileId === profileId) {
+      this.activeProfileId = 'default';
+    }
+    this.saveProfiles();
+    this.notifyStateChange();
+    return true;
+  }
+
+  public linkGoogleAccount(account: { email: string; name?: string; avatarUrl?: string }): UserProfile {
+    const active = this.getActiveProfile();
+    const idx = this.profiles.findIndex((p) => p.id === active.id);
+    if (idx !== -1) {
+      this.profiles[idx] = {
+        ...this.profiles[idx],
+        email: account.email.trim(),
+        name: account.name?.trim() || this.profiles[idx].name,
+        avatarUrl: account.avatarUrl || this.profiles[idx].avatarUrl,
+        updatedAt: Date.now(),
+      };
+      this.saveProfiles();
+      this.notifyStateChange();
+      return this.profiles[idx];
+    }
+    return active;
+  }
+
+  public async detectGoogleAccount(): Promise<{ email?: string; name?: string; avatarUrl?: string } | null> {
+    // 1. Search through open tabs for Google domains
+    const googleDomains = ['google.com', 'accounts.google.com', 'mail.google.com', 'myaccount.google.com', 'youtube.com'];
+    for (const tab of this.tabs.values()) {
+      if (!tab.view || !tab.view.webContents || tab.view.webContents.isDestroyed()) continue;
+      const url = tab.info.url || '';
+      const isGoogle = googleDomains.some((d) => url.includes(d));
+      if (isGoogle) {
+        try {
+          const result = await tab.view.webContents.executeJavaScript(`
+            (() => {
+              try {
+                // 1. Aria-label on account buttons/links
+                const accountEls = Array.from(document.querySelectorAll('a[aria-label*="@"], a[aria-label*="Google Account"], a[aria-label*="Conta do Google"], button[aria-label*="@"], button[aria-label*="Google Account"]'));
+                for (const el of accountEls) {
+                  const label = el.getAttribute('aria-label') || '';
+                  const emailMatch = label.match(/([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+)/);
+                  if (emailMatch) {
+                    let name = '';
+                    const nameMatch = label.match(/(?:Google Account|Conta do Google):\\s*([^\\n(]+)/i);
+                    if (nameMatch) name = nameMatch[1].trim();
+                    const img = el.querySelector('img') || document.querySelector('img[src*="googleusercontent.com"]');
+                    return { email: emailMatch[1], name, avatarUrl: (img && img.src) || '' };
+                  }
+                }
+                // 2. Data attributes
+                const dataEmailEl = document.querySelector('[data-email], [data-identifier]');
+                if (dataEmailEl) {
+                  const email = dataEmailEl.getAttribute('data-email') || dataEmailEl.getAttribute('data-identifier') || '';
+                  const img = document.querySelector('img[src*="googleusercontent.com"]');
+                  return { email, avatarUrl: (img && img.src) || '' };
+                }
+              } catch (e) {}
+              return null;
+            })()
+          `);
+          if (result && result.email) {
+            return result;
+          }
+        } catch {
+          // Continue searching other tabs
+        }
+      }
+    }
+
+    // 2. Check cookies in active session for hints
+    try {
+      const activeProfile = this.getActiveProfile();
+      const sess = activeProfile.partition ? session.fromPartition(activeProfile.partition) : session.defaultSession;
+      const cookies = await sess.cookies.get({ domain: '.google.com' });
+      const chooser = cookies.find((c) => c.name === 'ACCOUNT_CHOOSER');
+      if (chooser && chooser.value) {
+        const decoded = decodeURIComponent(chooser.value);
+        const emailMatch = decoded.match(/([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+)/);
+        if (emailMatch) {
+          return { email: emailMatch[1] };
+        }
+      }
+    } catch {
+      // Ignore
+    }
+
+    return null;
+  }
+
   public async getWeather(): Promise<WeatherData | null> {
     const CACHE_TTL = 20 * 60 * 1000; // 20 minutes
     if (this.cachedWeather && Date.now() - this.cachedWeather.timestamp < CACHE_TTL) {
@@ -871,6 +1081,8 @@ export class TabManager {
       mruTabIds: [...this.mruTabIds],
       bookmarks: [...this.bookmarks],
       settings: { ...this.settings },
+      profiles: [...this.profiles],
+      activeProfileId: this.activeProfileId,
     };
   }
 
@@ -973,13 +1185,17 @@ export class TabManager {
       return tab.view;
     }
 
+    const activeProfile = this.getActiveProfile();
+    const tabProfile = tab.info.profileId ? this.profiles.find((p) => p.id === tab.info.profileId) : activeProfile;
+    const partition = tab.info.isPrivate ? 'incognito' : (tabProfile?.partition || undefined);
+
     const view = new WebContentsView({
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: true,
         spellcheck: true,
-        partition: tab.info.isPrivate ? 'incognito' : undefined,
+        partition,
       },
     });
 
@@ -1043,6 +1259,9 @@ export class TabManager {
       effectiveUrl = 'about:blank';
     }
 
+    const activeProfile = this.getActiveProfile();
+    const partition = isPrivate ? 'incognito' : (activeProfile.partition || undefined);
+
     const id = 'tab-' + Math.random().toString(36).substring(2, 9);
     const view = new WebContentsView({
       webPreferences: {
@@ -1050,7 +1269,7 @@ export class TabManager {
         contextIsolation: true,
         sandbox: true,
         spellcheck: true,
-        partition: isPrivate ? 'incognito' : undefined,
+        partition,
       },
     });
 
@@ -1074,6 +1293,7 @@ export class TabManager {
       isMuted: false,
       zoomFactor: 1.0,
       isPrivate,
+      profileId: isPrivate ? undefined : activeProfile.id,
     };
 
     this.tabs.set(id, { info, view });

@@ -174,6 +174,16 @@ const api: IpcRendererApi = {
   maximizeWindow: () => ipcRenderer.invoke('window:maximize'),
   closeWindow: () => ipcRenderer.invoke('window:close'),
 
+  // Profiles & Accounts
+  getProfiles: () => ipcRenderer.invoke('browser:get-profiles'),
+  getActiveProfile: () => ipcRenderer.invoke('browser:get-active-profile'),
+  setActiveProfile: (id: string) => ipcRenderer.invoke('browser:set-active-profile', id),
+  saveProfile: (profile: any) => ipcRenderer.invoke('browser:save-profile', profile),
+  deleteProfile: (id: string) => ipcRenderer.invoke('browser:delete-profile', id),
+  detectGoogleAccount: () => ipcRenderer.invoke('browser:detect-google-account'),
+  linkGoogleAccount: (account: { email: string; name?: string; avatarUrl?: string }) =>
+    ipcRenderer.invoke('browser:link-google-account', account),
+
   // Updates
   checkForUpdates: (manual?: boolean) => ipcRenderer.invoke('browser:check-for-updates', manual),
   getUpdateInfo: () => ipcRenderer.invoke('browser:get-update-info'),

@@ -40,6 +40,9 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
+  User,
+  UserCheck,
+  LogOut,
 } from 'lucide-react';
 import { DARK_PALETTES, LIGHT_PALETTES, ColorPalette, getPalette } from '../theme/palettes';
 import { ConfirmModal } from './ConfirmModal';
@@ -55,11 +58,13 @@ import {
   SHORTCUT_DEFINITIONS,
   ShortcutActionId,
   UpdateCheckResult,
+  UserProfile,
 } from '@/shared/types';
 import type { ThemeMode } from '../App';
 
 export type SettingsTabType =
   | 'appearance'
+  | 'profiles'
   | 'shortcuts'
   | 'bookmarks'
   | 'startup'
@@ -275,6 +280,47 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       window.browserApi.getPasswords().then((items) => {
         if (items) setPasswordsList(items);
       });
+    }
+  }, [isOpen, activeTab]);
+
+  // Profiles state
+  const [profilesList, setProfilesList] = useState<UserProfile[]>([]);
+  const [activeProfileId, setActiveProfileId] = useState<string>('default');
+  const [isDetectingGoogle, setIsDetectingGoogle] = useState(false);
+  const [isNewProfileModalOpen, setIsNewProfileModalOpen] = useState(false);
+  const [newProfileName, setNewProfileName] = useState('');
+  const [newProfileColor, setNewProfileColor] = useState('#3b82f6');
+  const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
+  const [profileEditForm, setProfileEditForm] = useState<{
+    name: string;
+    email: string;
+    avatarUrl: string;
+    color: string;
+  }>({
+    name: '',
+    email: '',
+    avatarUrl: '',
+    color: '#6366f1',
+  });
+
+  const loadProfilesData = () => {
+    if (!window.browserApi?.getProfiles) return;
+    Promise.all([
+      window.browserApi.getProfiles(),
+      window.browserApi.getActiveProfile?.(),
+    ])
+      .then(([all, active]) => {
+        if (all) setProfilesList(all);
+        if (active) {
+          setActiveProfileId(active.id);
+        }
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    if (isOpen && activeTab === 'profiles') {
+      loadProfilesData();
     }
   }, [isOpen, activeTab]);
 
@@ -828,6 +874,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </button>
 
             <button
+              onClick={() => setActiveTab('profiles')}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                activeTab === 'profiles'
+                  ? 'bg-black/10 dark:bg-white/10 text-[var(--text-main)] font-semibold'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
+            >
+              <User className="w-4 h-4 text-[var(--text-muted)]" />
+              <span>Profiles & Account</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('shortcuts')}
               className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                 activeTab === 'shortcuts'
@@ -953,6 +1011,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
               {activeTab === 'appearance' && 'Appearance & Colors'}
+              {activeTab === 'profiles' && 'Profiles & Accounts'}
               {activeTab === 'shortcuts' && 'Keyboard Shortcuts'}
               {activeTab === 'bookmarks' && 'Bookmarks & Favorites'}
               {activeTab === 'startup' && 'Startup Behavior & Default Page'}
@@ -1292,6 +1351,492 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Profiles & Accounts */}
+            {activeTab === 'profiles' && (
+              <div className="space-y-6">
+                {/* Active Profile Card */}
+                {(() => {
+                  const currentActive =
+                    profilesList.find((p) => p.id === activeProfileId) ||
+                    profilesList[0] || {
+                      id: 'default',
+                      name: 'Personal',
+                      color: '#6366f1',
+                      isDefault: true,
+                      createdAt: Date.now(),
+                      updatedAt: Date.now(),
+                    };
+
+                  return (
+                    <div
+                      className="p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden"
+                      style={{
+                        borderColor: 'var(--border-subtle)',
+                        backgroundColor: 'var(--bg-card)',
+                        background: `linear-gradient(135deg, ${currentActive.color}15, transparent 65%)`,
+                      }}
+                    >
+                      <div className="flex items-center space-x-3.5">
+                        <div
+                          className="w-14 h-14 rounded-full p-0.5 flex-shrink-0 flex items-center justify-center shadow-sm"
+                          style={{
+                            background: `linear-gradient(135deg, ${currentActive.color}, ${currentActive.color}88)`,
+                          }}
+                        >
+                          {currentActive.avatarUrl ? (
+                            <img
+                              src={currentActive.avatarUrl}
+                              alt={currentActive.name}
+                              className="w-full h-full rounded-full object-cover bg-[var(--bg-card)]"
+                            />
+                          ) : (
+                            <div
+                              className="w-full h-full rounded-full flex items-center justify-center font-bold text-lg text-white"
+                              style={{ backgroundColor: currentActive.color }}
+                            >
+                              {currentActive.name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <span className="font-semibold text-sm text-[var(--text-main)]">
+                              {currentActive.name}
+                            </span>
+                            <span
+                              className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                              style={{
+                                backgroundColor: `${currentActive.color}20`,
+                                color: currentActive.color,
+                              }}
+                            >
+                              Active Profile
+                            </span>
+                            {currentActive.isDefault && (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded-full font-medium bg-black/5 dark:bg-white/10 text-[var(--text-muted)]">
+                                Default
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-[var(--text-muted)] font-mono">
+                            {currentActive.email ? (
+                              <span className="text-emerald-500 font-sans font-medium flex items-center space-x-1">
+                                <ShieldCheck className="w-3.5 h-3.5 inline mr-1" />
+                                {currentActive.email}
+                              </span>
+                            ) : (
+                              'Local Profile (No Google account linked)'
+                            )}
+                          </div>
+                          <div className="text-[11px] text-[var(--text-muted)]">
+                            Partition:{' '}
+                            <span className="font-mono">
+                              {currentActive.partition || 'Default Session (Unpartitioned)'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Google Account Linking Actions */}
+                      <div className="flex items-center space-x-2 flex-shrink-0">
+                        {currentActive.email ? (
+                          <div className="flex items-center space-x-2">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setIsDetectingGoogle(true);
+                                try {
+                                  const detected = await window.browserApi.detectGoogleAccount();
+                                  if (detected && detected.email) {
+                                    await window.browserApi.linkGoogleAccount(detected as { email: string; name?: string; avatarUrl?: string });
+                                    loadProfilesData();
+                                    onShowToast?.({
+                                      type: 'success',
+                                      message: `Re-synced with Google: ${detected.email}`,
+                                    });
+                                  } else {
+                                    onShowToast?.({
+                                      type: 'info',
+                                      message: 'Google session refreshed',
+                                    });
+                                  }
+                                } catch (err: any) {
+                                  onShowToast?.({ type: 'danger', message: err.message || 'Sync failed' });
+                                } finally {
+                                  setIsDetectingGoogle(false);
+                                }
+                              }}
+                              disabled={isDetectingGoogle}
+                              className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center space-x-1.5 cursor-pointer"
+                              title="Refresh active Google account info"
+                            >
+                              <RefreshCw className={`w-3.5 h-3.5 ${isDetectingGoogle ? 'animate-spin' : ''}`} />
+                              <span>Re-sync</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await window.browserApi.saveProfile({
+                                  id: currentActive.id,
+                                  email: '',
+                                  avatarUrl: '',
+                                });
+                                loadProfilesData();
+                                onShowToast?.({
+                                  type: 'info',
+                                  message: 'Google account unlinked',
+                                });
+                              }}
+                              className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-xs font-medium text-rose-500 hover:bg-rose-500/10 transition-colors flex items-center space-x-1.5 cursor-pointer"
+                              title="Unlink Google account from this profile"
+                            >
+                              <LogOut className="w-3.5 h-3.5" />
+                              <span>Unlink</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setIsDetectingGoogle(true);
+                              try {
+                                const detected = await window.browserApi.detectGoogleAccount();
+                                if (detected && detected.email) {
+                                  await window.browserApi.linkGoogleAccount(detected as { email: string; name?: string; avatarUrl?: string });
+                                  loadProfilesData();
+                                  onShowToast?.({
+                                    type: 'success',
+                                    message: `Linked Google account: ${detected.email}`,
+                                  });
+                                } else {
+                                  onShowToast?.({
+                                    type: 'info',
+                                    message: 'No active Google tab found. Opening Google Sign-In...',
+                                  });
+                                  await window.browserApi.createTab('https://accounts.google.com');
+                                  onClose();
+                                }
+                              } catch (err: any) {
+                                onShowToast?.({ type: 'danger', message: err.message || 'Detection failed' });
+                              } finally {
+                                setIsDetectingGoogle(false);
+                              }
+                            }}
+                            disabled={isDetectingGoogle}
+                            className="px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-modal)] text-xs font-medium text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center space-x-2 shadow-xs cursor-pointer"
+                          >
+                            <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24">
+                              <path
+                                fill="#4285F4"
+                                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                              />
+                              <path
+                                fill="#34A853"
+                                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                              />
+                              <path
+                                fill="#FBBC05"
+                                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                              />
+                              <path
+                                fill="#EA4335"
+                                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                              />
+                            </svg>
+                            <span>{isDetectingGoogle ? 'Detecting...' : 'Link Active Google Account'}</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (editingProfileId === currentActive.id) {
+                              setEditingProfileId(null);
+                            } else {
+                              setEditingProfileId(currentActive.id);
+                              setProfileEditForm({
+                                name: currentActive.name,
+                                email: currentActive.email || '',
+                                avatarUrl: currentActive.avatarUrl || '',
+                                color: currentActive.color || '#6366f1',
+                              });
+                            }
+                          }}
+                          className="p-2 rounded-lg border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                          title="Edit profile name & appearance"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Edit Profile Form Inline */}
+                {editingProfileId && (
+                  <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] space-y-3 animate-in fade-in">
+                    <div className="text-xs font-semibold text-[var(--text-main)]">Edit Profile</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] font-medium text-[var(--text-muted)] block mb-1">Profile Name</label>
+                        <input
+                          type="text"
+                          value={profileEditForm.name}
+                          onChange={(e) => setProfileEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                          className="w-full h-8 px-2.5 text-xs rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-input)] text-[var(--text-main)] focus:outline-none focus:border-[var(--border-selected)]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-medium text-[var(--text-muted)] block mb-1">Custom Avatar URL</label>
+                        <input
+                          type="text"
+                          value={profileEditForm.avatarUrl}
+                          onChange={(e) => setProfileEditForm((prev) => ({ ...prev, avatarUrl: e.target.value }))}
+                          placeholder="https://..."
+                          className="w-full h-8 px-2.5 text-xs rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-input)] text-[var(--text-main)] focus:outline-none focus:border-[var(--border-selected)]"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-medium text-[var(--text-muted)] block mb-1.5">Profile Accent Color</label>
+                      <div className="flex items-center space-x-2">
+                        {['#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444'].map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => setProfileEditForm((prev) => ({ ...prev, color: c }))}
+                            className={`w-6 h-6 rounded-full transition-transform cursor-pointer ${
+                              profileEditForm.color === c ? 'scale-125 ring-2 ring-white/60 shadow-xs' : 'opacity-75 hover:opacity-100'
+                            }`}
+                            style={{ backgroundColor: c }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[var(--border-subtle)]">
+                      <button
+                        type="button"
+                        onClick={() => setEditingProfileId(null)}
+                        className="px-3 py-1.5 rounded-lg text-xs text-[var(--text-muted)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!editingProfileId) return;
+                          await window.browserApi.saveProfile({
+                            id: editingProfileId,
+                            name: profileEditForm.name.trim() || 'Profile',
+                            avatarUrl: profileEditForm.avatarUrl.trim(),
+                            color: profileEditForm.color,
+                          });
+                          loadProfilesData();
+                          setEditingProfileId(null);
+                          onShowToast?.({
+                            type: 'success',
+                            message: 'Profile updated',
+                          });
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium text-white shadow-xs cursor-pointer"
+                        style={{ backgroundColor: profileEditForm.color }}
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Profiles List & Multi-Profile Section */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-semibold text-[var(--text-main)]">Browser Profiles</h4>
+                      <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                        Each profile maintains an isolated browsing session with separate cookies and logins.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsNewProfileModalOpen(true)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--text-on-accent)] shadow-xs flex items-center space-x-1.5 cursor-pointer hover:opacity-90 transition-opacity"
+                      style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' }}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>New Profile</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {profilesList.map((profile) => {
+                      const isActive = profile.id === activeProfileId;
+                      return (
+                        <div
+                          key={profile.id}
+                          className={`p-3 rounded-xl border flex items-center justify-between gap-3 transition-colors ${
+                            isActive
+                              ? 'border-[var(--border-selected)] bg-[var(--bg-card)]'
+                              : 'border-[var(--border-card)] bg-[var(--bg-card)]/50 hover:bg-[var(--bg-card)]'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-3 min-w-0">
+                            <div
+                              className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs text-white flex-shrink-0"
+                              style={{ backgroundColor: profile.color }}
+                            >
+                              {profile.avatarUrl ? (
+                                <img
+                                  src={profile.avatarUrl}
+                                  alt={profile.name}
+                                  className="w-full h-full rounded-full object-cover"
+                                />
+                              ) : (
+                                profile.name.charAt(0).toUpperCase()
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs font-semibold text-[var(--text-main)] truncate">
+                                  {profile.name}
+                                </span>
+                                {profile.isDefault && (
+                                  <span className="text-[10px] px-1.5 py-0.2 rounded-full font-medium bg-black/5 dark:bg-white/10 text-[var(--text-muted)]">
+                                    Default
+                                  </span>
+                                )}
+                                {isActive && (
+                                  <span className="text-[10px] px-1.5 py-0.2 rounded-full font-medium bg-emerald-500/10 text-emerald-500">
+                                    Active
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-[var(--text-muted)] truncate font-mono">
+                                {profile.email || (profile.partition ? 'Isolated partition' : 'Default session')}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-2 flex-shrink-0">
+                            {!isActive && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  await window.browserApi.setActiveProfile(profile.id);
+                                  loadProfilesData();
+                                  onShowToast?.({
+                                    type: 'success',
+                                    message: `Switched to ${profile.name}`,
+                                  });
+                                }}
+                                className="px-2.5 py-1 rounded-lg border border-[var(--border-subtle)] text-xs text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                              >
+                                Switch
+                              </button>
+                            )}
+                            {!profile.isDefault && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setConfirmModal({
+                                    isOpen: true,
+                                    title: `Delete Profile "${profile.name}"?`,
+                                    message: `Are you sure you want to delete profile "${profile.name}"? All isolated cookies and session data for this profile will be removed.`,
+                                    confirmLabel: 'Delete Profile',
+                                    variant: 'danger',
+                                    onConfirm: async () => {
+                                      await window.browserApi.deleteProfile(profile.id);
+                                      loadProfilesData();
+                                      onShowToast?.({
+                                        type: 'info',
+                                        message: `Deleted profile "${profile.name}"`,
+                                      });
+                                    },
+                                  });
+                                }}
+                                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                                title="Delete profile"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Create Profile Modal */}
+                {isNewProfileModalOpen && (
+                  <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] space-y-3 animate-in fade-in">
+                    <div className="text-xs font-semibold text-[var(--text-main)]">Create New Profile</div>
+                    <div>
+                      <label className="text-[11px] font-medium text-[var(--text-muted)] block mb-1">Profile Name</label>
+                      <input
+                        type="text"
+                        value={newProfileName}
+                        onChange={(e) => setNewProfileName(e.target.value)}
+                        placeholder="e.g. Work, School, Dev"
+                        className="w-full h-8 px-2.5 text-xs rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-input)] text-[var(--text-main)] focus:outline-none focus:border-[var(--border-selected)]"
+                        autoFocus
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-medium text-[var(--text-muted)] block mb-1.5">Profile Color</label>
+                      <div className="flex items-center space-x-2">
+                        {['#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444'].map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => setNewProfileColor(c)}
+                            className={`w-6 h-6 rounded-full transition-transform cursor-pointer ${
+                              newProfileColor === c ? 'scale-125 ring-2 ring-white/60 shadow-xs' : 'opacity-75 hover:opacity-100'
+                            }`}
+                            style={{ backgroundColor: c }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[var(--border-subtle)]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsNewProfileModalOpen(false);
+                          setNewProfileName('');
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs text-[var(--text-muted)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!newProfileName.trim()) return;
+                          const created = await window.browserApi.saveProfile({
+                            name: newProfileName.trim(),
+                            color: newProfileColor,
+                          });
+                          setIsNewProfileModalOpen(false);
+                          setNewProfileName('');
+                          loadProfilesData();
+                          onShowToast?.({
+                            type: 'success',
+                            message: `Created profile "${created.name}"`,
+                          });
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium text-white shadow-xs cursor-pointer"
+                        style={{ backgroundColor: newProfileColor }}
+                      >
+                        Create Profile
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
