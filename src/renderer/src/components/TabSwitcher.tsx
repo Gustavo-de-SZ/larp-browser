@@ -338,6 +338,18 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
     return `${Math.floor(diff / 3600)}h ago`;
   };
 
+  const formatMediaTime = (seconds: number) => {
+    const totalSecs = Math.floor(seconds);
+    const m = Math.floor(totalSecs / 60);
+    const s = Math.floor(totalSecs % 60);
+    const h = Math.floor(m / 60);
+    const remM = m % 60;
+    if (h > 0) {
+      return `${h}:${remM.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+    return `${remM}:${s.toString().padStart(2, '0')}`;
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col items-center justify-center p-6 backdrop-blur-md transition-all duration-150 select-none bg-black/35"
@@ -540,18 +552,29 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (!tab.isHibernated) {
+                        if (tab.isHibernated) {
+                          window.browserApi.wakeTab(tab.id);
+                        } else {
                           window.browserApi.hibernateTab(tab.id);
                         }
                       }}
-                      className={`p-1 rounded transition-colors ${
+                      className={`flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
                         tab.isHibernated
-                          ? 'text-sky-400 bg-sky-500/15'
+                          ? 'text-sky-400 bg-sky-500/15 border border-sky-500/20'
                           : 'text-[var(--text-muted)] hover:text-sky-400 hover:bg-sky-500/10'
                       }`}
-                      title={tab.isHibernated ? 'Tab is sleeping' : 'Put tab to sleep (Z)'}
+                      title={
+                        tab.isHibernated
+                          ? tab.savedMediaTime
+                            ? `Sleeping (Paused at ${formatMediaTime(tab.savedMediaTime)}) · Click to wake`
+                            : 'Sleeping · Click to wake'
+                          : 'Put tab to sleep (Z)'
+                      }
                     >
                       <Moon className="w-3 h-3" />
+                      {tab.isHibernated && tab.savedMediaTime && (
+                        <span className="font-mono text-[9px]">{formatMediaTime(tab.savedMediaTime)}</span>
+                      )}
                     </button>
                     {(tab.audioPlaying || tab.isMuted) && (
                       <button
@@ -655,16 +678,27 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (!tab.isHibernated) {
+                          if (tab.isHibernated) {
+                            window.browserApi.wakeTab(tab.id);
+                          } else {
                             window.browserApi.hibernateTab(tab.id);
                           }
                         }}
-                        className={`p-1 rounded transition-colors ${
-                          tab.isHibernated ? 'text-sky-400 bg-sky-500/15' : 'text-[var(--text-muted)] hover:text-sky-400 hover:bg-sky-500/10'
+                        className={`flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                          tab.isHibernated ? 'text-sky-400 bg-sky-500/15 border border-sky-500/20' : 'text-[var(--text-muted)] hover:text-sky-400 hover:bg-sky-500/10'
                         }`}
-                        title={tab.isHibernated ? 'Tab is sleeping' : 'Put tab to sleep (Z)'}
+                        title={
+                          tab.isHibernated
+                            ? tab.savedMediaTime
+                              ? `Sleeping (Paused at ${formatMediaTime(tab.savedMediaTime)}) · Click to wake`
+                              : 'Sleeping · Click to wake'
+                            : 'Put tab to sleep (Z)'
+                        }
                       >
                         <Moon className="w-3 h-3" />
+                        {tab.isHibernated && tab.savedMediaTime && (
+                          <span className="font-mono text-[9px]">{formatMediaTime(tab.savedMediaTime)}</span>
+                        )}
                       </button>
                       {(tab.audioPlaying || tab.isMuted) && (
                         <button
@@ -893,13 +927,23 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
 
           <button
             onClick={() => {
-              window.browserApi.hibernateTab(contextMenu.tab.id);
+              if (contextMenu.tab.isHibernated) {
+                window.browserApi.wakeTab(contextMenu.tab.id);
+              } else {
+                window.browserApi.hibernateTab(contextMenu.tab.id);
+              }
               setContextMenu(null);
             }}
             className="flex items-center px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-left space-x-2.5 cursor-pointer"
           >
             <Moon className="w-3.5 h-3.5 text-sky-400" />
-            <span className="flex-1">{contextMenu.tab.isHibernated ? 'Wake Tab' : 'Put Tab to Sleep'}</span>
+            <span className="flex-1">
+              {contextMenu.tab.isHibernated
+                ? contextMenu.tab.savedMediaTime
+                  ? `Wake Tab (Paused at ${formatMediaTime(contextMenu.tab.savedMediaTime)})`
+                  : 'Wake Tab'
+                : 'Put Tab to Sleep'}
+            </span>
             <span className="text-[10px] text-[var(--text-muted)] font-mono">Z</span>
           </button>
 

@@ -54,6 +54,10 @@ export function registerIpcHandlers(
     await tabManager.hibernateTab(tabId);
   });
 
+  ipcMain.handle('browser:wake-tab', async (_event, tabId: string) => {
+    await tabManager.wakeTab(tabId);
+  });
+
   ipcMain.handle('browser:duplicate-tab', (_event, tabId?: string) => {
     return tabManager.duplicateTab(tabId);
   });

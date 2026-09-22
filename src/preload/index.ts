@@ -93,6 +93,7 @@ const api: IpcRendererApi = {
   reloadTab: (tabId: string) => ipcRenderer.invoke('browser:reload-tab', tabId),
   toggleMuteTab: (tabId: string) => ipcRenderer.invoke('browser:toggle-mute-tab', tabId),
   hibernateTab: (tabId: string) => ipcRenderer.invoke('browser:hibernate-tab', tabId),
+  wakeTab: (tabId: string) => ipcRenderer.invoke('browser:wake-tab', tabId),
   duplicateTab: (tabId?: string) => ipcRenderer.invoke('browser:duplicate-tab', tabId),
   closeOtherTabs: (tabId: string) => ipcRenderer.invoke('browser:close-other-tabs', tabId),
   closeTabsToRight: (tabId: string) => ipcRenderer.invoke('browser:close-tabs-to-right', tabId),

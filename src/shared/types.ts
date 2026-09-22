@@ -13,6 +13,7 @@ export interface TabInfo {
   isMuted?: boolean;
   zoomFactor?: number;
   isHibernated?: boolean;
+  savedMediaTime?: number;
   isPrivate?: boolean;
   profileId?: string;
 }
@@ -162,6 +163,8 @@ export interface BrowserSettings {
   defaultSearchEngine: 'duckduckgo' | 'google' | 'brave' | 'bing';
   autoHibernateTabs: boolean;
   idleHibernateMinutes?: number; // 0 = disabled, 5, 15, 30, 60
+  preserveMediaTimestamps?: boolean; // Preserve video/audio playback position (YouTube, HTML5)
+  protectActiveMediaTabs?: boolean; // Never auto-hibernate tabs with active media or unsaved form text
   switcherLayout?: 'grid' | 'compact';
   switcherShowPreviews?: boolean;
   switcherShowUrls?: boolean;
@@ -242,6 +245,7 @@ export interface IpcRendererApi {
   reloadTab: (tabId: string) => Promise<void>;
   toggleMuteTab: (tabId: string) => Promise<void>;
   hibernateTab: (tabId: string) => Promise<void>;
+  wakeTab: (tabId: string) => Promise<void>;
   duplicateTab: (tabId?: string) => Promise<string | null>;
   closeOtherTabs: (tabId: string) => Promise<void>;
   closeTabsToRight: (tabId: string) => Promise<void>;

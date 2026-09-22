@@ -81,6 +81,8 @@ const DEFAULT_SETTINGS: BrowserSettings = {
   newTabClockFormat: '12h',
   newTabShowWeather: true,
   newTabShowQuickLinks: true,
+  preserveMediaTimestamps: true,
+  protectActiveMediaTabs: true,
 };
 
 const SMART_DARK_CSS = `
@@ -96,7 +98,19 @@ const SMART_DARK_CSS = `
 
 export class TabManager {
   private window: BrowserWindow;
-  private tabs: Map<string, { info: TabInfo; view?: WebContentsView; cssKey?: string }> = new Map();
+  private tabs: Map<
+    string,
+    {
+      info: TabInfo;
+      view?: WebContentsView;
+      cssKey?: string;
+      hibernatedState?: {
+        mediaTime?: number;
+        scrollX?: number;
+        scrollY?: number;
+      };
+    }
+  > = new Map();
   private activeTabId: string | null = null;
   private mruTabIds: string[] = [];
   private isSwitcherOpen = false;
@@ -961,16 +975,139 @@ export class TabManager {
 
       const idleDuration = now - (tab.info.lastAccessed || 0);
       if (idleDuration > thresholdMs) {
-        await this.hibernateTab(tabId);
+        await this.hibernateTab(tabId, true);
       }
     }
   }
 
-  public async hibernateTab(tabId: string) {
+  public async wakeTab(tabId: string) {
     const tab = this.tabs.get(tabId);
-    if (!tab || tabId === this.activeTabId || tab.info.isHibernated) return;
+    if (!tab || !tab.info.isHibernated) return;
+
+    tab.info.isHibernated = false;
+    tab.info.savedMediaTime = undefined;
+    this.ensureTabView(tabId);
+    this.notifyStateChange();
+  }
+
+  public async hibernateTab(tabId: string, isAutomatic = false) {
+    const tab = this.tabs.get(tabId);
+    if (!tab || tabId === this.activeTabId) return;
+
+    // If tab is already hibernated and hibernateTab was triggered manually, toggle: wake it up!
+    if (tab.info.isHibernated) {
+      if (!isAutomatic) {
+        await this.wakeTab(tabId);
+      }
+      return;
+    }
+
     if (tab.info.audioPlaying) return;
     if (!tab.info.url || tab.info.url === 'about:blank') return;
+
+    // Extract in-page media playback time, playing state, unsubmitted inputs, and scroll position
+    if (tab.view?.webContents && !tab.view.webContents.isDestroyed()) {
+      try {
+        const pageState = await tab.view.webContents.executeJavaScript(`
+          (() => {
+            try {
+              let mediaTime = null;
+              let isMediaPlaying = false;
+
+              // 1. YouTube movie_player API (most accurate on YouTube)
+              const ytPlayer = document.getElementById('movie_player');
+              if (ytPlayer && typeof ytPlayer.getCurrentTime === 'function') {
+                const t = ytPlayer.getCurrentTime();
+                if (typeof t === 'number' && t > 0) {
+                  mediaTime = Math.floor(t);
+                }
+                if (typeof ytPlayer.getPlayerState === 'function') {
+                  const state = ytPlayer.getPlayerState();
+                  // 1 = playing, 3 = buffering
+                  isMediaPlaying = state === 1 || state === 3;
+                }
+              }
+
+              // 2. HTML5 video/audio elements (YouTube, Vimeo, Twitch, podcasts, general web)
+              const mediaElements = Array.from(document.querySelectorAll('video, audio'));
+              for (const m of mediaElements) {
+                if (!m.paused && !m.ended) {
+                  isMediaPlaying = true;
+                }
+                if (mediaTime === null && !isNaN(m.currentTime) && m.currentTime > 1) {
+                  mediaTime = Math.floor(m.currentTime);
+                }
+              }
+
+              // 3. Form input protection (unsubmitted user typing)
+              const formInputs = Array.from(
+                document.querySelectorAll(
+                  'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]), textarea, [contenteditable="true"]'
+                )
+              );
+              const hasUnsubmittedInput = formInputs.some((el) => {
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                  return (el as HTMLInputElement).value && (el as HTMLInputElement).value.trim().length > 3;
+                }
+                return el.textContent && el.textContent.trim().length > 3;
+              });
+
+              return {
+                mediaTime,
+                isMediaPlaying,
+                hasUnsubmittedInput,
+                scrollX: window.scrollX || window.pageXOffset || 0,
+                scrollY: window.scrollY || window.pageYOffset || 0,
+              };
+            } catch {
+              return null;
+            }
+          })()
+        `, true);
+
+        if (pageState) {
+          // If media is STILL playing (even if muted or undetected by audioPlaying), DO NOT HIBERNATE!
+          if (pageState.isMediaPlaying && (this.settings.protectActiveMediaTabs !== false)) {
+            tab.info.audioPlaying = true;
+            this.notifyStateChange();
+            return;
+          }
+
+          // If auto-hibernating, protect tabs where user has unsubmitted input
+          if (isAutomatic && pageState.hasUnsubmittedInput && (this.settings.protectActiveMediaTabs !== false)) {
+            return;
+          }
+
+          tab.hibernatedState = {
+            mediaTime: pageState.mediaTime || undefined,
+            scrollX: pageState.scrollX || 0,
+            scrollY: pageState.scrollY || 0,
+          };
+
+          if (pageState.mediaTime && pageState.mediaTime > 0) {
+            tab.info.savedMediaTime = pageState.mediaTime;
+
+            // YouTube URL timestamp sync (&t=Xs)
+            if (this.settings.preserveMediaTimestamps !== false) {
+              try {
+                const urlObj = new URL(tab.info.url);
+                if (urlObj.hostname.includes('youtube.com') && urlObj.pathname.startsWith('/watch')) {
+                  urlObj.searchParams.set('t', `${pageState.mediaTime}s`);
+                  tab.info.url = urlObj.toString();
+                } else if (urlObj.hostname === 'youtu.be') {
+                  urlObj.searchParams.set('t', `${pageState.mediaTime}s`);
+                  tab.info.url = urlObj.toString();
+                }
+              } catch {
+                // Ignore URL parsing errors
+              }
+            }
+          }
+        }
+      } catch {
+        // executeJavaScript failed
+      }
+    }
 
     // Pre-capture preview before discarding view so Alt-Tab switcher card never goes blank
     if (!tab.info.previewImage && tab.view?.webContents && !tab.view.webContents.isDestroyed()) {
@@ -1027,7 +1164,11 @@ export class TabManager {
     try {
       const tabsList = Array.from(this.tabs.values())
         .filter((t) => !t.info.isPrivate)
-        .map((t) => ({ url: t.info.url, title: t.info.title }))
+        .map((t) => ({
+          url: t.info.url,
+          title: t.info.title,
+          savedMediaTime: t.info.savedMediaTime,
+        }))
         .filter((t) => t.url && t.url !== 'about:blank');
 
       const activeTab = this.activeTabId ? this.tabs.get(this.activeTabId) : null;
@@ -1055,6 +1196,13 @@ export class TabManager {
           for (const t of data.tabs) {
             if (t.url && t.url !== 'about:blank') {
               const id = await this.createTab(t.url);
+              if (t.savedMediaTime) {
+                const createdTab = this.tabs.get(id);
+                if (createdTab) {
+                  createdTab.info.savedMediaTime = t.savedMediaTime;
+                  createdTab.hibernatedState = { mediaTime: t.savedMediaTime };
+                }
+              }
               if (data.activeTabUrl && t.url === data.activeTabUrl) {
                 targetActiveId = id;
               }
@@ -1358,6 +1506,70 @@ export class TabManager {
     return id;
   }
 
+  private restoreTabHibernatedState(
+    wc: Electron.WebContents,
+    mediaTime?: number,
+    scrollX = 0,
+    scrollY = 0
+  ) {
+    if (!wc || wc.isDestroyed()) return;
+
+    const script = `
+      (() => {
+        try {
+          const targetTime = ${typeof mediaTime === 'number' && mediaTime > 0 ? mediaTime : 'null'};
+          const targetScrollX = ${scrollX || 0};
+          const targetScrollY = ${scrollY || 0};
+
+          // 1. Restore scroll position
+          if (targetScrollY > 0 || targetScrollX > 0) {
+            window.scrollTo(targetScrollX, targetScrollY);
+            setTimeout(() => window.scrollTo(targetScrollX, targetScrollY), 250);
+            setTimeout(() => window.scrollTo(targetScrollX, targetScrollY), 800);
+          }
+
+          // 2. Restore video/audio playback position
+          if (targetTime !== null && targetTime > 0) {
+            let attempts = 0;
+            const maxAttempts = 25; // Poll for up to ~12.5 seconds
+            const interval = setInterval(() => {
+              attempts++;
+              let restored = false;
+
+              // Check YouTube movie_player API first
+              const ytPlayer = document.getElementById('movie_player');
+              if (ytPlayer && typeof ytPlayer.seekTo === 'function') {
+                try {
+                  ytPlayer.seekTo(targetTime, true);
+                  restored = true;
+                } catch {}
+              }
+
+              // Check HTML5 video and audio tags (YouTube, Vimeo, Twitch, podcasts, general)
+              if (!restored) {
+                const mediaElements = Array.from(document.querySelectorAll('video, audio'));
+                for (const media of mediaElements) {
+                  if (media.duration && !isNaN(media.duration) && media.duration >= targetTime) {
+                    try {
+                      media.currentTime = targetTime;
+                      restored = true;
+                    } catch {}
+                  }
+                }
+              }
+
+              if (restored || attempts >= maxAttempts) {
+                clearInterval(interval);
+              }
+            }, 500);
+          }
+        } catch {}
+      })()
+    `;
+
+    wc.executeJavaScript(script, true).catch(() => {});
+  }
+
   private setupTabEvents(tabId: string, view: WebContentsView) {
     const wc = view.webContents;
 
@@ -1466,6 +1678,13 @@ export class TabManager {
           this.attachActiveTabView();
         }
         this.notifyStateChange();
+
+        // Restore hibernated state (scroll position and video/media timer)
+        if (tab.hibernatedState) {
+          const { mediaTime, scrollX, scrollY } = tab.hibernatedState;
+          tab.hibernatedState = undefined;
+          this.restoreTabHibernatedState(wc, mediaTime, scrollX, scrollY);
+        }
       }
     });
 
@@ -1920,6 +2139,8 @@ export class TabManager {
     this.activeTabId = tabId;
     const currentTab = this.tabs.get(tabId)!;
     currentTab.info.lastAccessed = Date.now();
+    currentTab.info.isHibernated = false;
+    currentTab.info.savedMediaTime = undefined;
 
     // Ensure tab has an active WebContentsView (resurrects if hibernated)
     this.ensureTabView(tabId);

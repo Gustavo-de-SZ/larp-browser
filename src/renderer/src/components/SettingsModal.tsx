@@ -2966,6 +2966,66 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                 )}
 
+                {/* Smart Hibernation: Preserve Media Timestamps */}
+                {safeSettings.autoHibernateTabs && (
+                  <div
+                    onClick={() =>
+                      onUpdateSettings({
+                        preserveMediaTimestamps: safeSettings.preserveMediaTimestamps === false ? true : false,
+                      })
+                    }
+                    className="p-3.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/40 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
+                  >
+                    <div className="space-y-0.5 mr-3 select-none">
+                      <div className="text-xs font-medium text-[var(--text-main)]">
+                        Preserve Video/Audio Timestamps & Scroll
+                      </div>
+                      <div className="text-[11px] text-[var(--text-muted)]">
+                        Remembers paused timestamps (YouTube, Vimeo, HTML5 media) and restores your exact video position upon waking up.
+                      </div>
+                    </div>
+                    <div className="relative inline-flex items-center flex-shrink-0 pointer-events-none">
+                      <input
+                        type="checkbox"
+                        readOnly
+                        checked={safeSettings.preserveMediaTimestamps !== false}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white peer-checked:after:bg-[var(--text-on-accent)] after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Smart Hibernation: Protect Active Media & Unsubmitted Forms */}
+                {safeSettings.autoHibernateTabs && (
+                  <div
+                    onClick={() =>
+                      onUpdateSettings({
+                        protectActiveMediaTabs: safeSettings.protectActiveMediaTabs === false ? true : false,
+                      })
+                    }
+                    className="p-3.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/40 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
+                  >
+                    <div className="space-y-0.5 mr-3 select-none">
+                      <div className="text-xs font-medium text-[var(--text-main)]">
+                        Protect Active Media & Forms
+                      </div>
+                      <div className="text-[11px] text-[var(--text-muted)]">
+                        Excludes tabs with active playback or unsubmitted form text from being interrupted by auto-hibernation.
+                      </div>
+                    </div>
+                    <div className="relative inline-flex items-center flex-shrink-0 pointer-events-none">
+                      <input
+                        type="checkbox"
+                        readOnly
+                        checked={safeSettings.protectActiveMediaTabs !== false}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white peer-checked:after:bg-[var(--text-on-accent)] after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent-primary)]"></div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Switcher Layout Selection */}
                 <div className="p-3.5 rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] space-y-2.5">
                   <div>
