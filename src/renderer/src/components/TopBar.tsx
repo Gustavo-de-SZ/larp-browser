@@ -576,7 +576,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                 </button>
               )}
 
-              {activeTab?.audioPlaying && (
+              {(activeTab?.audioPlaying || activeTab?.isMuted) && (
                 <button
                   type="button"
                   onClick={handleToggleMute}
@@ -746,17 +746,17 @@ export const TopBar: React.FC<TopBarProps> = ({
           className="flex items-center space-x-1"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
-          {/* Favorites Quick Popover Trigger Button */}
+          {/* Bookmarks Drawer Trigger Button */}
           <button
             onClick={onToggleFavorites}
-            className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+            className={`p-1.5 rounded-md transition-colors cursor-pointer border ${
               isFavoritesOpen
-                ? 'text-amber-400 bg-black/10 dark:bg-white/10'
-                : 'text-[var(--text-muted)] hover:text-amber-400 hover:bg-black/5 dark:hover:bg-white/5'
+                ? 'text-[var(--accent-primary)] bg-[var(--accent-primary)]/15 border-[var(--accent-primary)]/30'
+                : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
             }`}
-            title={`Favorites (${favoritesKey})`}
+            title={`Bookmarks (${favoritesKey})`}
           >
-            <Star className={`w-3.5 h-3.5 ${isFavoritesOpen ? 'fill-amber-400' : ''}`} />
+            <Bookmark className="w-3.5 h-3.5" />
           </button>
 
           {/* Recent Download Completion Banner */}

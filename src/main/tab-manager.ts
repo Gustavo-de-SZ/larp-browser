@@ -132,6 +132,15 @@ export class TabManager {
   private sessionPath: string;
   private cachedWeather: { data: WeatherData; timestamp: number } | null = null;
   private downloadManager?: DownloadManager;
+  private closedTabs: Array<{
+    url: string;
+    title: string;
+    isPrivate: boolean;
+    scrollX?: number;
+    scrollY?: number;
+    mediaTime?: number;
+    profileId?: string;
+  }> = [];
   private onStateChangeCallback?: (state: BrowserState) => void;
 
   public setDownloadManager(dm: DownloadManager) {
@@ -1381,6 +1390,11 @@ export class TabManager {
     tab.view = view;
     tab.info.isHibernated = false;
 
+    // Ensure download manager is attached to this session (including custom profile partitions)
+    if (this.downloadManager && view.webContents?.session) {
+      this.downloadManager.attachSession(view.webContents.session, tab.info.isPrivate || false);
+    }
+
     // Setup webContents event listeners
     this.setupTabEvents(tabId, view);
 
@@ -1722,11 +1736,41 @@ export class TabManager {
       }
     });
 
+    // Renderer process crash & termination resilience
+    wc.on('render-process-gone', (_event, details) => {
+      console.error(`Tab ${tabId} render process gone: reason=${details.reason}, exitCode=${details.exitCode}`);
+      const tab = this.tabs.get(tabId);
+      if (tab) {
+        tab.info.isCrashed = true;
+        tab.info.crashedReason = details.reason;
+        tab.info.isLoading = false;
+        this.notifyStateChange();
+      }
+    });
+
+    // Real-time zoom level sync for touchpad pinch & Ctrl+Wheel gestures
+    wc.on('zoom-changed', () => {
+      const tab = this.tabs.get(tabId);
+      if (tab && !wc.isDestroyed()) {
+        try {
+          tab.info.zoomFactor = Math.round(wc.getZoomFactor() * 100) / 100;
+          this.notifyStateChange();
+        } catch {
+          // Ignore
+        }
+      }
+    });
+
     wc.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
       console.error(`Tab ${tabId} failed to load ${validatedURL}: [${errorCode}] ${errorDescription}`);
       const tab = this.tabs.get(tabId);
       if (tab) {
         tab.info.isLoading = false;
+        // Don't show error page for aborted requests (e.g. user navigated away or redirected)
+        if (errorCode !== -3 && validatedURL && !validatedURL.startsWith('data:') && validatedURL !== 'about:blank') {
+          const errorHtml = this.generateErrorPage(validatedURL, errorCode, errorDescription);
+          wc.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(errorHtml)}`).catch(() => {});
+        }
         if (tab.info.url && tab.info.url !== 'about:blank') {
           tab.info.hasLoadedPage = true;
           if (tabId === this.activeTabId && !this.isSwitcherOpen) {
@@ -1806,6 +1850,119 @@ export class TabManager {
         this.window.webContents.send('browser:html-fullscreen', false);
       }
     });
+  }
+
+  private generateErrorPage(url: string, errorCode: number, errorDescription: string): string {
+    const isDark = this.settings.theme !== 'light';
+    const bg = isDark ? '#121214' : '#f8fafc';
+    const text = isDark ? '#f4f4f5' : '#0f172a';
+    const textMuted = isDark ? '#a1a1aa' : '#64748b';
+    const cardBg = isDark ? 'rgba(255,255,255,0.04)' : '#ffffff';
+    const border = isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0';
+    const accent = '#6366f1';
+
+    let friendlyMsg = 'An unexpected connection error occurred.';
+    if (errorCode === -105) friendlyMsg = 'The server IP address could not be found (DNS lookup failed).';
+    else if (errorCode === -106) friendlyMsg = 'You are currently offline. Check your internet or Wi-Fi connection.';
+    else if (errorCode === -102) friendlyMsg = 'The target server refused the connection.';
+    else if (errorCode === -118) friendlyMsg = 'The server took too long to respond (connection timed out).';
+    else if (errorCode <= -200 && errorCode >= -299) friendlyMsg = 'The site presented an invalid security certificate.';
+
+    const safeUrl = url.replace(/'/g, "\\'");
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Can't reach this page</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: ${bg};
+      color: ${text};
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      user-select: none;
+    }
+    .card {
+      background: ${cardBg};
+      border: 1px solid ${border};
+      border-radius: 18px;
+      max-width: 520px;
+      width: 100%;
+      padding: 36px 32px;
+      box-shadow: 0 20px 40px -10px rgba(0,0,0,0.3);
+      text-align: center;
+    }
+    .icon-wrap {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: rgba(239, 68, 68, 0.12);
+      color: #ef4444;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    h1 { font-size: 20px; font-weight: 600; margin-bottom: 8px; letter-spacing: -0.02em; }
+    p.desc { font-size: 13px; color: ${textMuted}; line-height: 1.5; margin-bottom: 18px; }
+    .url-pill {
+      font-family: monospace;
+      font-size: 11px;
+      background: rgba(128,128,128,0.1);
+      padding: 6px 12px;
+      border-radius: 8px;
+      word-break: break-all;
+      color: ${textMuted};
+      margin-bottom: 16px;
+      display: inline-block;
+      max-width: 100%;
+    }
+    .code-badge {
+      font-family: monospace;
+      font-size: 10px;
+      color: ${textMuted};
+      display: block;
+      margin-bottom: 24px;
+      opacity: 0.8;
+    }
+    .btn {
+      background: ${accent};
+      color: #ffffff;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 22px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.15s;
+    }
+    .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-wrap">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+    </div>
+    <h1>This site can’t be reached</h1>
+    <p class="desc">${friendlyMsg}</p>
+    <div class="url-pill">${url}</div>
+    <div class="code-badge">${errorDescription} (${errorCode})</div>
+    <button class="btn" onclick="window.location.href='${safeUrl}'">Try Again</button>
+  </div>
+</body>
+</html>`;
   }
 
   private showContextMenu(tabId: string, params: Electron.ContextMenuParams) {
@@ -2298,6 +2455,23 @@ export class TabManager {
         // Ignore
       }
     }
+
+    // Save to closed tabs history stack (up to 25 entries, excluding blank/new tabs)
+    if (tab.info.url && tab.info.url !== 'about:blank') {
+      this.closedTabs.push({
+        url: tab.info.url,
+        title: tab.info.title || 'Untitled',
+        isPrivate: tab.info.isPrivate || false,
+        scrollX: tab.hibernatedState?.scrollX,
+        scrollY: tab.hibernatedState?.scrollY,
+        mediaTime: tab.hibernatedState?.mediaTime || tab.info.savedMediaTime,
+        profileId: tab.info.profileId,
+      });
+      if (this.closedTabs.length > 25) {
+        this.closedTabs.shift();
+      }
+    }
+
     this.tabs.delete(tabId);
     this.mruTabIds = this.mruTabIds.filter(id => id !== tabId);
 
@@ -2330,6 +2504,29 @@ export class TabManager {
     } else {
       this.notifyStateChange();
     }
+  }
+
+  public async reopenClosedTab(): Promise<string | null> {
+    if (this.closedTabs.length === 0) return null;
+    const item = this.closedTabs.pop();
+    if (!item) return null;
+
+    const newTabId = await this.createTab(item.url, item.isPrivate);
+    const tab = this.tabs.get(newTabId);
+    if (tab) {
+      if (item.title) tab.info.title = item.title;
+      if (item.profileId) tab.info.profileId = item.profileId;
+      if (typeof item.mediaTime === 'number' || item.scrollX || item.scrollY) {
+        tab.hibernatedState = {
+          mediaTime: item.mediaTime,
+          scrollX: item.scrollX,
+          scrollY: item.scrollY,
+        };
+        tab.info.savedMediaTime = item.mediaTime;
+      }
+    }
+    this.notifyStateChange();
+    return newTabId;
   }
 
   public async navigateTab(tabId: string, input: string) {

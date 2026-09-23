@@ -113,9 +113,9 @@ export const QuickFavoritesPopover: React.FC<QuickFavoritesPopoverProps> = ({
         style={{ borderColor: 'var(--border-subtle)' }}
       >
         <div className="flex items-center space-x-2">
-          <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+          <Bookmark className="w-4 h-4 text-[var(--accent-primary)]" />
           <span className="text-xs font-semibold tracking-tight text-[var(--text-main)]">
-            Favorites
+            Bookmarks
           </span>
           <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-black/5 dark:bg-white/5 text-[var(--text-muted)]">
             {bookmarks.length}

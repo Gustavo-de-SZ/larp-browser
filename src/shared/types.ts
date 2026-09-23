@@ -16,6 +16,8 @@ export interface TabInfo {
   savedMediaTime?: number;
   isPrivate?: boolean;
   profileId?: string;
+  isCrashed?: boolean;
+  crashedReason?: string;
 }
 
 export interface BookmarkItem {
@@ -94,6 +96,7 @@ export type ShortcutActionId =
   | 'newTab'
   | 'newPrivateTab'
   | 'closeTab'
+  | 'reopenClosedTab'
   | 'duplicateTab'
   | 'reloadTab'
   | 'hardReloadTab'
@@ -129,6 +132,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
   { id: 'newTab', label: 'New Tab', category: 'Tabs', defaultKey: 'Ctrl+T', description: 'Open a new blank tab' },
   { id: 'newPrivateTab', label: 'New Private Tab', category: 'Tabs', defaultKey: 'Ctrl+Shift+N', description: 'Open a new private browsing tab' },
   { id: 'closeTab', label: 'Close Tab', category: 'Tabs', defaultKey: 'Ctrl+W', description: 'Close active tab' },
+  { id: 'reopenClosedTab', label: 'Reopen Closed Tab', category: 'Tabs', defaultKey: 'Ctrl+Shift+T', description: 'Reopen the last closed tab' },
   { id: 'duplicateTab', label: 'Duplicate Tab', category: 'Tabs', defaultKey: 'Ctrl+Shift+D', description: 'Duplicate active tab URL' },
   { id: 'reloadTab', label: 'Reload Tab', category: 'Navigation', defaultKey: 'Ctrl+R', description: 'Reload active page' },
   { id: 'hardReloadTab', label: 'Hard Reload', category: 'Navigation', defaultKey: 'Ctrl+Shift+R', description: 'Reload page bypassing cache' },
@@ -246,6 +250,7 @@ export interface IpcRendererApi {
   toggleMuteTab: (tabId: string) => Promise<void>;
   hibernateTab: (tabId: string) => Promise<void>;
   wakeTab: (tabId: string) => Promise<void>;
+  reopenClosedTab: () => Promise<string | null>;
   duplicateTab: (tabId?: string) => Promise<string | null>;
   closeOtherTabs: (tabId: string) => Promise<void>;
   closeTabsToRight: (tabId: string) => Promise<void>;

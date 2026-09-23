@@ -197,7 +197,17 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
       return;
     }
 
-    // 4. Duplicate Tab
+    // 4. Reopen Closed Tab (Ctrl+Shift+T)
+    if (
+      isTriggered('reopenClosedTab', input) ||
+      (input.control && input.shift && !input.alt && input.key.toLowerCase() === 't')
+    ) {
+      event.preventDefault();
+      tabManager.reopenClosedTab();
+      return;
+    }
+
+    // 5. Duplicate Tab
     if (isTriggered('duplicateTab', input)) {
       event.preventDefault();
       tabManager.duplicateTab();
@@ -421,5 +431,16 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
 
   app.on('web-contents-created', (_e, contents: WebContents) => {
     contents.on('before-input-event', handleInputEvent);
+  });
+
+  // Support mouse Back/Forward hardware thumb buttons (Mouse 4 & Mouse 5)
+  window.on('app-command', (_event, cmd) => {
+    const { activeTabId } = tabManager.getState();
+    if (!activeTabId) return;
+    if (cmd === 'browser-backward') {
+      tabManager.goBack(activeTabId);
+    } else if (cmd === 'browser-forward') {
+      tabManager.goForward(activeTabId);
+    }
   });
 }

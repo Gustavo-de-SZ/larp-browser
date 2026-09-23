@@ -58,6 +58,10 @@ export function registerIpcHandlers(
     await tabManager.wakeTab(tabId);
   });
 
+  ipcMain.handle('browser:reopen-closed-tab', async () => {
+    return tabManager.reopenClosedTab();
+  });
+
   ipcMain.handle('browser:duplicate-tab', (_event, tabId?: string) => {
     return tabManager.duplicateTab(tabId);
   });

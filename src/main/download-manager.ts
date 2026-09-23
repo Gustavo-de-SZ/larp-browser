@@ -66,13 +66,21 @@ export class DownloadManager {
     return app.getPath('downloads');
   }
 
+  private attachedSessions = new WeakSet<Electron.Session>();
+
   private initDownloadListener() {
-    this.setupSessionDownload(session.defaultSession, false);
+    this.attachSession(session.defaultSession, false);
     try {
-      this.setupSessionDownload(session.fromPartition('incognito'), true);
+      this.attachSession(session.fromPartition('incognito'), true);
     } catch (err) {
       console.error('Failed to attach incognito download listener:', err);
     }
+  }
+
+  public attachSession(targetSession: Electron.Session, isPrivate = false) {
+    if (!targetSession || this.attachedSessions.has(targetSession)) return;
+    this.attachedSessions.add(targetSession);
+    this.setupSessionDownload(targetSession, isPrivate);
   }
 
   private setupSessionDownload(targetSession: Electron.Session, isPrivate: boolean) {

@@ -10,6 +10,7 @@ import {
   VenetianMask,
   Copy,
   RotateCw,
+  RotateCcw,
   ArrowRightToLine,
   Layers,
 } from 'lucide-react';
@@ -497,6 +498,11 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                   key={tab.id}
                   onClick={() => handleCardClick(index)}
                   onContextMenu={(e) => handleTabContextMenu(e, tab)}
+                  onAuxClick={(e) => {
+                    if (e.button === 1) {
+                      handleCloseTab(e, tab.id);
+                    }
+                  }}
                   className={`flex items-center justify-between p-2.5 px-3 rounded-xl border cursor-pointer transition-all duration-100 ${
                     isSelected
                       ? 'scale-[1.005] shadow-xs'
@@ -945,6 +951,18 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                 : 'Put Tab to Sleep'}
             </span>
             <span className="text-[10px] text-[var(--text-muted)] font-mono">Z</span>
+          </button>
+
+          <button
+            onClick={() => {
+              window.browserApi.reopenClosedTab();
+              setContextMenu(null);
+            }}
+            className="flex items-center px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-left space-x-2.5 cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-sky-400" />
+            <span className="flex-1">Reopen Closed Tab</span>
+            <span className="text-[10px] text-[var(--text-muted)] font-mono">Ctrl+Shift+T</span>
           </button>
 
           <div className="my-1 border-t" style={{ borderColor: 'var(--border-subtle)' }} />
