@@ -538,6 +538,10 @@ export const TopBar: React.FC<TopBarProps> = ({
               onKeyDown={handleKeyDown}
               onFocus={handleFocus}
               onBlur={handleBlur}
+              spellCheck={false}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
               placeholder={activeTab?.isPrivate ? "Search privately or enter address..." : "Search or enter web address..."}
               className={`w-full h-7 pl-8 ${activeTab?.isPrivate ? 'pr-36' : 'pr-24'} rounded-md text-xs transition-all border focus:outline-none`}
               style={{
@@ -700,10 +704,10 @@ export const TopBar: React.FC<TopBarProps> = ({
                       )}
                       {item.type === 'top-hit' && (
                         <span
-                          className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                          className="text-[9px] font-semibold px-1.5 py-0.5 rounded shadow-xs"
                           style={{
                             backgroundColor: 'var(--accent-primary)',
-                            color: 'white',
+                            color: 'var(--text-on-accent)',
                           }}
                         >
                           Top Hit

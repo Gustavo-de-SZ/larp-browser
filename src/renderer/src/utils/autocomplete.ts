@@ -40,6 +40,63 @@ export function cleanUrlForMatching(rawUrl: string): { cleanUrl: string; cleanDo
 }
 
 /**
+ * Strips tracking/noise query parameters (e.g. themeRefresh, fbclid, utm_*) and normalizes URLs.
+ */
+export function canonicalizeUrl(rawUrl: string): string {
+  try {
+    let s = rawUrl.trim();
+    if (!s) return s;
+    if (!s.includes('://')) {
+      s = 'http://' + s;
+    }
+    const parsed = new URL(s);
+    const noiseParams = new Set(['themerefresh', 'fbclid', 'gclid', 'ref', 'source', 'reload']);
+    const keysToDelete: string[] = [];
+    parsed.searchParams.forEach((_, key) => {
+      const k = key.toLowerCase();
+      if (k.startsWith('utm_') || noiseParams.has(k)) {
+        keysToDelete.push(key);
+      }
+    });
+    for (const k of keysToDelete) {
+      parsed.searchParams.delete(k);
+    }
+    let res = parsed.toString();
+    if (parsed.pathname === '/' && !parsed.search && !parsed.hash) {
+      res = `${parsed.protocol}//${parsed.host}`;
+    }
+    return res;
+  } catch {
+    return rawUrl;
+  }
+}
+
+/**
+ * Normalizes a URL into a canonical key to deduplicate identical destinations.
+ */
+export function normalizeUrlKey(rawUrl: string): string {
+  try {
+    const canonical = canonicalizeUrl(rawUrl);
+    const parsed = new URL(canonical.includes('://') ? canonical : `http://${canonical}`);
+    let host = parsed.hostname.toLowerCase();
+    if (host.startsWith('www.')) host = host.slice(4);
+
+    let path = parsed.pathname;
+    if (path.length > 1 && path.endsWith('/')) {
+      path = path.slice(0, -1);
+    } else if (path === '/') {
+      path = '';
+    }
+
+    const queryStr = parsed.search ? parsed.search.toLowerCase() : '';
+    const hashStr = parsed.hash ? parsed.hash.toLowerCase() : '';
+    return `${host}${path}${queryStr}${hashStr}`;
+  } catch {
+    return rawUrl.trim().toLowerCase();
+  }
+}
+
+/**
  * Computes ranked URL suggestions matching a search query from history and bookmarks.
  */
 export function computeUrlSuggestions(
@@ -52,7 +109,7 @@ export function computeUrlSuggestions(
 ): UrlSuggestion[] {
   const q = query.trim().toLowerCase();
   const results: UrlSuggestion[] = [];
-  const seenUrls = new Set<string>();
+  const seenKeys = new Set<string>();
 
   // Explicit Tab Search with % or @tabs
   if (q.startsWith('%') || q.startsWith('@tabs')) {
@@ -102,14 +159,17 @@ export function computeUrlSuggestions(
   if (!q) {
     // Add bookmarks
     for (const bm of bookmarks.slice(0, 4)) {
-      if (!bm.url || bm.url === 'about:blank' || seenUrls.has(bm.url)) continue;
-      seenUrls.add(bm.url);
-      const { cleanUrl, cleanDomain } = cleanUrlForMatching(bm.url);
+      if (!bm.url || bm.url === 'about:blank') continue;
+      const canonical = canonicalizeUrl(bm.url);
+      const normKey = normalizeUrlKey(canonical);
+      if (seenKeys.has(normKey)) continue;
+      seenKeys.add(normKey);
+      const { cleanUrl, cleanDomain } = cleanUrlForMatching(canonical);
       results.push({
         id: `bm-${bm.url}`,
         type: 'bookmark',
         title: bm.title || cleanDomain,
-        url: bm.url,
+        url: canonical,
         displayUrl: cleanUrl,
         cleanDomain,
         favicon: bm.favicon,
@@ -117,19 +177,23 @@ export function computeUrlSuggestions(
     }
 
     // Add recent history
-    for (const h of history.slice(0, 4)) {
-      if (!h.url || h.url === 'about:blank' || seenUrls.has(h.url)) continue;
-      seenUrls.add(h.url);
-      const { cleanUrl, cleanDomain } = cleanUrlForMatching(h.url);
+    for (const h of history) {
+      if (!h.url || h.url === 'about:blank') continue;
+      const canonical = canonicalizeUrl(h.url);
+      const normKey = normalizeUrlKey(canonical);
+      if (seenKeys.has(normKey)) continue;
+      seenKeys.add(normKey);
+      const { cleanUrl, cleanDomain } = cleanUrlForMatching(canonical);
       results.push({
         id: `h-${h.id}`,
         type: 'history',
         title: h.title || cleanDomain,
-        url: h.url,
+        url: canonical,
         displayUrl: cleanUrl,
         cleanDomain,
         visitedAt: h.visitedAt,
       });
+      if (results.length >= 6) break;
     }
     return results.slice(0, 6);
   }
@@ -150,24 +214,37 @@ export function computeUrlSuggestions(
     favicon?: string,
     visitedAt?: number
   ) => {
-    if (!url || url === 'about:blank' || seenUrls.has(url)) return;
-    seenUrls.add(url);
+    if (!url || url === 'about:blank') return;
+    const canonical = canonicalizeUrl(url);
+    const normKey = normalizeUrlKey(canonical);
+    if (seenKeys.has(normKey)) return;
+    seenKeys.add(normKey);
 
-    const { cleanUrl, cleanDomain } = cleanUrlForMatching(url);
+    const { cleanUrl, cleanDomain } = cleanUrlForMatching(canonical);
     const cleanUrlLower = cleanUrl.toLowerCase();
     const cleanDomainLower = cleanDomain.toLowerCase();
     const titleLower = (title || '').toLowerCase();
-    const fullUrlLower = url.toLowerCase();
+    const fullUrlLower = canonical.toLowerCase();
+
+    // Check if URL is root domain (e.g. "youtube.com" or "youtube.com/")
+    const isRootDomain =
+      cleanUrlLower === cleanDomainLower ||
+      cleanUrlLower === `${cleanDomainLower}/` ||
+      cleanUrlLower === '';
 
     let score = -1;
-    let isTopHit = false;
 
     // 1. Domain prefix match (e.g. "youtu" matches "youtube.com")
     if (cleanDomainLower.startsWith(q)) {
       score = 1000 - cleanDomainLower.length;
-      isTopHit = true;
+      if (isRootDomain) {
+        score += 400; // Prioritize main root domain (e.g. youtube.com over specific videos)
+      }
     } else if (cleanUrlLower.startsWith(q)) {
       score = 800 - cleanUrlLower.length;
+      if (isRootDomain) {
+        score += 200;
+      }
     } else if (fullUrlLower.startsWith(q)) {
       score = 700 - fullUrlLower.length;
     } else if (titleLower.startsWith(q)) {
@@ -190,9 +267,9 @@ export function computeUrlSuggestions(
       candidates.push({
         suggestion: {
           id: `${type}-${id}`,
-          type: isTopHit ? 'top-hit' : type,
+          type,
           title: title || cleanDomain,
-          url,
+          url: canonical,
           displayUrl: cleanUrl,
           cleanDomain,
           favicon,
@@ -283,6 +360,16 @@ export function computeUrlSuggestions(
 
   // Sort by score descending
   candidates.sort((a, b) => b.score - a.score);
+
+  // Exactly ONE Top Hit: only the single highest-scoring candidate if it is a strong domain or URL prefix match (score >= 800)
+  if (candidates.length > 0 && candidates[0].score >= 800 && candidates[0].suggestion.type !== 'tab') {
+    const top = candidates[0];
+    const topDomain = top.suggestion.cleanDomain.toLowerCase();
+    const topUrl = top.suggestion.displayUrl.toLowerCase();
+    if (topDomain.startsWith(q) || topUrl.startsWith(q)) {
+      top.suggestion.type = 'top-hit';
+    }
+  }
 
   const engines: Record<string, string> = {
     google: 'Google',

@@ -768,6 +768,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
             onKeyDown={handleSearchKeyDown}
             onFocus={handleSearchFocus}
             onBlur={handleSearchBlur}
+            spellCheck={false}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
             placeholder="Search the web or enter an address..."
             autoFocus
             className="w-full h-11 pl-10 pr-4 rounded-xl text-xs sm:text-sm transition-all border focus:outline-none shadow-sm"
@@ -832,10 +836,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ state, theme }) => {
                     <div className="shrink-0 flex items-center space-x-1.5">
                       {item.type === 'top-hit' && (
                         <span
-                          className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                          className="text-[9px] font-semibold px-1.5 py-0.5 rounded shadow-xs"
                           style={{
                             backgroundColor: 'var(--accent-primary)',
-                            color: 'white',
+                            color: 'var(--text-on-accent)',
                           }}
                         >
                           Top Hit
