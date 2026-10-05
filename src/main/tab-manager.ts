@@ -2296,6 +2296,16 @@ export class TabManager {
     const wc = tab.view.webContents;
     const menu = new Menu();
 
+    const userLocale = app.getLocale() || 'en-US';
+    const langCode = userLocale.split('-')[0].toLowerCase() || 'en';
+    let targetLangName = 'English';
+    try {
+      const displayNames = new Intl.DisplayNames(['en'], { type: 'language' });
+      targetLangName = displayNames.of(langCode) || 'English';
+    } catch {
+      targetLangName = 'English';
+    }
+
     // 1. Misspelled Word Suggestions (Spellcheck)
     if (params.misspelledWord && params.dictionarySuggestions && params.dictionarySuggestions.length > 0) {
       for (const suggestion of params.dictionarySuggestions) {
@@ -2338,10 +2348,24 @@ export class TabManager {
       menu.append(new MenuItem({ type: 'separator' }));
       menu.append(
         new MenuItem({
+          label: 'Save Link As...',
+          click: () => wc.downloadURL(params.linkURL),
+        })
+      );
+      menu.append(
+        new MenuItem({
           label: 'Copy Link Address',
           click: () => clipboard.writeText(params.linkURL),
         })
       );
+      if (params.linkText && params.linkText.trim()) {
+        menu.append(
+          new MenuItem({
+            label: 'Copy Link Text',
+            click: () => clipboard.writeText(params.linkText.trim()),
+          })
+        );
+      }
       menu.append(new MenuItem({ type: 'separator' }));
     }
 
@@ -2380,6 +2404,16 @@ export class TabManager {
             click: () => clipboard.writeText(params.srcURL),
           })
         );
+        menu.append(new MenuItem({ type: 'separator' }));
+        menu.append(
+          new MenuItem({
+            label: 'Search Image with Google Lens',
+            click: () => {
+              const lensUrl = `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(params.srcURL)}`;
+              this.createTab(lensUrl, tab.info.isPrivate);
+            },
+          })
+        );
       }
       menu.append(new MenuItem({ type: 'separator' }));
     } else if (params.mediaType === 'video' || params.mediaType === 'audio') {
@@ -2402,8 +2436,42 @@ export class TabManager {
             click: () => clipboard.writeText(params.srcURL),
           })
         );
-        menu.append(new MenuItem({ type: 'separator' }));
       }
+      if (params.mediaType === 'video') {
+        menu.append(
+          new MenuItem({
+            label: 'Picture in Picture',
+            click: () => {
+              wc.executeJavaScript(`
+                (function() {
+                  const video = document.elementFromPoint(${params.x}, ${params.y})?.closest('video') || document.querySelector('video');
+                  if (video) {
+                    if (document.pictureInPictureElement) {
+                      document.exitPictureInPicture();
+                    } else if (document.pictureInPictureEnabled) {
+                      video.requestPictureInPicture();
+                    }
+                  }
+                })()
+              `).catch(() => {});
+            },
+          })
+        );
+      }
+      menu.append(
+        new MenuItem({
+          label: 'Toggle Loop',
+          click: () => {
+            wc.executeJavaScript(`
+              (function() {
+                const media = document.elementFromPoint(${params.x}, ${params.y})?.closest('video, audio') || document.querySelector('video, audio');
+                if (media) media.loop = !media.loop;
+              })()
+            `).catch(() => {});
+          },
+        })
+      );
+      menu.append(new MenuItem({ type: 'separator' }));
     }
 
     // 4. Selection Text Menu
@@ -2428,6 +2496,62 @@ export class TabManager {
           },
         })
       );
+
+      // Direct navigation if selected text is a valid web address or hostname
+      let directNavUrl: string | null = null;
+      if (/^https?:\/\/[^\s]+$/i.test(selected)) {
+        directNavUrl = selected;
+      } else if (/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(:\d+)?(\/[^\s]*)?$/i.test(selected)) {
+        directNavUrl = 'https://' + selected;
+      }
+      if (directNavUrl) {
+        menu.append(
+          new MenuItem({
+            label: `Go to ${selected.length > 30 ? selected.substring(0, 30) + '…' : selected}`,
+            click: () => this.createTab(directNavUrl!, tab.info.isPrivate),
+          })
+        );
+      }
+
+      menu.append(new MenuItem({ type: 'separator' }));
+
+      // Selection translation options
+      menu.append(
+        new MenuItem({
+          label: `Translate selection to ${targetLangName}`,
+          click: () => {
+            const transUrl = `https://translate.google.com/?sl=auto&tl=${langCode}&text=${encodeURIComponent(selected)}&op=translate`;
+            this.createTab(transUrl, tab.info.isPrivate);
+          },
+        })
+      );
+
+      const selTransSubmenu = new Menu();
+      selTransSubmenu.append(
+        new MenuItem({
+          label: `Google Translate (${targetLangName})`,
+          click: () => {
+            const transUrl = `https://translate.google.com/?sl=auto&tl=${langCode}&text=${encodeURIComponent(selected)}&op=translate`;
+            this.createTab(transUrl, tab.info.isPrivate);
+          },
+        })
+      );
+      selTransSubmenu.append(
+        new MenuItem({
+          label: `DeepL Translator`,
+          click: () => {
+            const transUrl = `https://www.deepl.com/translator#auto/${langCode}/${encodeURIComponent(selected)}`;
+            this.createTab(transUrl, tab.info.isPrivate);
+          },
+        })
+      );
+      menu.append(
+        new MenuItem({
+          label: 'Translate with...',
+          submenu: selTransSubmenu,
+        })
+      );
+
       menu.append(new MenuItem({ type: 'separator' }));
     }
 
@@ -2483,6 +2607,27 @@ export class TabManager {
       );
       menu.append(new MenuItem({ type: 'separator' }));
 
+      // Save Page As...
+      if (tab.info.url && tab.info.url.startsWith('http')) {
+        menu.append(
+          new MenuItem({
+            label: 'Save Page As...',
+            accelerator: 'Ctrl+S',
+            click: () => this.savePage(tabId),
+          })
+        );
+      }
+
+      // Copy Page Address
+      if (tab.info.url && tab.info.url !== 'about:blank') {
+        menu.append(
+          new MenuItem({
+            label: 'Copy Page Address',
+            click: () => clipboard.writeText(tab.info.url),
+          })
+        );
+      }
+
       // Bookmark page
       if (tab.info.url && tab.info.url !== 'about:blank') {
         menu.append(
@@ -2498,6 +2643,54 @@ export class TabManager {
           })
         );
       }
+
+      // Page Translation
+      if (tab.info.url && tab.info.url.startsWith('http')) {
+        menu.append(new MenuItem({ type: 'separator' }));
+        menu.append(
+          new MenuItem({
+            label: `Translate to ${targetLangName}`,
+            click: () => {
+              const url = `https://translate.google.com/translate?sl=auto&tl=${langCode}&u=${encodeURIComponent(tab.info.url)}`;
+              this.createTab(url, tab.info.isPrivate);
+            },
+          })
+        );
+
+        const pageTransSubmenu = new Menu();
+        pageTransSubmenu.append(
+          new MenuItem({
+            label: `Google Translate (${targetLangName})`,
+            click: () => {
+              const url = `https://translate.google.com/translate?sl=auto&tl=${langCode}&u=${encodeURIComponent(tab.info.url)}`;
+              this.createTab(url, tab.info.isPrivate);
+            },
+          })
+        );
+        pageTransSubmenu.append(
+          new MenuItem({
+            label: `In-Page Translation Widget`,
+            click: () => this.translatePage(tabId, langCode),
+          })
+        );
+        pageTransSubmenu.append(
+          new MenuItem({
+            label: `DeepL Translator`,
+            click: () => {
+              const url = `https://www.deepl.com/translator#auto/${langCode}/${encodeURIComponent(tab.info.url)}`;
+              this.createTab(url, tab.info.isPrivate);
+            },
+          })
+        );
+        menu.append(
+          new MenuItem({
+            label: 'Translate Options',
+            submenu: pageTransSubmenu,
+          })
+        );
+      }
+
+      menu.append(new MenuItem({ type: 'separator' }));
 
       menu.append(
         new MenuItem({
@@ -2580,6 +2773,132 @@ export class TabManager {
       for (const id of toClose) {
         this.closeTab(id);
       }
+    }
+  }
+
+  public async savePage(tabId?: string): Promise<void> {
+    const targetId = tabId || this.activeTabId;
+    if (!targetId || !this.tabs.has(targetId)) return;
+    const tab = this.tabs.get(targetId)!;
+    if (!tab.view || tab.view.webContents.isDestroyed()) return;
+    const wc = tab.view.webContents;
+    if (!tab.info.url || tab.info.url === 'about:blank') return;
+
+    try {
+      const rawTitle = tab.info.title || 'webpage';
+      const safeTitle = rawTitle.replace(/[/\\?%*:|"<>]/g, '_').substring(0, 80);
+      const { canceled, filePath } = await dialog.showSaveDialog(this.window, {
+        title: 'Save Webpage',
+        defaultPath: `${safeTitle}.html`,
+        filters: [
+          { name: 'Webpage, Complete (*.html)', extensions: ['html', 'htm'] },
+          { name: 'Webpage, Single File (*.mhtml)', extensions: ['mhtml'] },
+          { name: 'Webpage, HTML Only (*.html)', extensions: ['html', 'htm'] },
+        ],
+      });
+      if (!canceled && filePath) {
+        let saveType: 'HTMLComplete' | 'MHTML' | 'HTMLOnly' = 'HTMLComplete';
+        if (filePath.endsWith('.mhtml')) {
+          saveType = 'MHTML';
+        } else if (filePath.endsWith('.htm') || filePath.endsWith('.html')) {
+          saveType = 'HTMLComplete';
+        }
+        await wc.savePage(filePath, saveType);
+      }
+    } catch (err) {
+      console.error('Failed to save page:', err);
+    }
+  }
+
+  public async translatePage(tabId?: string, targetLang?: string): Promise<void> {
+    const targetId = tabId || this.activeTabId;
+    if (!targetId || !this.tabs.has(targetId)) return;
+    const tab = this.tabs.get(targetId)!;
+    if (!tab.view || tab.view.webContents.isDestroyed()) return;
+    const wc = tab.view.webContents;
+    if (!tab.info.url || !tab.info.url.startsWith('http')) return;
+
+    const userLocale = app.getLocale() || 'en-US';
+    const lang = targetLang || userLocale.split('-')[0].toLowerCase() || 'en';
+
+    const script = `
+      (function() {
+        const existing = document.getElementById('larp-translate-widget');
+        if (existing) {
+          existing.style.display = existing.style.display === 'none' ? 'flex' : 'none';
+          return;
+        }
+
+        const container = document.createElement('div');
+        container.id = 'larp-translate-widget';
+        container.style.cssText = [
+          'position: fixed',
+          'top: 14px',
+          'right: 20px',
+          'z-index: 2147483647',
+          'background: #18181b',
+          'color: #f4f4f5',
+          'border: 1px solid rgba(255, 255, 255, 0.15)',
+          'border-radius: 12px',
+          'box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5)',
+          'padding: 8px 14px',
+          'font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          'font-size: 13px',
+          'display: flex',
+          'align-items: center',
+          'gap: 12px',
+          'box-sizing: border-box'
+        ].join(';');
+
+        const label = document.createElement('div');
+        label.style.cssText = 'display: flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap;';
+        label.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> <span>Translate</span>';
+
+        const elemContainer = document.createElement('div');
+        elemContainer.id = 'google_translate_element';
+
+        const webFallback = document.createElement('a');
+        webFallback.href = 'https://translate.google.com/translate?sl=auto&tl=' + encodeURIComponent('${lang}') + '&u=' + encodeURIComponent(window.location.href);
+        webFallback.target = '_blank';
+        webFallback.innerText = 'Web View ↗';
+        webFallback.style.cssText = 'color: #93c5fd; text-decoration: none; font-size: 12px; font-weight: 500; cursor: pointer; padding: 2px 6px; border-radius: 4px; background: rgba(147, 197, 253, 0.1); border: 1px solid rgba(147, 197, 253, 0.2); white-space: nowrap;';
+
+        const closeBtn = document.createElement('button');
+        closeBtn.innerText = '✕';
+        closeBtn.title = 'Close';
+        closeBtn.style.cssText = 'background: transparent; border: none; color: #a1a1aa; font-size: 13px; cursor: pointer; padding: 2px 6px; border-radius: 4px; line-height: 1;';
+        closeBtn.onclick = () => container.remove();
+
+        container.appendChild(label);
+        container.appendChild(elemContainer);
+        container.appendChild(webFallback);
+        container.appendChild(closeBtn);
+        document.body.appendChild(container);
+
+        window.googleTranslateElementInit = function() {
+          new window.google.translate.TranslateElement({
+            pageLanguage: 'auto',
+            includedLanguages: '${lang},en,es,fr,de,ja,zh-CN,ru,pt,it,ko,ar,hi',
+            autoDisplay: true,
+            layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE
+          }, 'google_translate_element');
+        };
+
+        const script = document.createElement('script');
+        script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+        script.onerror = () => {
+          elemContainer.innerHTML = '<span style="color: #f87171; font-size: 12px;">Script blocked by site policy.</span>';
+        };
+        document.head.appendChild(script);
+      })();
+    `;
+
+    try {
+      await wc.executeJavaScript(script);
+    } catch (err) {
+      console.error('Failed to inject translation script:', err);
+      const url = `https://translate.google.com/translate?sl=auto&tl=${lang}&u=${encodeURIComponent(tab.info.url)}`;
+      this.createTab(url, tab.info.isPrivate);
     }
   }
 

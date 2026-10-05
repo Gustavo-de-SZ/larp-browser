@@ -121,6 +121,7 @@ export type ShortcutActionId =
   | 'openDevTools'
   | 'printPage'
   | 'viewSource'
+  | 'savePage'
   | 'togglePinTab';
 
 export interface ShortcutDefinition {
@@ -145,6 +146,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
   { id: 'focusOmnibar', label: 'Focus Address Bar', category: 'Navigation', defaultKey: 'Ctrl+L', description: 'Focus and select omnibar URL' },
   { id: 'findInPage', label: 'Find in Page', category: 'Navigation', defaultKey: 'Ctrl+F', description: 'Search text on active page' },
   { id: 'printPage', label: 'Print Page', category: 'Navigation', defaultKey: 'Ctrl+P', description: 'Print active page or save as PDF' },
+  { id: 'savePage', label: 'Save Page As', category: 'Navigation', defaultKey: 'Ctrl+S', description: 'Save current webpage to disk' },
   { id: 'viewSource', label: 'View Page Source', category: 'Navigation', defaultKey: 'Ctrl+U', description: 'View HTML source of current page' },
   { id: 'openSwitcher', label: 'Tab Switcher', category: 'Tabs', defaultKey: 'Ctrl+Tab', description: 'Open visual Alt-Tab switcher HUD' },
   { id: 'toggleBookmark', label: 'Bookmark Page', category: 'Bookmarks', defaultKey: 'Ctrl+D', description: 'Add or remove bookmark for current page' },

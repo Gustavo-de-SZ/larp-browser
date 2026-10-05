@@ -398,6 +398,16 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
       return;
     }
 
+    // 20.5. Save Page As (Ctrl+S)
+    if (
+      isTriggered('savePage', input) ||
+      (input.control && !input.shift && !input.alt && input.key.toLowerCase() === 's')
+    ) {
+      event.preventDefault();
+      tabManager.savePage();
+      return;
+    }
+
     // 21. View Page Source (Ctrl+U)
     if (
       isTriggered('viewSource', input) ||
