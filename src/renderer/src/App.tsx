@@ -9,9 +9,10 @@ import { QuickFavoritesPopover } from './components/QuickFavoritesPopover';
 import { DownloadsPopover } from './components/DownloadsPopover';
 import { ProfilePopover } from './components/ProfilePopover';
 import { FindInPageBar } from './components/FindInPageBar';
+import { PermissionPrompt } from './components/PermissionPrompt';
 import { ToastContainer, type ToastItem } from './components/Toast';
 import { getPalette, applyPalette } from './theme/palettes';
-import type { BrowserState, BrowserSettings } from '@/shared/types';
+import type { BrowserState, BrowserSettings, SitePermissionRequest } from '@/shared/types';
 
 export type ThemeMode = 'dark' | 'light';
 
@@ -28,6 +29,7 @@ export const App: React.FC = () => {
   const [isHtmlFullscreen, setIsHtmlFullscreen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTabType>('appearance');
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [permissionRequest, setPermissionRequest] = useState<SitePermissionRequest | null>(null);
 
   const showToast = (toast: Omit<ToastItem, 'id'>) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -213,6 +215,26 @@ export const App: React.FC = () => {
     });
     return () => unsub();
   }, []);
+
+  // Listen for interactive site permission requests
+  useEffect(() => {
+    if (!window.browserApi?.onPermissionRequest) return;
+    const unsub = window.browserApi.onPermissionRequest((req) => {
+      setPermissionRequest(req);
+    });
+    return () => unsub();
+  }, []);
+
+  const handlePermissionRespond = (
+    id: string,
+    decision: 'allow' | 'deny' | 'dismiss',
+    remember: boolean
+  ) => {
+    if (window.browserApi) {
+      window.browserApi.respondPermissionRequest(id, decision, remember);
+    }
+    setPermissionRequest((prev) => (prev?.id === id ? null : prev));
+  };
 
   const activeTabIdRef = React.useRef(state.activeTabId);
   useEffect(() => {
@@ -461,6 +483,13 @@ export const App: React.FC = () => {
           }}
         />
       )}
+
+      {/* Interactive Site Permission Prompt Banner */}
+      <PermissionPrompt
+        request={permissionRequest}
+        onRespond={handlePermissionRespond}
+        theme={theme}
+      />
 
       {/* Floating Toast Feedback Notifications */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />

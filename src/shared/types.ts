@@ -233,10 +233,21 @@ export interface BrowserState {
 
 export type SwitcherDirection = 'forward' | 'backward';
 
+export type SitePermissionDecision = 'allow' | 'deny';
+
+export interface SitePermissionRequest {
+  id: string;
+  tabId: string | null;
+  origin: string;
+  permission: string;
+  mediaTypes?: ('video' | 'audio')[];
+}
+
 export interface IpcRendererApi {
   // State observation
   onStateUpdate: (callback: (state: BrowserState) => void) => () => void;
   onToggleModal: (callback: (modal: 'settings' | 'shortcuts' | 'history' | 'passwords' | 'downloads') => void) => () => void;
+  onPermissionRequest: (callback: (request: SitePermissionRequest) => void) => () => void;
   onFocusOmnibar: (callback: () => void) => () => void;
   onToggleFind: (callback: () => void) => () => void;
   onToggleFavorites: (callback: () => void) => () => void;
@@ -343,6 +354,12 @@ export interface IpcRendererApi {
   getUpdateInfo: () => Promise<UpdateCheckResult | null>;
   downloadUpdateAsset: (url: string) => Promise<void>;
   onUpdateAvailable: (callback: (info: UpdateCheckResult) => void) => () => void;
+
+  // Site Permissions
+  respondPermissionRequest: (id: string, decision: 'allow' | 'deny' | 'dismiss', remember?: boolean) => Promise<void>;
+  getSitePermissions: () => Promise<Record<string, Record<string, SitePermissionDecision>>>;
+  setSitePermission: (origin: string, permission: string, decision: 'allow' | 'deny' | 'ask') => Promise<void>;
+  clearSitePermissions: (origin?: string) => Promise<void>;
 }
 
 declare global {

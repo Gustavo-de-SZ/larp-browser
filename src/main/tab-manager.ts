@@ -28,6 +28,7 @@ import type {
 } from '../shared/types';
 import { parseBangQuery } from '../shared/bangs';
 import type { DownloadManager } from './download-manager';
+import { PermissionManager } from './permission-manager';
 
 export const TOP_BAR_HEIGHT = 44;
 export const BOOKMARKS_BAR_HEIGHT = 28;
@@ -152,13 +153,32 @@ export class TabManager {
   }> = [];
   private onStateChangeCallback?: (state: BrowserState) => void;
   private cleanUserAgent: string = '';
+  private permissionManager: PermissionManager;
 
   public setDownloadManager(dm: DownloadManager) {
     this.downloadManager = dm;
   }
 
+  public getPermissionManager(): PermissionManager {
+    return this.permissionManager;
+  }
+
+  public getTabIdByWebContents(wc: Electron.WebContents): string | null {
+    if (!wc || wc.isDestroyed()) return null;
+    for (const [id, tab] of this.tabs.entries()) {
+      if (tab.view && !tab.view.webContents.isDestroyed() && tab.view.webContents.id === wc.id) {
+        return id;
+      }
+    }
+    return null;
+  }
+
   constructor(window: BrowserWindow) {
     this.window = window;
+    this.permissionManager = new PermissionManager(
+      () => this.window,
+      (wc) => this.getTabIdByWebContents(wc)
+    );
     this.settingsPath = path.join(app.getPath('userData'), 'larp-settings.json');
     this.bookmarksPath = path.join(app.getPath('userData'), 'larp-bookmarks.json');
     this.historyPath = path.join(app.getPath('userData'), 'larp-history.json');
@@ -1533,6 +1553,12 @@ export class TabManager {
     }
 
     try {
+      this.permissionManager.attachToSession(view.webContents.session);
+    } catch {
+      // Ignore
+    }
+
+    try {
       const isForceDark = this.settings.theme === 'dark' && this.settings.forcePageDarkMode;
       const themeBg = isForceDark ? '#121214' : '#ffffff';
       view.setBackgroundColor(themeBg);
@@ -2669,6 +2695,7 @@ export class TabManager {
       // Destroy webContents
       try {
         if (viewToDestroy.webContents && !viewToDestroy.webContents.isDestroyed()) {
+          this.permissionManager.cleanupForWebContents(viewToDestroy.webContents.id);
           (viewToDestroy.webContents as any).destroy?.();
         }
       } catch {

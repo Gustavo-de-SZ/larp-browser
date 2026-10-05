@@ -8,6 +8,8 @@ import type {
   HistoryItem,
   FindResult,
   DownloadItemInfo,
+  SitePermissionRequest,
+  SitePermissionDecision,
 } from '../shared/types';
 
 const api: IpcRendererApi = {
@@ -28,6 +30,16 @@ const api: IpcRendererApi = {
     ipcRenderer.on('browser:toggle-modal', listener);
     return () => {
       ipcRenderer.removeListener('browser:toggle-modal', listener);
+    };
+  },
+
+  onPermissionRequest: (callback: (request: SitePermissionRequest) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, request: SitePermissionRequest) => {
+      callback(request);
+    };
+    ipcRenderer.on('browser:permission-request', listener);
+    return () => {
+      ipcRenderer.removeListener('browser:permission-request', listener);
     };
   },
 
@@ -218,6 +230,15 @@ const api: IpcRendererApi = {
       ipcRenderer.removeListener('browser:update-available', listener);
     };
   },
+
+  // Site Permissions
+  respondPermissionRequest: (id: string, decision: 'allow' | 'deny' | 'dismiss', remember?: boolean) =>
+    ipcRenderer.invoke('browser:respond-permission', id, decision, remember),
+  getSitePermissions: () => ipcRenderer.invoke('browser:get-site-permissions'),
+  setSitePermission: (origin: string, permission: string, decision: 'allow' | 'deny' | 'ask') =>
+    ipcRenderer.invoke('browser:set-site-permission', origin, permission, decision),
+  clearSitePermissions: (origin?: string) =>
+    ipcRenderer.invoke('browser:clear-site-permissions', origin),
 };
 
 contextBridge.exposeInMainWorld('browserApi', api);

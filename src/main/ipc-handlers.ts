@@ -316,4 +316,27 @@ export function registerIpcHandlers(
   ipcMain.handle('browser:download-update-asset', (_event, url: string) => {
     updateManager.downloadUpdate(url);
   });
+
+  // Site Permissions
+  ipcMain.handle(
+    'browser:respond-permission',
+    (_event, id: string, decision: 'allow' | 'deny' | 'dismiss', remember?: boolean) => {
+      tabManager.getPermissionManager().handleResponse(id, decision, remember);
+    }
+  );
+
+  ipcMain.handle('browser:get-site-permissions', () => {
+    return tabManager.getPermissionManager().getPermissions();
+  });
+
+  ipcMain.handle(
+    'browser:set-site-permission',
+    (_event, origin: string, permission: string, decision: 'allow' | 'deny' | 'ask') => {
+      tabManager.getPermissionManager().setPermission(origin, permission, decision);
+    }
+  );
+
+  ipcMain.handle('browser:clear-site-permissions', (_event, origin?: string) => {
+    tabManager.getPermissionManager().clearPermissions(origin);
+  });
 }

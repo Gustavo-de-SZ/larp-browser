@@ -40,43 +40,6 @@ function setupSecurityDefaults() {
     .trim();
   app.userAgentFallback = cleanUa;
   session.defaultSession.setUserAgent(cleanUa);
-
-  // Security: Block high-risk peripheral device access and OS-level execution
-  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-    const dangerousPermissions = [
-      'usb',
-      'serial',
-      'bluetooth',
-      'hid',
-      'midi',
-      'midiSysex',
-      'openExternal',
-      'system-audio',
-    ];
-    if (dangerousPermissions.includes(permission)) {
-      console.warn(`[Security] Blocked dangerous permission request: ${permission}`);
-      return callback(false);
-    }
-
-    // Allow safe display features
-    if (permission === 'fullscreen' || permission === 'pointerLock') {
-      return callback(true);
-    }
-
-    // Default deny sensitive hardware (camera, mic, geolocation) until explicit user permission UI
-    callback(false);
-  });
-
-  session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
-    const dangerousPermissions = ['usb', 'serial', 'bluetooth', 'hid', 'midi', 'midiSysex', 'openExternal'];
-    if (dangerousPermissions.includes(permission)) {
-      return false;
-    }
-    if (permission === 'fullscreen' || permission === 'pointerLock') {
-      return true;
-    }
-    return false;
-  });
 }
 
 async function createWindow() {
@@ -107,6 +70,7 @@ async function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
   tabManager = new TabManager(mainWindow);
+  tabManager.getPermissionManager().attachToSession(session.defaultSession);
   downloadManager = new DownloadManager(mainWindow, () => tabManager!.getSettings());
   tabManager.setDownloadManager(downloadManager);
   updateManager = new UpdateManager(mainWindow);
