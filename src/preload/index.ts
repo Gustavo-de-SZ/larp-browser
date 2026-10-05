@@ -117,9 +117,11 @@ const api: IpcRendererApi = {
   print: (tabId?: string) => ipcRenderer.invoke('browser:print', tabId),
   openDevTools: (tabId?: string) => ipcRenderer.invoke('browser:open-devtools', tabId),
 
-  // Zoom
+  // Zoom & Volume Boost
   setZoomFactor: (tabId: string, factor: number) =>
     ipcRenderer.invoke('browser:set-zoom', tabId, factor),
+  setTabVolumeBoost: (tabId: string, boostPercent: number, rememberDomain?: boolean) =>
+    ipcRenderer.invoke('browser:set-tab-volume-boost', tabId, boostPercent, rememberDomain),
 
   // Find in Page
   findInPage: (text: string, forward?: boolean, findNext?: boolean) =>

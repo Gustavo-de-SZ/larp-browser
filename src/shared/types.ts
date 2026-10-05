@@ -20,6 +20,7 @@ export interface TabInfo {
   crashedReason?: string;
   forceDarkActive?: boolean;
   isPinned?: boolean;
+  volumeBoost?: number;
 }
 
 export interface BookmarkItem {
@@ -197,6 +198,7 @@ export interface BrowserSettings {
   askDownloadLocation?: boolean;
   autoCheckUpdates?: boolean;
   domainZoomLevels?: Record<string, number>;
+  domainVolumeBoost?: Record<string, number>;
 }
 
 export interface UpdateAssetInfo {
@@ -292,8 +294,9 @@ export interface IpcRendererApi {
   print: (tabId?: string) => Promise<void>;
   openDevTools: (tabId?: string) => Promise<void>;
 
-  // Zoom
+  // Zoom & Audio Boost
   setZoomFactor: (tabId: string, factor: number) => Promise<number>;
+  setTabVolumeBoost: (tabId: string, boostPercent: number, rememberDomain?: boolean) => Promise<void>;
 
   // Find in Page
   findInPage: (text: string, forward?: boolean, findNext?: boolean) => Promise<void>;

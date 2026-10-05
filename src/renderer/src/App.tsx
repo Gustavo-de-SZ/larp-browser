@@ -11,6 +11,7 @@ import { ProfilePopover } from './components/ProfilePopover';
 import { FindInPageBar } from './components/FindInPageBar';
 import { PermissionPrompt } from './components/PermissionPrompt';
 import { SiteSecurityPopover } from './components/SiteSecurityPopover';
+import { VolumeBoosterPopover } from './components/VolumeBoosterPopover';
 import { ToastContainer, type ToastItem } from './components/Toast';
 import { getPalette, applyPalette } from './theme/palettes';
 import type { BrowserState, BrowserSettings, SitePermissionRequest } from '@/shared/types';
@@ -25,6 +26,7 @@ export const App: React.FC = () => {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const [isDownloadsOpen, setIsDownloadsOpen] = useState(false);
+  const [isVolumeBoosterOpen, setIsVolumeBoosterOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isFindOpen, setIsFindOpen] = useState(false);
   const [isSecurityOpen, setIsSecurityOpen] = useState(false);
@@ -379,6 +381,8 @@ export const App: React.FC = () => {
             isFavoritesOpen={isFavoritesOpen}
             onToggleDownloads={() => setIsDownloadsOpen((prev) => !prev)}
             isDownloadsOpen={isDownloadsOpen}
+            onToggleVolumeBooster={() => setIsVolumeBoosterOpen((prev) => !prev)}
+            isVolumeBoosterOpen={isVolumeBoosterOpen}
             onToggleProfile={() => setIsProfileOpen((prev) => !prev)}
             isProfileOpen={isProfileOpen}
             onToggleSecurity={() => setIsSecurityOpen((prev) => !prev)}
@@ -474,6 +478,15 @@ export const App: React.FC = () => {
         onClose={() => setIsSecurityOpen(false)}
         activeTab={activeTab || null}
         theme={theme}
+        onShowToast={showToast}
+      />
+
+      {/* Volume Booster Popover */}
+      <VolumeBoosterPopover
+        isOpen={isVolumeBoosterOpen}
+        onClose={() => setIsVolumeBoosterOpen(false)}
+        activeTab={activeTab || null}
+        domainVolumeBoost={state.settings.domainVolumeBoost}
         onShowToast={showToast}
       />
 

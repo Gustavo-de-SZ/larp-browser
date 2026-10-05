@@ -51,6 +51,8 @@ interface TopBarProps {
   isFavoritesOpen?: boolean;
   onToggleDownloads?: () => void;
   isDownloadsOpen?: boolean;
+  onToggleVolumeBooster?: () => void;
+  isVolumeBoosterOpen?: boolean;
   onToggleProfile?: () => void;
   isProfileOpen?: boolean;
   onToggleSecurity?: () => void;
@@ -69,6 +71,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   isFavoritesOpen = false,
   onToggleDownloads,
   isDownloadsOpen = false,
+  onToggleVolumeBooster,
+  isVolumeBoosterOpen = false,
   onToggleProfile,
   isProfileOpen = false,
   onToggleSecurity,
@@ -863,6 +867,44 @@ export const TopBar: React.FC<TopBarProps> = ({
             ) : recentCompletedDownload ? (
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[var(--bg-topbar)] animate-ping" />
             ) : null}
+          </button>
+
+          {/* Volume Booster Button */}
+          <button
+            onClick={onToggleVolumeBooster}
+            className={`p-1.5 rounded-md transition-colors cursor-pointer relative ${
+              isVolumeBoosterOpen
+                ? 'text-[var(--accent-primary)] bg-black/10 dark:bg-white/10'
+                : (activeTab?.volumeBoost ?? 100) > 100
+                ? 'text-amber-400 bg-amber-500/15 border border-amber-500/30'
+                : activeTab?.audioPlaying
+                ? 'text-emerald-400 bg-emerald-500/10'
+                : 'text-[var(--text-muted)] hover:text-[var(--accent-primary)] hover:bg-black/5 dark:hover:bg-white/5'
+            }`}
+            title={`Volume Booster (${activeTab?.volumeBoost ?? 100}%)${activeTab?.audioPlaying ? ' — Audio Playing' : ''}`}
+          >
+            {(activeTab?.volumeBoost ?? 100) === 0 ? (
+              <VolumeX className="w-3.5 h-3.5 text-zinc-400" />
+            ) : (activeTab?.volumeBoost ?? 100) > 100 ? (
+              <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+            ) : (
+              <Volume2 className="w-3.5 h-3.5" />
+            )}
+
+            {/* Badge showing current volume boost if not 100% */}
+            {(activeTab?.volumeBoost ?? 100) !== 100 && (
+              <span
+                className={`absolute -top-1.5 -right-2 px-1 py-0.2 rounded-full text-[8.5px] font-mono font-bold leading-tight border ${
+                  (activeTab?.volumeBoost ?? 100) > 300
+                    ? 'bg-rose-500 text-white border-rose-400'
+                    : (activeTab?.volumeBoost ?? 100) > 100
+                    ? 'bg-amber-500 text-black border-amber-400 font-extrabold'
+                    : 'bg-zinc-600 text-zinc-200 border-zinc-500'
+                }`}
+              >
+                {activeTab?.volumeBoost}%
+              </span>
+            )}
           </button>
 
           {/* Tab Switcher Trigger Button */}

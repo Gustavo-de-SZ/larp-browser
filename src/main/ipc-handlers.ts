@@ -98,9 +98,13 @@ export function registerIpcHandlers(
     tabManager.toggleDevTools(tabId);
   });
 
-  // Zoom handler
+  // Zoom & Volume Boost handlers
   ipcMain.handle('browser:set-zoom', (_event, tabId: string, factor: number) => {
     return tabManager.setZoomFactor(tabId, factor);
+  });
+
+  ipcMain.handle('browser:set-tab-volume-boost', (_event, tabId: string, boostPercent: number, rememberDomain?: boolean) => {
+    return tabManager.setTabVolumeBoost(tabId, boostPercent, rememberDomain);
   });
 
   // Find in Page handlers

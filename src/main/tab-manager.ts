@@ -89,6 +89,7 @@ const DEFAULT_SETTINGS: BrowserSettings = {
   preserveMediaTimestamps: true,
   protectActiveMediaTabs: true,
   domainZoomLevels: {},
+  domainVolumeBoost: {},
 };
 
 const SMART_DARK_CSS = `
@@ -1558,6 +1559,18 @@ export class TabManager {
     // Apply smart dark mode
     this.applyThemeToTab(tabId).catch(() => {});
 
+    // Re-apply domain volume boost if remembered
+    if (tab.info.url && tab.info.url !== 'about:blank') {
+      try {
+        const host = new URL(tab.info.url).hostname;
+        if (this.settings.domainVolumeBoost?.[host] !== undefined) {
+          tab.info.volumeBoost = this.settings.domainVolumeBoost[host];
+        }
+      } catch {
+        // Ignore
+      }
+    }
+
     // Reload content transparently
     if (tab.info.url && tab.info.url !== 'about:blank') {
       tab.info.isLoading = true;
@@ -1648,6 +1661,7 @@ export class TabManager {
       audioPlaying: false,
       isMuted: false,
       zoomFactor: 1.0,
+      volumeBoost: 100,
       isPrivate,
       profileId: effectiveProfileId,
     };
@@ -1664,6 +1678,9 @@ export class TabManager {
               // Ignore
             }
           }
+        }
+        if (this.settings.domainVolumeBoost?.[host]) {
+          info.volumeBoost = this.settings.domainVolumeBoost[host];
         }
       } catch {
         // Ignore
@@ -1877,8 +1894,15 @@ export class TabManager {
               tab.info.zoomFactor = domainZoom;
               wc.setZoomFactor(domainZoom);
             }
+            const domainBoost = this.settings.domainVolumeBoost?.[host];
+            if (domainBoost !== undefined) {
+              tab.info.volumeBoost = domainBoost;
+            }
           } catch {
             // Ignore
+          }
+          if (tab.info.volumeBoost && tab.info.volumeBoost !== 100) {
+            this.applyVolumeBoostToTab(tabId).catch(() => {});
           }
           if (tabId === this.activeTabId && !this.isSwitcherOpen && !this.isModalOpen) {
             this.attachActiveTabView();
@@ -1905,6 +1929,18 @@ export class TabManager {
           tab.info.canGoForward = wc.navigationHistory ? wc.navigationHistory.canGoForward() : wc.canGoForward();
           if (url && url !== 'about:blank') {
             tab.info.hasLoadedPage = true;
+            try {
+              const host = new URL(url).hostname;
+              const domainBoost = this.settings.domainVolumeBoost?.[host];
+              if (domainBoost !== undefined) {
+                tab.info.volumeBoost = domainBoost;
+              }
+            } catch {
+              // Ignore
+            }
+            if (tab.info.volumeBoost && tab.info.volumeBoost !== 100) {
+              this.applyVolumeBoostToTab(tabId).catch(() => {});
+            }
           }
           this.addHistory(tab.info.title, url, tab.info.isPrivate);
           this.saveSession();
@@ -1923,6 +1959,9 @@ export class TabManager {
         tab.info.hasLoadedPage = true;
         if (tabId === this.activeTabId && !this.isSwitcherOpen && !this.isModalOpen) {
           this.attachActiveTabView();
+        }
+        if (tab.info.volumeBoost && tab.info.volumeBoost !== 100) {
+          this.applyVolumeBoostToTab(tabId).catch(() => {});
         }
         this.notifyStateChange();
 
@@ -2471,6 +2510,26 @@ export class TabManager {
           },
         })
       );
+
+      // Volume Boost submenu for media
+      const boostSubmenu = new Menu();
+      const currentBoost = tab.info.volumeBoost ?? 100;
+      [100, 150, 200, 300, 400, 600].forEach((pct) => {
+        boostSubmenu.append(
+          new MenuItem({
+            label: pct === 100 ? '100% (Normal)' : `${pct}% Boost`,
+            type: 'checkbox',
+            checked: currentBoost === pct,
+            click: () => this.setTabVolumeBoost(tabId, pct),
+          })
+        );
+      });
+      menu.append(
+        new MenuItem({
+          label: `Volume Boost (${currentBoost}%)`,
+          submenu: boostSubmenu,
+        })
+      );
       menu.append(new MenuItem({ type: 'separator' }));
     }
 
@@ -2686,6 +2745,25 @@ export class TabManager {
           new MenuItem({
             label: 'Translate Options',
             submenu: pageTransSubmenu,
+          })
+        );
+
+        const pageBoostSubmenu = new Menu();
+        const currentBoost = tab.info.volumeBoost ?? 100;
+        [100, 150, 200, 300, 400, 600].forEach((pct) => {
+          pageBoostSubmenu.append(
+            new MenuItem({
+              label: pct === 100 ? '100% (Normal)' : `${pct}% Boost`,
+              type: 'checkbox',
+              checked: currentBoost === pct,
+              click: () => this.setTabVolumeBoost(tabId, pct),
+            })
+          );
+        });
+        menu.append(
+          new MenuItem({
+            label: `Volume Boost (${currentBoost}%)`,
+            submenu: pageBoostSubmenu,
           })
         );
       }
@@ -3520,5 +3598,146 @@ export class TabManager {
 
     this.notifyStateChange();
     return clamped;
+  }
+
+  // --- Tab Audio Volume Booster ---
+
+  public async applyVolumeBoostToTab(tabId: string): Promise<void> {
+    const tab = this.tabs.get(tabId);
+    if (!tab || !tab.view || tab.view.webContents.isDestroyed()) return;
+    const boostPercent = tab.info.volumeBoost ?? 100;
+    const factor = Math.max(0, Math.min(600, boostPercent)) / 100;
+
+    const script = `
+      (function() {
+        try {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContext) return;
+
+          if (!window.__larpAudioEngine) {
+            let ctx = null;
+            let gainNode = null;
+            let compressor = null;
+            let currentGain = 1.0;
+            const hookedMedia = new WeakSet();
+
+            function getOrCreateContext() {
+              if (!ctx) {
+                ctx = new AudioContext();
+                gainNode = ctx.createGain();
+                gainNode.gain.setValueAtTime(currentGain, ctx.currentTime);
+
+                // Anti-clipping dynamics compressor (limiter)
+                compressor = ctx.createDynamicsCompressor();
+                compressor.threshold.setValueAtTime(-14, ctx.currentTime);
+                compressor.knee.setValueAtTime(30, ctx.currentTime);
+                compressor.ratio.setValueAtTime(12, ctx.currentTime);
+                compressor.attack.setValueAtTime(0.003, ctx.currentTime);
+                compressor.release.setValueAtTime(0.25, ctx.currentTime);
+
+                gainNode.connect(compressor);
+                compressor.connect(ctx.destination);
+              }
+              if (ctx.state === 'suspended') {
+                ctx.resume().catch(() => {});
+              }
+              return ctx;
+            }
+
+            function hookElement(mediaEl) {
+              if (!mediaEl || hookedMedia.has(mediaEl)) return;
+              try {
+                getOrCreateContext();
+                const source = ctx.createMediaElementSource(mediaEl);
+                source.connect(gainNode);
+                hookedMedia.add(mediaEl);
+              } catch (err) {
+                // Media might already be connected or CORS restricted
+              }
+            }
+
+            function scanAndHook() {
+              document.querySelectorAll('video, audio').forEach(hookElement);
+            }
+
+            // MutationObserver to hook dynamically created elements (e.g. YouTube, Twitter, Twitch)
+            const observer = new MutationObserver(() => scanAndHook());
+            if (document.body) {
+              observer.observe(document.body, { childList: true, subtree: true });
+            } else {
+              document.addEventListener('DOMContentLoaded', () => {
+                if (document.body) observer.observe(document.body, { childList: true, subtree: true });
+              });
+            }
+
+            // Hook on play event capture
+            window.addEventListener('play', (e) => {
+              if (e.target && (e.target.tagName === 'VIDEO' || e.target.tagName === 'AUDIO')) {
+                hookElement(e.target);
+                if (ctx && ctx.state === 'suspended') {
+                  ctx.resume().catch(() => {});
+                }
+              }
+            }, true);
+
+            scanAndHook();
+
+            window.__larpAudioEngine = {
+              setGain(val) {
+                currentGain = val;
+                getOrCreateContext();
+                if (gainNode && ctx) {
+                  gainNode.gain.setValueAtTime(val, ctx.currentTime);
+                }
+              },
+              getGain() {
+                return currentGain;
+              }
+            };
+          }
+
+          if (window.__larpAudioEngine) {
+            window.__larpAudioEngine.setGain(${factor});
+          }
+        } catch (e) {
+          console.warn('[LarpVolumeBooster] Error adjusting audio gain:', e);
+        }
+      })();
+    `;
+
+    try {
+      await tab.view.webContents.executeJavaScript(script);
+    } catch {
+      // Ignore
+    }
+  }
+
+  public async setTabVolumeBoost(tabId: string, boostPercent: number, rememberDomain = false): Promise<void> {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return;
+    const clamped = Math.max(0, Math.min(600, Math.round(boostPercent)));
+    tab.info.volumeBoost = clamped;
+
+    if (rememberDomain && tab.info.url && tab.info.url !== 'about:blank') {
+      try {
+        const host = new URL(tab.info.url).hostname;
+        if (host) {
+          if (!this.settings.domainVolumeBoost) {
+            this.settings.domainVolumeBoost = {};
+          }
+          if (clamped === 100) {
+            delete this.settings.domainVolumeBoost[host];
+          } else {
+            this.settings.domainVolumeBoost[host] = clamped;
+          }
+          this.saveSettings();
+        }
+      } catch {
+        // Ignore
+      }
+    }
+
+    await this.applyVolumeBoostToTab(tabId);
+    this.notifyStateChange();
   }
 }
