@@ -214,6 +214,14 @@ export function registerShortcuts(window: BrowserWindow, tabManager: TabManager)
       return;
     }
 
+    // 5b. Pin / Unpin Tab (Alt+P)
+    if (isTriggered('togglePinTab', input)) {
+      event.preventDefault();
+      const { activeTabId } = tabManager.getState();
+      if (activeTabId) tabManager.togglePinTab(activeTabId);
+      return;
+    }
+
     // 5. Bookmark Page
     if (isTriggered('toggleBookmark', input)) {
       event.preventDefault();

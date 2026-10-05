@@ -54,6 +54,18 @@ export function registerIpcHandlers(
     await tabManager.toggleTabForceDark(tabId);
   });
 
+  ipcMain.handle('browser:pin-tab', async (_event, tabId: string) => {
+    await tabManager.pinTab(tabId);
+  });
+
+  ipcMain.handle('browser:unpin-tab', async (_event, tabId: string) => {
+    await tabManager.unpinTab(tabId);
+  });
+
+  ipcMain.handle('browser:toggle-pin-tab', async (_event, tabId: string) => {
+    await tabManager.togglePinTab(tabId);
+  });
+
   ipcMain.handle('browser:hibernate-tab', async (_event, tabId: string) => {
     await tabManager.hibernateTab(tabId);
   });

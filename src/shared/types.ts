@@ -19,6 +19,7 @@ export interface TabInfo {
   isCrashed?: boolean;
   crashedReason?: string;
   forceDarkActive?: boolean;
+  isPinned?: boolean;
 }
 
 export interface BookmarkItem {
@@ -119,7 +120,8 @@ export type ShortcutActionId =
   | 'toggleMaximize'
   | 'openDevTools'
   | 'printPage'
-  | 'viewSource';
+  | 'viewSource'
+  | 'togglePinTab';
 
 export interface ShortcutDefinition {
   id: ShortcutActionId;
@@ -133,6 +135,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
   { id: 'newTab', label: 'New Tab', category: 'Tabs', defaultKey: 'Ctrl+T', description: 'Open a new blank tab' },
   { id: 'newPrivateTab', label: 'New Private Tab', category: 'Tabs', defaultKey: 'Ctrl+Shift+N', description: 'Open a new private browsing tab' },
   { id: 'closeTab', label: 'Close Tab', category: 'Tabs', defaultKey: 'Ctrl+W', description: 'Close active tab' },
+  { id: 'togglePinTab', label: 'Pin / Unpin Tab', category: 'Tabs', defaultKey: 'Alt+P', description: 'Pin or unpin active tab to the sidebar' },
   { id: 'reopenClosedTab', label: 'Reopen Closed Tab', category: 'Tabs', defaultKey: 'Ctrl+Shift+T', description: 'Reopen the last closed tab' },
   { id: 'duplicateTab', label: 'Duplicate Tab', category: 'Tabs', defaultKey: 'Ctrl+Shift+D', description: 'Duplicate active tab URL' },
   { id: 'reloadTab', label: 'Reload Tab', category: 'Navigation', defaultKey: 'Ctrl+R', description: 'Reload active page' },
@@ -176,6 +179,7 @@ export interface BrowserSettings {
   switcherShowUrls?: boolean;
   switcherSortOrder?: 'mru' | 'creation';
   showBookmarksBar: boolean;
+  showPinnedSidebar?: boolean;
   showFavoritesOnNewTab: boolean;
   startupBehavior: 'new-tab' | 'continue' | 'custom-url';
   startupCustomUrl?: string;
@@ -251,6 +255,9 @@ export interface IpcRendererApi {
   reloadTab: (tabId: string) => Promise<void>;
   toggleMuteTab: (tabId: string) => Promise<void>;
   toggleTabDarkMode: (tabId?: string) => Promise<void>;
+  pinTab: (tabId: string) => Promise<void>;
+  unpinTab: (tabId: string) => Promise<void>;
+  togglePinTab: (tabId: string) => Promise<void>;
   hibernateTab: (tabId: string) => Promise<void>;
   wakeTab: (tabId: string) => Promise<void>;
   reopenClosedTab: () => Promise<string | null>;

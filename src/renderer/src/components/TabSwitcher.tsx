@@ -13,6 +13,8 @@ import {
   RotateCcw,
   ArrowRightToLine,
   Layers,
+  Pin,
+  PinOff,
 } from 'lucide-react';
 import type { BrowserState, TabInfo } from '@/shared/types';
 import type { ThemeMode } from '../App';
@@ -929,6 +931,22 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
             )}
             <span className="flex-1">{contextMenu.tab.isMuted ? 'Unmute Tab' : 'Mute Tab'}</span>
             <span className="text-[10px] text-[var(--text-muted)] font-mono">M</span>
+          </button>
+
+          <button
+            onClick={() => {
+              window.browserApi.togglePinTab(contextMenu.tab.id);
+              setContextMenu(null);
+            }}
+            className="flex items-center px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-left space-x-2.5 cursor-pointer"
+          >
+            {contextMenu.tab.isPinned ? (
+              <PinOff className="w-3.5 h-3.5 text-amber-500" />
+            ) : (
+              <Pin className="w-3.5 h-3.5 text-amber-500" />
+            )}
+            <span className="flex-1">{contextMenu.tab.isPinned ? 'Unpin Tab' : 'Pin Tab to Sidebar'}</span>
+            <span className="text-[10px] text-[var(--text-muted)] font-mono">Alt+P</span>
           </button>
 
           <button

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TopBar } from './components/TopBar';
 import { TabSwitcher } from './components/TabSwitcher';
+import { PinnedSidebar } from './components/PinnedSidebar';
 import { NewTabPage } from './components/NewTabPage';
 import { SettingsModal, type SettingsTabType } from './components/SettingsModal';
 import { KeyboardShortcuts } from './components/KeyboardShortcuts';
@@ -213,6 +214,11 @@ export const App: React.FC = () => {
     return () => unsub();
   }, []);
 
+  const activeTabIdRef = React.useRef(state.activeTabId);
+  useEffect(() => {
+    activeTabIdRef.current = state.activeTabId;
+  }, [state.activeTabId]);
+
   // Global renderer keyboard shortcuts when focused in shell
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -249,6 +255,13 @@ export const App: React.FC = () => {
         e.preventDefault();
         setSettingsTab('history');
         setIsSettingsOpen(true);
+        return;
+      }
+      if (e.altKey && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        if (activeTabIdRef.current && window.browserApi) {
+          window.browserApi.togglePinTab(activeTabIdRef.current);
+        }
         return;
       }
       if (!typing && !e.ctrlKey && !e.altKey && e.key === '?') {
@@ -306,6 +319,8 @@ export const App: React.FC = () => {
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
   const isNewTab = !activeTab || !activeTab.url || activeTab.url === 'about:blank' || !activeTab.hasLoadedPage;
+  const pinnedTabs = state.tabs.filter((t) => t.isPinned);
+  const showPinnedSidebar = (state.settings?.showPinnedSidebar ?? true) && pinnedTabs.length > 0;
 
   return (
     <div
@@ -346,23 +361,37 @@ export const App: React.FC = () => {
         </>
       )}
 
-      {/* Main Content Area */}
-      <main
-        className="flex-1 w-full relative overflow-hidden"
-        style={{ backgroundColor: 'var(--bg-app)' }}
-      >
-        {isNewTab ? (
-          <NewTabPage state={state} theme={theme} />
-        ) : (
-          (state.isSwitcherOpen || isSettingsOpen || isShortcutsOpen || isFavoritesOpen || isOmnibarOpen || isDownloadsOpen || isProfileOpen) && activeTab?.previewImage ? (
-            <img
-              src={activeTab.previewImage}
-              alt="Active tab preview"
-              className="w-full h-full object-cover object-top"
-            />
-          ) : null
+      {/* Main Content Area Container with Optional Pinned Sidebar */}
+      <div className="flex-1 flex flex-row w-full overflow-hidden relative">
+        {!isHtmlFullscreen && showPinnedSidebar && (
+          <PinnedSidebar
+            pinnedTabs={pinnedTabs}
+            activeTabId={state.activeTabId}
+            onSwitchTab={(id) => window.browserApi?.switchTab(id)}
+            onUnpinTab={(id) => window.browserApi?.unpinTab(id)}
+            onTogglePinActiveTab={() => state.activeTabId && window.browserApi?.togglePinTab(state.activeTabId)}
+            onToggleMuteTab={(id) => window.browserApi?.toggleMuteTab(id)}
+            onReloadTab={(id) => window.browserApi?.reloadTab(id)}
+            onCloseTab={(id) => window.browserApi?.closeTab(id)}
+          />
         )}
-      </main>
+        <main
+          className="flex-1 h-full relative overflow-hidden"
+          style={{ backgroundColor: 'var(--bg-app)' }}
+        >
+          {isNewTab ? (
+            <NewTabPage state={state} theme={theme} />
+          ) : (
+            (state.isSwitcherOpen || isSettingsOpen || isShortcutsOpen || isFavoritesOpen || isOmnibarOpen || isDownloadsOpen || isProfileOpen) && activeTab?.previewImage ? (
+              <img
+                src={activeTab.previewImage}
+                alt="Active tab preview"
+                className="w-full h-full object-cover object-top"
+              />
+            ) : null
+          )}
+        </main>
+      </div>
 
       {/* Quick Favorites Popover */}
       <QuickFavoritesPopover

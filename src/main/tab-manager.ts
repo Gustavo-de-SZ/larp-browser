@@ -32,6 +32,7 @@ import type { DownloadManager } from './download-manager';
 export const TOP_BAR_HEIGHT = 44;
 export const BOOKMARKS_BAR_HEIGHT = 28;
 export const FIND_BAR_HEIGHT = 36;
+export const PINNED_SIDEBAR_WIDTH = 48;
 
 export function getSearchEngineHomeUrl(engine: string): string {
   switch (engine) {
@@ -72,6 +73,7 @@ const DEFAULT_SETTINGS: BrowserSettings = {
   switcherShowUrls: true,
   switcherSortOrder: 'mru',
   showBookmarksBar: false,
+  showPinnedSidebar: true,
   showFavoritesOnNewTab: true,
   startupBehavior: 'new-tab',
   startupCustomUrl: 'https://www.google.com',
@@ -1200,6 +1202,7 @@ export class TabManager {
         .map((t) => ({
           url: t.info.url,
           title: t.info.title,
+          isPinned: t.info.isPinned,
           savedMediaTime: t.info.savedMediaTime,
         }))
         .filter((t) => t.url && t.url !== 'about:blank');
@@ -1229,8 +1232,11 @@ export class TabManager {
           for (const t of data.tabs) {
             if (t.url && t.url !== 'about:blank') {
               const id = await this.createTab(t.url);
+              const createdTab = this.tabs.get(id);
+              if (createdTab && t.isPinned) {
+                createdTab.info.isPinned = true;
+              }
               if (t.savedMediaTime) {
-                const createdTab = this.tabs.get(id);
                 if (createdTab) {
                   createdTab.info.savedMediaTime = t.savedMediaTime;
                   createdTab.hibernatedState = { mediaTime: t.savedMediaTime };
@@ -1250,6 +1256,25 @@ export class TabManager {
         }
       } catch (err) {
         console.error('Failed to restore session:', err);
+      }
+    }
+
+    // If not restoring session, always restore pinned tabs as persistent apps
+    if (!shouldRestore && fs.existsSync(this.sessionPath)) {
+      try {
+        const raw = fs.readFileSync(this.sessionPath, 'utf8');
+        const data = JSON.parse(raw);
+        if (Array.isArray(data.tabs)) {
+          for (const t of data.tabs) {
+            if (t.isPinned && t.url && t.url !== 'about:blank') {
+              const id = await this.createTab(t.url, false, undefined, true);
+              const createdTab = this.tabs.get(id);
+              if (createdTab) createdTab.info.isPinned = true;
+            }
+          }
+        }
+      } catch (err) {
+        // Ignore
       }
     }
 
@@ -2357,6 +2382,13 @@ export class TabManager {
             click: () => this.toggleTabForceDark(tabId),
           })
         );
+
+        menu.append(
+          new MenuItem({
+            label: tab.info.isPinned ? 'Unpin This Tab' : 'Pin This Tab',
+            click: () => this.togglePinTab(tabId),
+          })
+        );
       }
       menu.append(new MenuItem({ type: 'separator' }));
     }
@@ -2386,17 +2418,22 @@ export class TabManager {
   }
 
   public closeOtherTabs(tabId: string) {
-    const toClose = Array.from(this.tabs.keys()).filter((id) => id !== tabId);
+    const toClose = Array.from(this.tabs.entries())
+      .filter(([id, tab]) => id !== tabId && !tab.info.isPinned)
+      .map(([id]) => id);
     for (const id of toClose) {
       this.closeTab(id);
     }
   }
 
   public closeTabsToRight(tabId: string) {
-    const keys = Array.from(this.tabs.keys());
-    const targetIndex = keys.indexOf(tabId);
+    const entries = Array.from(this.tabs.entries());
+    const targetIndex = entries.findIndex(([id]) => id === tabId);
     if (targetIndex !== -1) {
-      const toClose = keys.slice(targetIndex + 1);
+      const toClose = entries
+        .slice(targetIndex + 1)
+        .filter(([, tab]) => !tab.info.isPinned)
+        .map(([id]) => id);
       for (const id of toClose) {
         this.closeTab(id);
       }
@@ -2565,14 +2602,18 @@ export class TabManager {
       return;
     }
 
+    const hasPinnedTabs = Array.from(this.tabs.values()).some((t) => t.info.isPinned);
+    const showSidebar = (this.settings.showPinnedSidebar ?? true) && hasPinnedTabs;
+    const sidebarWidth = showSidebar ? PINNED_SIDEBAR_WIDTH : 0;
+
     const topOffset =
       TOP_BAR_HEIGHT +
       (this.settings.showBookmarksBar ? BOOKMARKS_BAR_HEIGHT : 0) +
       (this.isFindOpen ? FIND_BAR_HEIGHT : 0);
     tab.view.setBounds({
-      x: 0,
+      x: sidebarWidth,
       y: topOffset,
-      width: width,
+      width: Math.max(0, width - sidebarWidth),
       height: Math.max(0, height - topOffset),
     });
   }
@@ -2839,6 +2880,34 @@ export class TabManager {
     tab.info.forceDarkActive = !currentActive;
     await this.applyThemeToTab(tabId);
     this.notifyStateChange();
+  }
+
+  public pinTab(tabId: string) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return;
+    tab.info.isPinned = true;
+    this.saveSession();
+    this.updateActiveViewBounds();
+    this.notifyStateChange();
+  }
+
+  public unpinTab(tabId: string) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return;
+    tab.info.isPinned = false;
+    this.saveSession();
+    this.updateActiveViewBounds();
+    this.notifyStateChange();
+  }
+
+  public togglePinTab(tabId: string) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return;
+    if (tab.info.isPinned) {
+      this.unpinTab(tabId);
+    } else {
+      this.pinTab(tabId);
+    }
   }
 
   // --- Alt-Tab / Ctrl-Tab Switcher HUD Controls ---
