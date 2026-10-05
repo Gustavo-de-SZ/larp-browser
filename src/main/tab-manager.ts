@@ -142,6 +142,7 @@ export class TabManager {
     profileId?: string;
   }> = [];
   private onStateChangeCallback?: (state: BrowserState) => void;
+  private cleanUserAgent: string = '';
 
   public setDownloadManager(dm: DownloadManager) {
     this.downloadManager = dm;
@@ -155,6 +156,17 @@ export class TabManager {
     this.passwordsPath = path.join(app.getPath('userData'), 'larp-passwords.json');
     this.profilesPath = path.join(app.getPath('userData'), 'larp-profiles.json');
     this.sessionPath = path.join(app.getPath('userData'), 'larp-session.json');
+
+    try {
+      const defaultUa = session.defaultSession.getUserAgent();
+      this.cleanUserAgent = defaultUa
+        .replace(/Electron\/\S+\s?/, '')
+        .replace(/larp-browser\/\S+\s?/, '')
+        .trim();
+    } catch {
+      // Ignore
+    }
+
     this.loadSettings();
     this.loadProfiles();
     this.loadBookmarks();
@@ -1429,7 +1441,7 @@ export class TabManager {
     return view;
   }
 
-  public async createTab(initialUrl?: string, isPrivate = false): Promise<string> {
+  public async createTab(initialUrl?: string, isPrivate = false, profileId?: string): Promise<string> {
     let effectiveUrl = initialUrl;
     if (!effectiveUrl && !isPrivate) {
       const mode =
@@ -1446,7 +1458,10 @@ export class TabManager {
     }
 
     const activeProfile = this.getActiveProfile();
-    const partition = isPrivate ? 'incognito' : (activeProfile.partition || undefined);
+    const effectiveProfileId = isPrivate ? undefined : (profileId || activeProfile.id);
+    const partition = isPrivate
+      ? 'incognito'
+      : (effectiveProfileId ? `persist:${effectiveProfileId}` : (activeProfile.partition || undefined));
 
     const id = 'tab-' + Math.random().toString(36).substring(2, 9);
     const view = new WebContentsView({
@@ -1458,6 +1473,15 @@ export class TabManager {
         partition,
       },
     });
+
+    if (this.cleanUserAgent && view.webContents) {
+      view.webContents.setUserAgent(this.cleanUserAgent);
+      try {
+        view.webContents.session.setUserAgent(this.cleanUserAgent);
+      } catch {
+        // Ignore
+      }
+    }
 
     try {
       const themeBg = this.settings.theme === 'dark' ? '#121214' : '#fafafa';
@@ -1479,7 +1503,7 @@ export class TabManager {
       isMuted: false,
       zoomFactor: 1.0,
       isPrivate,
-      profileId: isPrivate ? undefined : activeProfile.id,
+      profileId: effectiveProfileId,
     };
 
     this.tabs.set(id, { info, view });
@@ -1584,6 +1608,34 @@ export class TabManager {
     wc.executeJavaScript(script, true).catch(() => {});
   }
 
+  private handleExternalProtocolNavigation(event: Electron.Event, url: string): boolean {
+    try {
+      const parsed = new URL(url);
+      if (['http:', 'https:', 'about:', 'view-source:', 'data:'].includes(parsed.protocol)) {
+        return false;
+      }
+      event.preventDefault();
+      const safeExternalProtocols = [
+        'mailto:', 'tel:', 'sms:', 'slack:', 'zoommtg:', 'discord:',
+        'tg:', 'steam:', 'vscode:', 'github-mac:', 'github-windows:',
+      ];
+      if (
+        safeExternalProtocols.includes(parsed.protocol) ||
+        parsed.protocol.endsWith('-auth:') ||
+        parsed.protocol.endsWith('-oauth:') ||
+        parsed.protocol.startsWith('x-')
+      ) {
+        shell.openExternal(url).catch(() => {});
+      } else {
+        console.warn(`[Security] Blocked external navigation to: ${url}`);
+      }
+      return true;
+    } catch {
+      event.preventDefault();
+      return true;
+    }
+  }
+
   private setupTabEvents(tabId: string, view: WebContentsView) {
     const wc = view.webContents;
 
@@ -1598,17 +1650,13 @@ export class TabManager {
       }
     });
 
-    // Security: Validate navigation protocol before allowing tabs to navigate
+    // Security & External Protocols: Validate navigation and redirects (including deep links)
     wc.on('will-navigate', (event, url) => {
-      try {
-        const parsed = new URL(url);
-        if (!['http:', 'https:', 'about:', 'view-source:'].includes(parsed.protocol)) {
-          console.warn(`[Security] Blocked unsafe navigation in tab ${tabId} to: ${url}`);
-          event.preventDefault();
-        }
-      } catch {
-        event.preventDefault();
-      }
+      this.handleExternalProtocolNavigation(event, url);
+    });
+
+    wc.on('will-redirect', (event, url) => {
+      this.handleExternalProtocolNavigation(event, url);
     });
 
     wc.on('did-start-loading', () => {
@@ -1761,13 +1809,20 @@ export class TabManager {
       }
     });
 
-    wc.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    wc.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      // Ignore subframe / iframe failures so hidden tracking or captcha widgets don't crash the main page
+      if (!isMainFrame) {
+        return;
+      }
       console.error(`Tab ${tabId} failed to load ${validatedURL}: [${errorCode}] ${errorDescription}`);
       const tab = this.tabs.get(tabId);
       if (tab) {
         tab.info.isLoading = false;
-        // Don't show error page for aborted requests (e.g. user navigated away or redirected)
-        if (errorCode !== -3 && validatedURL && !validatedURL.startsWith('data:') && validatedURL !== 'about:blank') {
+        // Don't show error page for aborted requests (e.g. user navigated away or HTTP redirects) or custom app schemes
+        const isAborted = errorCode === -3; // ERR_ABORTED
+        const isUnknownScheme = errorCode === -302; // ERR_UNKNOWN_URL_SCHEME
+        const isInternalUrl = validatedURL.startsWith('data:') || validatedURL === 'about:blank';
+        if (!isAborted && !isUnknownScheme && validatedURL && !isInternalUrl) {
           const errorHtml = this.generateErrorPage(validatedURL, errorCode, errorDescription);
           wc.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(errorHtml)}`).catch(() => {});
         }
@@ -1813,20 +1868,85 @@ export class TabManager {
       }
     });
 
-    // Intercept window.open or links with target="_blank"
+    // Handle window.open (OAuth popups, SSO login windows, or target="_blank" links)
     wc.setWindowOpenHandler((details) => {
       try {
-        const parsed = new URL(details.url);
-        if (['http:', 'https:', 'about:', 'view-source:'].includes(parsed.protocol)) {
-          const currentTab = this.tabs.get(tabId);
-          this.createTab(details.url, currentTab?.info.isPrivate || false);
+        let isSafeProtocol = false;
+        if (!details.url || details.url === 'about:blank') {
+          isSafeProtocol = true;
         } else {
-          console.warn(`[Security] Blocked popup request to unsafe protocol: ${details.url}`);
+          const parsed = new URL(details.url);
+          isSafeProtocol = ['http:', 'https:', 'about:', 'view-source:'].includes(parsed.protocol);
         }
-      } catch {
-        // Ignore invalid URL
+
+        if (!isSafeProtocol) {
+          console.warn(`[Security] Blocked popup request to unsafe protocol: ${details.url}`);
+          return { action: 'deny' };
+        }
+
+        const currentTab = this.tabs.get(tabId);
+        const isPrivate = currentTab?.info.isPrivate || false;
+        const profileId = currentTab?.info.profileId;
+        const partition = isPrivate
+          ? 'incognito'
+          : (profileId ? `persist:${profileId}` : (this.getActiveProfile().partition || undefined));
+
+        // Detect if this is an OAuth / SSO login popup or auxiliary dialog (features defined with dimensions or specific disposition)
+        const hasFeatures = !!(details.features && details.features.trim().length > 0);
+        const isNewWindow = details.disposition === 'new-window';
+        const hasNonBlankFrame = !!(details.frameName && details.frameName !== '_blank');
+
+        if (hasFeatures || (isNewWindow && hasNonBlankFrame)) {
+          // Allow native child window so window.opener, postMessage, and window.close() work seamlessly for OAuth/SSO
+          return {
+            action: 'allow',
+            overrideBrowserWindowOptions: {
+              parent: this.window,
+              modal: false,
+              autoHideMenuBar: true,
+              backgroundColor: this.settings.theme === 'dark' ? '#121214' : '#ffffff',
+              webPreferences: {
+                partition,
+                nodeIntegration: false,
+                contextIsolation: true,
+                sandbox: true,
+                spellcheck: true,
+              },
+            },
+          };
+        }
+
+        // Standard link opened with target="_blank" -> open as a regular browser tab in the same profile
+        if (details.url && details.url !== 'about:blank') {
+          this.createTab(details.url, isPrivate, profileId);
+        }
+      } catch (err) {
+        console.error('Error handling window open:', err);
       }
       return { action: 'deny' };
+    });
+
+    // Listen for child popup window creation to configure clean User-Agent and external link handlers
+    wc.on('did-create-window', (childWindow) => {
+      try {
+        childWindow.setMenu(null);
+        if (this.cleanUserAgent) {
+          childWindow.webContents.setUserAgent(this.cleanUserAgent);
+        }
+        childWindow.webContents.on('will-navigate', (event, url) => {
+          this.handleExternalProtocolNavigation(event, url);
+        });
+        childWindow.webContents.on('will-redirect', (event, url) => {
+          this.handleExternalProtocolNavigation(event, url);
+        });
+      } catch (err) {
+        console.error('Error configuring child popup window:', err);
+      }
+    });
+
+    // When in-page JavaScript calls window.close() or webContents is destroyed, close the tab
+    wc.on('destroyed', () => {
+      this.closeTab(tabId);
     });
 
     // In-Page Context Menu

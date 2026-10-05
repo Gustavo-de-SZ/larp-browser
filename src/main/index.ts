@@ -31,6 +31,16 @@ let updateManager: UpdateManager | null = null;
 const isDev = process.env.NODE_ENV === 'development';
 
 function setupSecurityDefaults() {
+  // Sanitize User-Agent by stripping Electron and application tokens to ensure Google OAuth,
+  // Microsoft SSO, Discord, and third-party login flows recognize an authentic modern Chrome browser.
+  const defaultUa = session.defaultSession.getUserAgent();
+  const cleanUa = defaultUa
+    .replace(/Electron\/\S+\s?/, '')
+    .replace(/larp-browser\/\S+\s?/, '')
+    .trim();
+  app.userAgentFallback = cleanUa;
+  session.defaultSession.setUserAgent(cleanUa);
+
   // Security: Block high-risk peripheral device access and OS-level execution
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
     const dangerousPermissions = [
