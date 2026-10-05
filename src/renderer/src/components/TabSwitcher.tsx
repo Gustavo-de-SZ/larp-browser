@@ -26,7 +26,7 @@ interface TabSwitcherProps {
 
 export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
   const [filterQuery, setFilterQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'audio' | 'sleeping' | 'private'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'pinned' | 'audio' | 'sleeping' | 'private'>('all');
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -56,12 +56,15 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
           .map((id) => state.tabs.find((t) => t.id === id))
           .filter((t): t is TabInfo => Boolean(t));
 
+  const pinnedCount = baseTabs.filter((t) => t.isPinned).length;
   const audioCount = baseTabs.filter((t) => t.audioPlaying || t.isMuted).length;
   const sleepingCount = baseTabs.filter((t) => t.isHibernated).length;
   const privateCount = baseTabs.filter((t) => t.isPrivate).length;
 
   let tabsToDisplay = baseTabs;
-  if (categoryFilter === 'audio') {
+  if (categoryFilter === 'pinned') {
+    tabsToDisplay = tabsToDisplay.filter((t) => t.isPinned);
+  } else if (categoryFilter === 'audio') {
     tabsToDisplay = tabsToDisplay.filter((t) => t.audioPlaying || t.isMuted);
   } else if (categoryFilter === 'sleeping') {
     tabsToDisplay = tabsToDisplay.filter((t) => t.isHibernated);
@@ -418,6 +421,20 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
               >
                 All ({baseTabs.length})
               </button>
+              {pinnedCount > 0 && (
+                <button
+                  onClick={() => setCategoryFilter(categoryFilter === 'pinned' ? 'all' : 'pinned')}
+                  className={`flex items-center space-x-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all cursor-pointer ${
+                    categoryFilter === 'pinned'
+                      ? 'bg-amber-500 text-black font-semibold shadow-xs'
+                      : 'text-amber-500 hover:bg-amber-500/10'
+                  }`}
+                  title="Filter pinned tabs"
+                >
+                  <Pin className="w-3 h-3 fill-amber-500" />
+                  <span>Pinned ({pinnedCount})</span>
+                </button>
+              )}
               {audioCount > 0 && (
                 <button
                   onClick={() => setCategoryFilter(categoryFilter === 'audio' ? 'all' : 'audio')}
@@ -604,6 +621,20 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                       {formatLastAccessed(tab.lastAccessed)}
                     </span>
                     <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.browserApi.togglePinTab(tab.id);
+                      }}
+                      className={`p-1 rounded transition-colors cursor-pointer ${
+                        tab.isPinned
+                          ? 'text-amber-500 bg-amber-500/15 border border-amber-500/25 hover:bg-amber-500/25'
+                          : 'text-[var(--text-muted)] hover:text-amber-500 hover:bg-black/5 dark:hover:bg-white/5 opacity-0 group-hover:opacity-100'
+                      }`}
+                      title={tab.isPinned ? 'Unpin Tab (Alt+P)' : 'Pin Tab to Sidebar (Alt+P)'}
+                    >
+                      <Pin className={`w-3.5 h-3.5 ${tab.isPinned ? 'fill-amber-500 text-amber-500' : ''}`} />
+                    </button>
+                    <button
                       onClick={(e) => handleCloseTab(e, tab.id)}
                       className="p-1 rounded text-[var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
                       title="Close Tab (W or Middle Click)"
@@ -724,6 +755,20 @@ export const TabSwitcher: React.FC<TabSwitcherProps> = ({ state, theme }) => {
                           )}
                         </button>
                       )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.browserApi.togglePinTab(tab.id);
+                        }}
+                        className={`p-1 rounded transition-colors cursor-pointer ${
+                          tab.isPinned
+                            ? 'text-amber-500 bg-amber-500/15 border border-amber-500/25 hover:bg-amber-500/25'
+                            : 'text-[var(--text-muted)] hover:text-amber-500 hover:bg-black/5 dark:hover:bg-white/5 opacity-0 group-hover:opacity-100'
+                        }`}
+                        title={tab.isPinned ? 'Unpin Tab (Alt+P)' : 'Pin Tab to Sidebar (Alt+P)'}
+                      >
+                        <Pin className={`w-3 h-3 ${tab.isPinned ? 'fill-amber-500 text-amber-500' : ''}`} />
+                      </button>
                       <button
                         onClick={(e) => handleCloseTab(e, tab.id)}
                         className="p-1 rounded transition-colors text-[var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10"

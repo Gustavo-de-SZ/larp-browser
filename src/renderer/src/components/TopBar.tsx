@@ -27,6 +27,7 @@ import {
   CheckCircle2,
   FolderOpen,
   User,
+  Pin,
 } from 'lucide-react';
 import type { BrowserState, HistoryItem, UpdateCheckResult, DownloadItemInfo } from '@/shared/types';
 import type { ThemeMode } from '../App';
@@ -454,6 +455,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   const bookmarkKey = state.settings?.customShortcuts?.toggleBookmark || 'Ctrl+D';
   const favoritesKey = state.settings?.customShortcuts?.openFavorites || 'Ctrl+B';
   const privateKey = state.settings?.customShortcuts?.newPrivateTab || 'Ctrl+Shift+N';
+  const pinKey = state.settings?.customShortcuts?.togglePinTab || 'Alt+P';
 
   const zoomPercent = activeTab?.zoomFactor ? Math.round(activeTab.zoomFactor * 100) : 100;
 
@@ -584,7 +586,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               autoCorrect="off"
               autoCapitalize="off"
               placeholder={activeTab?.isPrivate ? "Search privately or enter address..." : "Search or enter web address..."}
-              className={`w-full h-7 pl-8 ${activeTab?.isPrivate ? 'pr-36' : 'pr-24'} rounded-md text-xs transition-all border focus:outline-none`}
+              className={`w-full h-7 pl-8 ${activeTab?.isPrivate ? 'pr-44' : 'pr-32'} rounded-md text-xs transition-all border focus:outline-none`}
               style={{
                 backgroundColor: 'var(--bg-input)',
                 borderColor: activeTab?.isPrivate
@@ -597,7 +599,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               }}
             />
 
-            {/* Right badges in Omnibar (Audio, Zoom, Star, Private, Shortcut) */}
+            {/* Right badges in Omnibar (Audio, Zoom, Pin, Star, Private, Shortcut) */}
             <div className="absolute right-2 flex items-center space-x-1">
               {/* Private Mode Badge */}
               {activeTab?.isPrivate && (
@@ -633,6 +635,22 @@ export const TopBar: React.FC<TopBarProps> = ({
                   ) : (
                     <Volume2 className="w-3 h-3" />
                   )}
+                </button>
+              )}
+
+              {/* Pin Tab Button */}
+              {activeTab && (
+                <button
+                  type="button"
+                  onClick={() => window.browserApi.togglePinTab(activeTab.id)}
+                  className={`p-1 rounded transition-colors cursor-pointer ${
+                    activeTab.isPinned
+                      ? 'text-amber-500 hover:text-amber-400'
+                      : 'text-[var(--text-muted)] hover:text-amber-500'
+                  }`}
+                  title={activeTab.isPinned ? `Unpin Tab (${pinKey})` : `Pin Tab to Sidebar (${pinKey})`}
+                >
+                  <Pin className={`w-3.5 h-3.5 ${activeTab.isPinned ? 'fill-amber-500' : ''}`} />
                 </button>
               )}
 
