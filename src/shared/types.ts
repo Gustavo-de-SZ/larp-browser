@@ -18,6 +18,7 @@ export interface TabInfo {
   profileId?: string;
   isCrashed?: boolean;
   crashedReason?: string;
+  forceDarkActive?: boolean;
 }
 
 export interface BookmarkItem {
@@ -158,6 +159,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
 ];
 
 export interface BrowserSettings {
+  settingsVersion?: number;
   theme: 'dark' | 'light';
   darkPaletteId: string;
   lightPaletteId: string;
@@ -248,6 +250,7 @@ export interface IpcRendererApi {
   goForward: (tabId: string) => Promise<void>;
   reloadTab: (tabId: string) => Promise<void>;
   toggleMuteTab: (tabId: string) => Promise<void>;
+  toggleTabDarkMode: (tabId?: string) => Promise<void>;
   hibernateTab: (tabId: string) => Promise<void>;
   wakeTab: (tabId: string) => Promise<void>;
   reopenClosedTab: () => Promise<string | null>;

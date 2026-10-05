@@ -50,6 +50,10 @@ export function registerIpcHandlers(
     tabManager.toggleMuteTab(tabId);
   });
 
+  ipcMain.handle('browser:toggle-tab-dark-mode', async (_event, tabId?: string) => {
+    await tabManager.toggleTabForceDark(tabId);
+  });
+
   ipcMain.handle('browser:hibernate-tab', async (_event, tabId: string) => {
     await tabManager.hibernateTab(tabId);
   });

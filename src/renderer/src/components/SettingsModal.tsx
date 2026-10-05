@@ -409,10 +409,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   if (!isOpen) return null;
 
   const safeSettings = settings || {
+    settingsVersion: 2,
     theme: 'dark',
     darkPaletteId: 'graphite',
     lightPaletteId: 'paper',
-    forcePageDarkMode: true,
+    forcePageDarkMode: false,
     defaultSearchEngine: 'google',
     autoHibernateTabs: true,
     showBookmarksBar: false,
@@ -1231,10 +1232,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 >
                   <div className="space-y-0.5 mr-3 select-none">
                     <div className="text-xs font-medium text-[var(--text-main)]">
-                      Smart Inverted Web Page Dark Theme
+                      Force Dark Theme on Web Pages (Experimental)
                     </div>
                     <div className="text-[11px] text-[var(--text-muted)]">
-                      Automatically darkens light-themed web pages when Larp is set to Dark Mode.
+                      Applies a smart high-contrast dark filter to websites that only support light mode. Keep off to preserve natural website styling and native dark themes.
                     </div>
                   </div>
                   <div className="relative inline-flex items-center flex-shrink-0 pointer-events-none">

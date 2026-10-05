@@ -45,10 +45,11 @@ export const App: React.FC = () => {
     mruTabIds: [],
     bookmarks: [],
     settings: {
+      settingsVersion: 2,
       theme: 'dark',
       darkPaletteId: 'graphite',
       lightPaletteId: 'paper',
-      forcePageDarkMode: true,
+      forcePageDarkMode: false,
       defaultSearchEngine: 'google',
       autoHibernateTabs: true,
       idleHibernateMinutes: 30,

@@ -59,10 +59,11 @@ export function getSearchUrl(engine: string, query: string): string {
 }
 
 const DEFAULT_SETTINGS: BrowserSettings = {
+  settingsVersion: 2,
   theme: 'dark',
   darkPaletteId: 'graphite',
   lightPaletteId: 'paper',
-  forcePageDarkMode: true,
+  forcePageDarkMode: false,
   defaultSearchEngine: 'google',
   autoHibernateTabs: true,
   idleHibernateMinutes: 30,
@@ -86,13 +87,19 @@ const DEFAULT_SETTINGS: BrowserSettings = {
 };
 
 const SMART_DARK_CSS = `
-  :root {
-    color-scheme: dark !important;
+  /* High-contrast smart dark mode filter for websites without native dark mode */
+  html:not([data-theme="dark"]):not([data-color-mode="dark"]):not(.dark):not([dark]) {
+    filter: invert(90%) hue-rotate(180deg) !important;
+    background-color: #ffffff !important;
   }
-  @media (prefers-color-scheme: dark) {
-    html:not([data-theme="dark"]) {
-      background-color: #121214 !important;
-    }
+  html:not([data-theme="dark"]):not([data-color-mode="dark"]):not(.dark):not([dark]) img,
+  html:not([data-theme="dark"]):not([data-color-mode="dark"]):not(.dark):not([dark]) video,
+  html:not([data-theme="dark"]):not([data-color-mode="dark"]):not(.dark):not([dark]) canvas,
+  html:not([data-theme="dark"]):not([data-color-mode="dark"]):not(.dark):not([dark]) svg:not([role="img"]),
+  html:not([data-theme="dark"]):not([data-color-mode="dark"]):not(.dark):not([dark]) picture,
+  html:not([data-theme="dark"]):not([data-color-mode="dark"]):not(.dark):not([dark]) iframe,
+  html:not([data-theme="dark"]):not([data-color-mode="dark"]):not(.dark):not([dark]) [style*="background-image"] {
+    filter: invert(100%) hue-rotate(180deg) !important;
   }
 `;
 
@@ -184,6 +191,11 @@ export class TabManager {
         const raw = fs.readFileSync(this.settingsPath, 'utf8');
         const parsed = JSON.parse(raw);
         this.settings = { ...DEFAULT_SETTINGS, ...parsed };
+        // Migrate legacy settings where forcePageDarkMode defaulted to true
+        if (parsed.settingsVersion === undefined || parsed.settingsVersion < 2) {
+          this.settings.forcePageDarkMode = false;
+          this.settings.settingsVersion = 2;
+        }
       }
     } catch {
       this.settings = { ...DEFAULT_SETTINGS };
@@ -1343,8 +1355,12 @@ export class TabManager {
     const tab = this.tabs.get(tabId);
     if (!tab || !tab.view || tab.view.webContents.isDestroyed()) return;
 
+    const isForceDark = tab.info.forceDarkActive !== undefined
+      ? tab.info.forceDarkActive
+      : (this.settings.theme === 'dark' && this.settings.forcePageDarkMode);
+
     try {
-      const themeBg = this.settings.theme === 'dark' ? '#121214' : '#fafafa';
+      const themeBg = isForceDark ? '#121214' : '#ffffff';
       tab.view.setBackgroundColor(themeBg);
     } catch {
       // Ignore
@@ -1357,7 +1373,7 @@ export class TabManager {
         tab.cssKey = undefined;
       }
 
-      if (this.settings.theme === 'dark' && this.settings.forcePageDarkMode) {
+      if (isForceDark) {
         tab.cssKey = await tab.view.webContents.insertCSS(SMART_DARK_CSS);
       }
     } catch (err) {
@@ -1393,7 +1409,10 @@ export class TabManager {
     });
 
     try {
-      const themeBg = this.settings.theme === 'dark' ? '#121214' : '#fafafa';
+      const isForceDark = tab.info.forceDarkActive !== undefined
+        ? tab.info.forceDarkActive
+        : (this.settings.theme === 'dark' && this.settings.forcePageDarkMode);
+      const themeBg = isForceDark ? '#121214' : '#ffffff';
       view.setBackgroundColor(themeBg);
     } catch {
       // Ignore
@@ -1484,7 +1503,8 @@ export class TabManager {
     }
 
     try {
-      const themeBg = this.settings.theme === 'dark' ? '#121214' : '#fafafa';
+      const isForceDark = this.settings.theme === 'dark' && this.settings.forcePageDarkMode;
+      const themeBg = isForceDark ? '#121214' : '#ffffff';
       view.setBackgroundColor(themeBg);
     } catch {
       // Ignore
@@ -2298,6 +2318,16 @@ export class TabManager {
             click: () => this.createTab('view-source:' + tab.info.url, tab.info.isPrivate),
           })
         );
+
+        const isForceDarkActive = tab.info.forceDarkActive !== undefined
+          ? tab.info.forceDarkActive
+          : (this.settings.theme === 'dark' && this.settings.forcePageDarkMode);
+        menu.append(
+          new MenuItem({
+            label: isForceDarkActive ? 'Disable Dark Mode on This Tab' : 'Force Dark Mode on This Tab',
+            click: () => this.toggleTabForceDark(tabId),
+          })
+        );
       }
       menu.append(new MenuItem({ type: 'separator' }));
     }
@@ -2765,6 +2795,21 @@ export class TabManager {
       tab.info.isMuted = isMuted;
       this.notifyStateChange();
     }
+  }
+
+  public async toggleTabForceDark(targetTabId?: string): Promise<void> {
+    const tabId = targetTabId || this.activeTabId;
+    if (!tabId) return;
+    const tab = this.tabs.get(tabId);
+    if (!tab) return;
+
+    const currentActive = tab.info.forceDarkActive !== undefined
+      ? tab.info.forceDarkActive
+      : (this.settings.theme === 'dark' && this.settings.forcePageDarkMode);
+
+    tab.info.forceDarkActive = !currentActive;
+    await this.applyThemeToTab(tabId);
+    this.notifyStateChange();
   }
 
   // --- Alt-Tab / Ctrl-Tab Switcher HUD Controls ---
