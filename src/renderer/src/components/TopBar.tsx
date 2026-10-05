@@ -502,13 +502,19 @@ export const TopBar: React.FC<TopBarProps> = ({
           {/* Reload Button */}
           <button
             onClick={() => activeTab && window.browserApi.reloadTab(activeTab.id)}
+            onAuxClick={(e) => {
+              if (e.button === 1 && activeTab?.url && activeTab.url !== 'about:blank') {
+                e.preventDefault();
+                window.browserApi.createTab(activeTab.url, activeTab.isPrivate, true);
+              }
+            }}
             className={`p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer ${
               activeTab?.isLoading ? 'animate-spin' : ''
             }`}
             style={{
               color: activeTab?.isLoading ? 'var(--accent-primary)' : undefined,
             }}
-            title="Reload (Ctrl+R)"
+            title="Reload (Ctrl+R, Middle-click to duplicate in background)"
           >
             <RotateCw className="w-3.5 h-3.5" />
           </button>
@@ -857,8 +863,14 @@ export const TopBar: React.FC<TopBarProps> = ({
           {/* New Tab Button */}
           <button
             onClick={() => window.browserApi.createTab()}
+            onAuxClick={(e) => {
+              if (e.button === 1) {
+                e.preventDefault();
+                window.browserApi.createTab(undefined, false, true);
+              }
+            }}
             className="p-1.5 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
-            title="New Tab (Ctrl+T)"
+            title="New Tab (Ctrl+T, Middle-click for background tab)"
           >
             <Plus className="w-3.5 h-3.5" />
           </button>

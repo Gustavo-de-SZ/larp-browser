@@ -18,8 +18,8 @@ export function registerIpcHandlers(
     return process.env.APP_VERSION || app.getVersion();
   });
 
-  ipcMain.handle('browser:create-tab', (_event, url?: string, isPrivate?: boolean) => {
-    return tabManager.createTab(url, isPrivate);
+  ipcMain.handle('browser:create-tab', (_event, url?: string, isPrivate?: boolean, inBackground?: boolean) => {
+    return tabManager.createTab(url, isPrivate, undefined, inBackground);
   });
 
   ipcMain.handle('browser:close-tab', (_event, tabId: string) => {

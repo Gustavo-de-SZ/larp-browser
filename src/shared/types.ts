@@ -242,7 +242,7 @@ export interface IpcRendererApi {
   getAppVersion: () => Promise<string>;
 
   // Tab Operations
-  createTab: (url?: string, isPrivate?: boolean) => Promise<string>;
+  createTab: (url?: string, isPrivate?: boolean, inBackground?: boolean) => Promise<string>;
   closeTab: (tabId: string) => Promise<void>;
   switchTab: (tabId: string) => Promise<void>;
   navigateTab: (tabId: string, url: string) => Promise<void>;

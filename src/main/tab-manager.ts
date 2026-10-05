@@ -1460,7 +1460,12 @@ export class TabManager {
     return view;
   }
 
-  public async createTab(initialUrl?: string, isPrivate = false, profileId?: string): Promise<string> {
+  public async createTab(
+    initialUrl?: string,
+    isPrivate = false,
+    profileId?: string,
+    inBackground = false
+  ): Promise<string> {
     let effectiveUrl = initialUrl;
     if (!effectiveUrl && !isPrivate) {
       const mode =
@@ -1545,20 +1550,31 @@ export class TabManager {
       });
     }
 
-    // Switch to the newly created tab
-    await this.switchTab(id);
-    this.saveSession();
+    if (inBackground && this.activeTabId) {
+      // Background tab: keep current active tab focused, insert new tab next in MRU
+      const activeIdx = this.mruTabIds.indexOf(this.activeTabId);
+      if (activeIdx >= 0) {
+        this.mruTabIds = this.mruTabIds.filter((t) => t !== id);
+        this.mruTabIds.splice(activeIdx + 1, 0, id);
+      }
+      this.saveSession();
+      this.notifyStateChange();
+    } else {
+      // Switch to the newly created tab
+      await this.switchTab(id);
+      this.saveSession();
 
-    if (effectiveUrl === 'about:blank') {
-      setTimeout(() => {
-        try {
-          this.window.focus();
-          this.window.webContents.focus();
-          this.window.webContents.send('browser:focus-omnibar');
-        } catch {
-          // Ignore
-        }
-      }, 50);
+      if (effectiveUrl === 'about:blank') {
+        setTimeout(() => {
+          try {
+            this.window.focus();
+            this.window.webContents.focus();
+            this.window.webContents.send('browser:focus-omnibar');
+          } catch {
+            // Ignore
+          }
+        }, 50);
+      }
     }
 
     return id;
@@ -1936,9 +1952,10 @@ export class TabManager {
           };
         }
 
-        // Standard link opened with target="_blank" -> open as a regular browser tab in the same profile
+        // Standard link opened with target="_blank", middle-click, or Ctrl+click -> open as a regular browser tab
         if (details.url && details.url !== 'about:blank') {
-          this.createTab(details.url, isPrivate, profileId);
+          const isBackground = details.disposition === 'background-tab';
+          this.createTab(details.url, isPrivate, profileId, isBackground);
         }
       } catch (err) {
         console.error('Error handling window open:', err);
@@ -2135,13 +2152,19 @@ export class TabManager {
       menu.append(
         new MenuItem({
           label: 'Open Link in New Tab',
-          click: () => this.createTab(params.linkURL, false),
+          click: () => this.createTab(params.linkURL, false, undefined, false),
+        })
+      );
+      menu.append(
+        new MenuItem({
+          label: 'Open Link in Background Tab',
+          click: () => this.createTab(params.linkURL, false, undefined, true),
         })
       );
       menu.append(
         new MenuItem({
           label: 'Open Link in New Private Tab',
-          click: () => this.createTab(params.linkURL, true),
+          click: () => this.createTab(params.linkURL, true, undefined, false),
         })
       );
       menu.append(new MenuItem({ type: 'separator' }));
@@ -2160,7 +2183,13 @@ export class TabManager {
         menu.append(
           new MenuItem({
             label: 'Open Image in New Tab',
-            click: () => this.createTab(params.srcURL, false),
+            click: () => this.createTab(params.srcURL, false, undefined, false),
+          })
+        );
+        menu.append(
+          new MenuItem({
+            label: 'Open Image in Background Tab',
+            click: () => this.createTab(params.srcURL, false, undefined, true),
           })
         );
         menu.append(
