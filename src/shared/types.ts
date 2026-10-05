@@ -243,6 +243,17 @@ export interface SitePermissionRequest {
   mediaTypes?: ('video' | 'audio')[];
 }
 
+export interface SiteSecurityInfo {
+  url: string;
+  origin: string;
+  protocol: string;
+  isSecure: boolean;
+  certificateIssuer?: string;
+  certificateSubject?: string;
+  validTo?: number;
+  permissions: Record<string, SitePermissionDecision>;
+}
+
 export interface IpcRendererApi {
   // State observation
   onStateUpdate: (callback: (state: BrowserState) => void) => () => void;
@@ -355,11 +366,13 @@ export interface IpcRendererApi {
   downloadUpdateAsset: (url: string) => Promise<void>;
   onUpdateAvailable: (callback: (info: UpdateCheckResult) => void) => () => void;
 
-  // Site Permissions
+  // Site Permissions & Security
   respondPermissionRequest: (id: string, decision: 'allow' | 'deny' | 'dismiss', remember?: boolean) => Promise<void>;
   getSitePermissions: () => Promise<Record<string, Record<string, SitePermissionDecision>>>;
   setSitePermission: (origin: string, permission: string, decision: 'allow' | 'deny' | 'ask') => Promise<void>;
   clearSitePermissions: (origin?: string) => Promise<void>;
+  getSiteSecurityInfo: (tabId?: string) => Promise<SiteSecurityInfo | null>;
+  clearOriginData: (origin: string) => Promise<boolean>;
 }
 
 declare global {

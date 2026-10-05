@@ -53,6 +53,8 @@ interface TopBarProps {
   isDownloadsOpen?: boolean;
   onToggleProfile?: () => void;
   isProfileOpen?: boolean;
+  onToggleSecurity?: () => void;
+  isSecurityOpen?: boolean;
   onShowToast?: (toast: { type: ToastType; message: string }) => void;
   onOmnibarDropdownChange?: (isOpen: boolean) => void;
 }
@@ -69,6 +71,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   isDownloadsOpen = false,
   onToggleProfile,
   isProfileOpen = false,
+  onToggleSecurity,
+  isSecurityOpen = false,
   onShowToast,
   onOmnibarDropdownChange,
 }) => {
@@ -526,7 +530,28 @@ export const TopBar: React.FC<TopBarProps> = ({
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           <form onSubmit={handleSubmit} className="relative flex items-center">
-            <div className="absolute left-2.5 flex items-center pointer-events-none">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (activeTab?.url && activeTab.url !== 'about:blank') {
+                  onToggleSecurity?.();
+                }
+              }}
+              title={
+                activeTab?.isPrivate
+                  ? "Private Tab Security"
+                  : activeTab?.url.startsWith('https://')
+                  ? "Connection is secure (Click for permissions & cookies)"
+                  : "Site Information"
+              }
+              className={`absolute left-1.5 flex items-center justify-center p-1 rounded-md transition-colors z-10 ${
+                activeTab?.url && activeTab.url !== 'about:blank'
+                  ? 'hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer'
+                  : 'pointer-events-none'
+              }`}
+            >
               {activeTab?.isPrivate ? (
                 <VenetianMask className="w-3.5 h-3.5 text-purple-400" />
               ) : activeTab?.url.startsWith('https://') ? (
@@ -534,7 +559,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               ) : (
                 <Search className="w-3 h-3 text-[var(--text-muted)]" />
               )}
-            </div>
+            </button>
 
             <input
               ref={inputRef}

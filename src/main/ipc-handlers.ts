@@ -339,4 +339,12 @@ export function registerIpcHandlers(
   ipcMain.handle('browser:clear-site-permissions', (_event, origin?: string) => {
     tabManager.getPermissionManager().clearPermissions(origin);
   });
+
+  ipcMain.handle('browser:get-site-security-info', (_event, tabId?: string) => {
+    return tabManager.getSiteSecurityInfo(tabId);
+  });
+
+  ipcMain.handle('browser:clear-origin-data', (_event, origin: string) => {
+    return tabManager.clearOriginData(origin);
+  });
 }

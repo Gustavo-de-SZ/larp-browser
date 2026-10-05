@@ -10,6 +10,7 @@ import { DownloadsPopover } from './components/DownloadsPopover';
 import { ProfilePopover } from './components/ProfilePopover';
 import { FindInPageBar } from './components/FindInPageBar';
 import { PermissionPrompt } from './components/PermissionPrompt';
+import { SiteSecurityPopover } from './components/SiteSecurityPopover';
 import { ToastContainer, type ToastItem } from './components/Toast';
 import { getPalette, applyPalette } from './theme/palettes';
 import type { BrowserState, BrowserSettings, SitePermissionRequest } from '@/shared/types';
@@ -26,6 +27,7 @@ export const App: React.FC = () => {
   const [isDownloadsOpen, setIsDownloadsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isFindOpen, setIsFindOpen] = useState(false);
+  const [isSecurityOpen, setIsSecurityOpen] = useState(false);
   const [isHtmlFullscreen, setIsHtmlFullscreen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTabType>('appearance');
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -333,11 +335,20 @@ export const App: React.FC = () => {
       isFavoritesOpen ||
       isOmnibarOpen ||
       isDownloadsOpen ||
-      isProfileOpen;
+      isProfileOpen ||
+      isSecurityOpen;
     if (window.browserApi?.setModalOpen) {
       window.browserApi.setModalOpen(isAnyModalOpen);
     }
-  }, [isSettingsOpen, isShortcutsOpen, isFavoritesOpen, isOmnibarOpen, isDownloadsOpen, isProfileOpen]);
+  }, [
+    isSettingsOpen,
+    isShortcutsOpen,
+    isFavoritesOpen,
+    isOmnibarOpen,
+    isDownloadsOpen,
+    isProfileOpen,
+    isSecurityOpen,
+  ]);
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
   const isNewTab = !activeTab || !activeTab.url || activeTab.url === 'about:blank' || !activeTab.hasLoadedPage;
@@ -370,6 +381,8 @@ export const App: React.FC = () => {
             isDownloadsOpen={isDownloadsOpen}
             onToggleProfile={() => setIsProfileOpen((prev) => !prev)}
             isProfileOpen={isProfileOpen}
+            onToggleSecurity={() => setIsSecurityOpen((prev) => !prev)}
+            isSecurityOpen={isSecurityOpen}
             onShowToast={showToast}
             onOmnibarDropdownChange={setIsOmnibarOpen}
           />
@@ -452,6 +465,15 @@ export const App: React.FC = () => {
           setIsProfileOpen(false);
           setIsSettingsOpen(true);
         }}
+        onShowToast={showToast}
+      />
+
+      {/* Site Security & Permissions Popover */}
+      <SiteSecurityPopover
+        isOpen={isSecurityOpen}
+        onClose={() => setIsSecurityOpen(false)}
+        activeTab={activeTab || null}
+        theme={theme}
         onShowToast={showToast}
       />
 

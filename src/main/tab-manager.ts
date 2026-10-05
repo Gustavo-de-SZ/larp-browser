@@ -25,6 +25,7 @@ import type {
   ClearBrowsingDataOptions,
   WeatherData,
   UserProfile,
+  SiteSecurityInfo,
 } from '../shared/types';
 import { parseBangQuery } from '../shared/bangs';
 import type { DownloadManager } from './download-manager';
@@ -455,6 +456,62 @@ export class TabManager {
       }
     } catch (err) {
       console.error('Failed to clear browsing data:', err);
+    }
+  }
+
+  public async getSiteSecurityInfo(tabId?: string): Promise<SiteSecurityInfo | null> {
+    const targetId = tabId || this.activeTabId;
+    if (!targetId || !this.tabs.has(targetId)) return null;
+
+    const tab = this.tabs.get(targetId)!;
+    const url = tab.info.url;
+    if (!url || url === 'about:blank') return null;
+
+    let origin = '';
+    let protocol = '';
+    try {
+      const parsed = new URL(url);
+      origin = parsed.origin;
+      protocol = parsed.protocol;
+    } catch {
+      return null;
+    }
+
+    const isSecure = protocol === 'https:';
+    const permissions = this.permissionManager.getOriginPermissions(origin);
+
+    return {
+      url,
+      origin,
+      protocol,
+      isSecure,
+      permissions,
+    };
+  }
+
+  public async clearOriginData(origin: string): Promise<boolean> {
+    try {
+      const { session } = await import('electron');
+      const sessionsToClear = new Set<Electron.Session>();
+      sessionsToClear.add(session.defaultSession);
+
+      if (this.activeTabId && this.tabs.has(this.activeTabId)) {
+        const tab = this.tabs.get(this.activeTabId)!;
+        if (tab.view && !tab.view.webContents.isDestroyed()) {
+          sessionsToClear.add(tab.view.webContents.session);
+        }
+      }
+
+      for (const sess of sessionsToClear) {
+        await sess.clearStorageData({
+          origin,
+          storages: ['cookies', 'localstorage', 'websql', 'indexdb', 'cachestorage'],
+        });
+      }
+      return true;
+    } catch (err) {
+      console.error('[TabManager] Failed to clear origin data for', origin, err);
+      return false;
     }
   }
 

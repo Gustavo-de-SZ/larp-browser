@@ -239,6 +239,10 @@ const api: IpcRendererApi = {
     ipcRenderer.invoke('browser:set-site-permission', origin, permission, decision),
   clearSitePermissions: (origin?: string) =>
     ipcRenderer.invoke('browser:clear-site-permissions', origin),
+  getSiteSecurityInfo: (tabId?: string) =>
+    ipcRenderer.invoke('browser:get-site-security-info', tabId),
+  clearOriginData: (origin: string) =>
+    ipcRenderer.invoke('browser:clear-origin-data', origin),
 };
 
 contextBridge.exposeInMainWorld('browserApi', api);
