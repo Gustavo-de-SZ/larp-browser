@@ -88,6 +88,7 @@ const DEFAULT_SETTINGS: BrowserSettings = {
   newTabShowQuickLinks: true,
   preserveMediaTimestamps: true,
   protectActiveMediaTabs: true,
+  domainZoomLevels: {},
 };
 
 const SMART_DARK_CSS = `
@@ -1531,11 +1532,23 @@ export class TabManager {
     // Setup webContents event listeners
     this.setupTabEvents(tabId, view);
 
-    // Re-apply zoom factor if customized
-    if (tab.info.zoomFactor && tab.info.zoomFactor !== 1.0) {
+    // Re-apply zoom factor if customized or remembered for domain
+    let effectiveZoom = tab.info.zoomFactor || 1.0;
+    if (tab.info.url && tab.info.url !== 'about:blank') {
+      try {
+        const host = new URL(tab.info.url).hostname;
+        if (this.settings.domainZoomLevels?.[host]) {
+          effectiveZoom = this.settings.domainZoomLevels[host];
+          tab.info.zoomFactor = effectiveZoom;
+        }
+      } catch {
+        // Ignore
+      }
+    }
+    if (effectiveZoom !== 1.0) {
       try {
         if (view.webContents && !view.webContents.isDestroyed()) {
-          view.webContents.setZoomFactor(tab.info.zoomFactor);
+          view.webContents.setZoomFactor(effectiveZoom);
         }
       } catch {
         // Ignore
@@ -1638,6 +1651,24 @@ export class TabManager {
       isPrivate,
       profileId: effectiveProfileId,
     };
+
+    if (effectiveUrl && effectiveUrl !== 'about:blank') {
+      try {
+        const host = new URL(effectiveUrl).hostname;
+        if (this.settings.domainZoomLevels?.[host]) {
+          info.zoomFactor = this.settings.domainZoomLevels[host];
+          if (view.webContents) {
+            try {
+              view.webContents.setZoomFactor(info.zoomFactor);
+            } catch {
+              // Ignore
+            }
+          }
+        }
+      } catch {
+        // Ignore
+      }
+    }
 
     this.tabs.set(id, { info, view });
     this.mruTabIds.unshift(id);
@@ -1839,6 +1870,16 @@ export class TabManager {
         tab.info.canGoForward = wc.navigationHistory ? wc.navigationHistory.canGoForward() : wc.canGoForward();
         if (url && url !== 'about:blank') {
           tab.info.hasLoadedPage = true;
+          try {
+            const host = new URL(url).hostname;
+            const domainZoom = this.settings.domainZoomLevels?.[host];
+            if (domainZoom && domainZoom !== tab.info.zoomFactor) {
+              tab.info.zoomFactor = domainZoom;
+              wc.setZoomFactor(domainZoom);
+            }
+          } catch {
+            // Ignore
+          }
           if (tabId === this.activeTabId && !this.isSwitcherOpen && !this.isModalOpen) {
             this.attachActiveTabView();
           }
@@ -1945,7 +1986,26 @@ export class TabManager {
       const tab = this.tabs.get(tabId);
       if (tab && !wc.isDestroyed()) {
         try {
-          tab.info.zoomFactor = Math.round(wc.getZoomFactor() * 100) / 100;
+          const factor = Math.round(wc.getZoomFactor() * 100) / 100;
+          tab.info.zoomFactor = factor;
+          if (tab.info.url && tab.info.url !== 'about:blank') {
+            try {
+              const host = new URL(tab.info.url).hostname;
+              if (host) {
+                if (!this.settings.domainZoomLevels) {
+                  this.settings.domainZoomLevels = {};
+                }
+                if (factor === 1.0) {
+                  delete this.settings.domainZoomLevels[host];
+                } else {
+                  this.settings.domainZoomLevels[host] = factor;
+                }
+                this.saveSettings();
+              }
+            } catch {
+              // Ignore
+            }
+          }
           this.notifyStateChange();
         } catch {
           // Ignore
@@ -3119,6 +3179,26 @@ export class TabManager {
     } catch {
       // Ignore
     }
+
+    if (tab.info.url && tab.info.url !== 'about:blank') {
+      try {
+        const host = new URL(tab.info.url).hostname;
+        if (host) {
+          if (!this.settings.domainZoomLevels) {
+            this.settings.domainZoomLevels = {};
+          }
+          if (clamped === 1.0) {
+            delete this.settings.domainZoomLevels[host];
+          } else {
+            this.settings.domainZoomLevels[host] = clamped;
+          }
+          this.saveSettings();
+        }
+      } catch {
+        // Ignore
+      }
+    }
+
     this.notifyStateChange();
     return clamped;
   }

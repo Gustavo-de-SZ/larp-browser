@@ -194,6 +194,7 @@ export interface BrowserSettings {
   downloadsPath?: string;
   askDownloadLocation?: boolean;
   autoCheckUpdates?: boolean;
+  domainZoomLevels?: Record<string, number>;
 }
 
 export interface UpdateAssetInfo {

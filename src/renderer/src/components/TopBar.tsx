@@ -453,6 +453,12 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   const zoomPercent = activeTab?.zoomFactor ? Math.round(activeTab.zoomFactor * 100) : 100;
 
+  const backgroundAudioTabs = state.tabs.filter(
+    (t) => t.id !== state.activeTabId && (t.audioPlaying || t.isMuted)
+  );
+  const playingBackgroundTab = backgroundAudioTabs.find((t) => t.audioPlaying);
+  const mutedBackgroundTab = backgroundAudioTabs.find((t) => t.isMuted);
+
   return (
     <div className="flex flex-col w-full select-none z-40">
       {/* Primary Top Bar (44px) */}
@@ -873,6 +879,32 @@ export const TopBar: React.FC<TopBarProps> = ({
             <span className="text-[11px] font-medium">
               {state.tabs.length} {state.tabs.length === 1 ? 'tab' : 'tabs'}
             </span>
+
+            {/* Background Tab Audio Indicator */}
+            {playingBackgroundTab ? (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.browserApi.toggleMuteTab(playingBackgroundTab.id);
+                }}
+                className="flex items-center space-x-0.5 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/25 px-1 py-0.5 rounded-full text-[10px] font-medium border border-emerald-500/30 transition-all cursor-pointer animate-pulse"
+                title={`Audio playing in "${playingBackgroundTab.title || 'tab'}" (Click to mute)`}
+              >
+                <Volume2 className="w-3 h-3" />
+              </span>
+            ) : mutedBackgroundTab ? (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.browserApi.toggleMuteTab(mutedBackgroundTab.id);
+                }}
+                className="flex items-center space-x-0.5 text-rose-400 bg-rose-500/10 hover:bg-rose-500/25 px-1 py-0.5 rounded-full text-[10px] font-medium border border-rose-500/30 transition-all cursor-pointer"
+                title={`Muted audio in "${mutedBackgroundTab.title || 'tab'}" (Click to unmute)`}
+              >
+                <VolumeX className="w-3 h-3" />
+              </span>
+            ) : null}
+
             <span
               className="text-[9px] font-mono px-1 py-0.2 rounded border"
               style={{
