@@ -40,6 +40,7 @@ import {
 
 import type { ToastType } from './Toast';
 import { formatBytes } from './DownloadsPopover';
+import { InlineVolumeBooster } from './InlineVolumeBooster';
 
 interface TopBarProps {
   state: BrowserState;
@@ -887,59 +888,67 @@ export const TopBar: React.FC<TopBarProps> = ({
             ) : null}
           </button>
 
-          {/* Volume Booster Button */}
-          <button
-            onClick={onToggleVolumeBooster}
-            onAuxClick={(e) => {
-              if (e.button === 1 && activeTab) {
-                e.preventDefault();
-                window.browserApi.toggleMuteTab(activeTab.id);
-              }
-            }}
-            onContextMenu={(e) => {
-              if (activeTab) {
-                e.preventDefault();
-                window.browserApi.toggleMuteTab(activeTab.id);
-              }
-            }}
-            className={`p-1.5 rounded-md transition-colors cursor-pointer relative ${
-              isVolumeBoosterOpen
-                ? 'text-[var(--accent-primary)] bg-black/10 dark:bg-white/10'
-                : activeTab?.isMuted
-                ? 'text-rose-400 bg-rose-500/15 border border-rose-500/30'
-                : (activeTab?.volumeBoost ?? 100) > 100
-                ? 'text-amber-400 bg-amber-500/15 border border-amber-500/30'
-                : activeTab?.audioPlaying
-                ? 'text-emerald-400 bg-emerald-500/10'
-                : 'text-[var(--text-muted)] hover:text-[var(--accent-primary)] hover:bg-black/5 dark:hover:bg-white/5'
-            }`}
-            title={`Volume Booster (${activeTab?.volumeBoost ?? 100}%)${
-              activeTab?.isMuted ? ' — Muted' : activeTab?.audioPlaying ? ' — Audio Playing' : ''
-            } (Click to open, Right/Middle-click to mute)`}
-          >
-            {activeTab?.isMuted || (activeTab?.volumeBoost ?? 100) === 0 ? (
-              <VolumeX className="w-3.5 h-3.5 text-rose-400" />
-            ) : (activeTab?.volumeBoost ?? 100) > 100 ? (
-              <Volume2 className="w-3.5 h-3.5 text-amber-400" />
-            ) : (
-              <Volume2 className="w-3.5 h-3.5" />
-            )}
+          {/* Volume Booster Controller */}
+          {isVolumeBoosterOpen && activeTab ? (
+            <InlineVolumeBooster
+              isOpen={isVolumeBoosterOpen}
+              onClose={onToggleVolumeBooster}
+              activeTab={activeTab}
+              domainVolumeBoost={state.settings?.domainVolumeBoost}
+              onShowToast={onShowToast}
+            />
+          ) : (
+            <button
+              onClick={onToggleVolumeBooster}
+              onAuxClick={(e) => {
+                if (e.button === 1 && activeTab) {
+                  e.preventDefault();
+                  window.browserApi.toggleMuteTab(activeTab.id);
+                }
+              }}
+              onContextMenu={(e) => {
+                if (activeTab) {
+                  e.preventDefault();
+                  window.browserApi.toggleMuteTab(activeTab.id);
+                }
+              }}
+              className={`p-1.5 rounded-md transition-colors cursor-pointer relative ${
+                activeTab?.isMuted
+                  ? 'text-rose-400 bg-rose-500/15 border border-rose-500/30'
+                  : (activeTab?.volumeBoost ?? 100) > 100
+                  ? 'text-amber-400 bg-amber-500/15 border border-amber-500/30'
+                  : activeTab?.audioPlaying
+                  ? 'text-emerald-400 bg-emerald-500/10'
+                  : 'text-[var(--text-muted)] hover:text-[var(--accent-primary)] hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
+              title={`Volume Booster (${activeTab?.volumeBoost ?? 100}%)${
+                activeTab?.isMuted ? ' — Muted' : activeTab?.audioPlaying ? ' — Audio Playing' : ''
+              } (Click to open, Right/Middle-click to mute)`}
+            >
+              {activeTab?.isMuted || (activeTab?.volumeBoost ?? 100) === 0 ? (
+                <VolumeX className="w-3.5 h-3.5 text-rose-400" />
+              ) : (activeTab?.volumeBoost ?? 100) > 100 ? (
+                <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+              ) : (
+                <Volume2 className="w-3.5 h-3.5" />
+              )}
 
-            {/* Badge showing current volume boost if not 100% */}
-            {(activeTab?.volumeBoost ?? 100) !== 100 && (
-              <span
-                className={`absolute -top-1.5 -right-2 px-1 py-0.2 rounded-full text-[8.5px] font-mono font-bold leading-tight border ${
-                  (activeTab?.volumeBoost ?? 100) > 300
-                    ? 'bg-rose-500 text-white border-rose-400'
-                    : (activeTab?.volumeBoost ?? 100) > 100
-                    ? 'bg-amber-500 text-black border-amber-400 font-extrabold'
-                    : 'bg-zinc-600 text-zinc-200 border-zinc-500'
-                }`}
-              >
-                {activeTab?.volumeBoost}%
-              </span>
-            )}
-          </button>
+              {/* Badge showing current volume boost if not 100% */}
+              {(activeTab?.volumeBoost ?? 100) !== 100 && (
+                <span
+                  className={`absolute -top-1.5 -right-2 px-1 py-0.2 rounded-full text-[8.5px] font-mono font-bold leading-tight border ${
+                    (activeTab?.volumeBoost ?? 100) > 300
+                      ? 'bg-rose-500 text-white border-rose-400'
+                      : (activeTab?.volumeBoost ?? 100) > 100
+                      ? 'bg-amber-500 text-black border-amber-400 font-extrabold'
+                      : 'bg-zinc-600 text-zinc-200 border-zinc-500'
+                  }`}
+                >
+                  {activeTab?.volumeBoost}%
+                </span>
+              )}
+            </button>
+          )}
 
           {/* Tab Switcher Trigger Button */}
           <button
