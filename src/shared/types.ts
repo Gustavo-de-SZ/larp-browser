@@ -199,6 +199,7 @@ export interface BrowserSettings {
   autoCheckUpdates?: boolean;
   domainZoomLevels?: Record<string, number>;
   domainVolumeBoost?: Record<string, number>;
+  enableSearchSuggestions?: boolean;
 }
 
 export interface UpdateAssetInfo {
@@ -383,6 +384,9 @@ export interface IpcRendererApi {
   // System & OS Integration
   isDefaultBrowser: () => Promise<boolean>;
   setAsDefaultBrowser: () => Promise<boolean>;
+
+  // Search Suggestions
+  getSearchSuggestions: (query: string, engine?: string) => Promise<string[]>;
 }
 
 declare global {

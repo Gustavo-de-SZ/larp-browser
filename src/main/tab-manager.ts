@@ -94,6 +94,7 @@ const DEFAULT_SETTINGS: BrowserSettings = {
   protectActiveMediaTabs: true,
   domainZoomLevels: {},
   domainVolumeBoost: {},
+  enableSearchSuggestions: true,
 };
 
 const SMART_DARK_CSS = `
@@ -1548,6 +1549,80 @@ export class TabManager {
     } catch (err) {
       console.error('[TabManager] Error setting default browser:', err);
       return false;
+    }
+  }
+
+  // In-memory cache for search suggestions: key -> { timestamp, suggestions }
+  private searchSuggestionsCache = new Map<string, { timestamp: number; suggestions: string[] }>();
+
+  public async getSearchSuggestions(rawQuery: string, engineOverride?: string): Promise<string[]> {
+    const q = rawQuery.trim();
+    if (!q || q.length < 2) return [];
+
+    // Check settings: if search suggestions are explicitly disabled, return empty
+    if (this.settings.enableSearchSuggestions === false) {
+      return [];
+    }
+
+    const engine = engineOverride || this.settings.defaultSearchEngine || 'google';
+    const cacheKey = `${engine}:${q.toLowerCase()}`;
+    const now = Date.now();
+
+    // 1. Check cache (valid for 60 seconds)
+    const cached = this.searchSuggestionsCache.get(cacheKey);
+    if (cached && now - cached.timestamp < 60_000) {
+      return cached.suggestions;
+    }
+
+    let url = '';
+    switch (engine) {
+      case 'duckduckgo':
+        url = `https://duckduckgo.com/ac/?q=${encodeURIComponent(q)}&type=list`;
+        break;
+      case 'brave':
+        url = `https://search.brave.com/api/suggest?q=${encodeURIComponent(q)}`;
+        break;
+      case 'bing':
+        url = `https://api.bing.com/osjson.aspx?query=${encodeURIComponent(q)}`;
+        break;
+      case 'google':
+      default:
+        url = `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(q)}`;
+        break;
+    }
+
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+          'Accept': 'application/json, text/javascript, */*',
+        },
+        signal: AbortSignal.timeout(1500),
+      });
+
+      if (!response.ok) return [];
+
+      const data = await response.json();
+      let suggestions: string[] = [];
+
+      // OpenSearch standard format: [query, [sugg1, sugg2, ...]]
+      if (Array.isArray(data) && Array.isArray(data[1])) {
+        suggestions = (data[1] as any[])
+          .filter((item: any) => typeof item === 'string' && item.trim().length > 0)
+          .slice(0, 6);
+      }
+
+      // Cache up to 100 entries
+      if (this.searchSuggestionsCache.size > 100) {
+        const oldestKey = this.searchSuggestionsCache.keys().next().value;
+        if (oldestKey) this.searchSuggestionsCache.delete(oldestKey);
+      }
+      this.searchSuggestionsCache.set(cacheKey, { timestamp: now, suggestions });
+
+      return suggestions;
+    } catch {
+      // Offline or network timeout - fail gracefully without errors
+      return [];
     }
   }
 

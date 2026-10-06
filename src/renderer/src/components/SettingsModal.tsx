@@ -3317,6 +3317,43 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     );
                   })}
                 </div>
+
+                {/* Search Suggestions Preference Toggle */}
+                <div className="pt-3 border-t border-[var(--border-subtle)] space-y-2.5">
+                  <div>
+                    <h4 className="text-xs font-semibold text-[var(--text-main)]">Live Search Suggestions</h4>
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      Control whether query predictions are queried as you type in the address bar and dashboard.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !(safeSettings.enableSearchSuggestions !== false);
+                      onUpdateSettings({ enableSearchSuggestions: next });
+                    }}
+                    className={`w-full p-3 rounded-xl border flex items-center justify-between transition-all text-left cursor-pointer ${
+                      safeSettings.enableSearchSuggestions !== false
+                        ? 'border-[var(--border-selected)] bg-[var(--bg-card-selected)] ring-1 ring-[var(--accent-primary)]/20 shadow-xs'
+                        : 'border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--accent-primary)]/40 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                    }`}
+                  >
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-medium text-[var(--text-main)]">
+                        Show search suggestions as you type
+                      </div>
+                      <div className="text-[10px] text-[var(--text-muted)]">
+                        Automatically fetch relevant search completions from your default search engine
+                      </div>
+                    </div>
+                    {safeSettings.enableSearchSuggestions !== false ? (
+                      <Check className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-primary)' }} />
+                    ) : (
+                      <div className="w-4 h-4 rounded-md border border-[var(--border-subtle)] shrink-0" />
+                    )}
+                  </button>
+                </div>
               </div>
             )}
 

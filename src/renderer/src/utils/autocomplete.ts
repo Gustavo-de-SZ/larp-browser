@@ -470,3 +470,83 @@ export function computeInlineAutocomplete(
 
   return null;
 }
+
+/**
+ * Checks whether the input string looks like a direct URL or domain rather than a general search.
+ */
+export function isLikelyUrl(input: string): boolean {
+  const trimmed = input.trim();
+  if (/^https?:\/\//i.test(trimmed)) return true;
+  if (/^localhost(:\d+)?/i.test(trimmed)) return true;
+  if (trimmed.startsWith('%') || trimmed.startsWith('@tabs')) return true;
+  if (trimmed.includes(' ') || !trimmed.includes('.')) return false;
+
+  const dotParts = trimmed.split('/');
+  const domainPart = dotParts[0];
+  return domainPart.includes('.') && !domainPart.endsWith('.');
+}
+
+/**
+ * Formats live search query completions into UrlSuggestion items.
+ */
+export function formatSearchSuggestions(
+  query: string,
+  rawSuggestions: string[]
+): UrlSuggestion[] {
+  const qLower = query.trim().toLowerCase();
+  const results: UrlSuggestion[] = [];
+
+  for (let i = 0; i < rawSuggestions.length; i++) {
+    const term = rawSuggestions[i].trim();
+    if (!term || term.toLowerCase() === qLower) continue;
+
+    results.push({
+      id: `suggest-${i}-${term}`,
+      type: 'search',
+      title: term,
+      url: term,
+      displayUrl: term,
+      cleanDomain: '',
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Merges live search query suggestions into an existing UrlSuggestions list.
+ * Preserves 'top-hit', open tabs, and the primary 'Search <Engine> for <query>' fallback.
+ */
+export function mergeSearchSuggestions(
+  currentList: UrlSuggestion[],
+  searchSuggestions: UrlSuggestion[]
+): UrlSuggestion[] {
+  if (searchSuggestions.length === 0) return currentList;
+
+  const topHit = currentList.find((item) => item.type === 'top-hit');
+  const searchFallback = currentList.find(
+    (item) => item.id === 'search-fallback' || item.id === 'search-bang'
+  );
+  const otherItems = currentList.filter(
+    (item) =>
+      item.type !== 'top-hit' &&
+      item.id !== 'search-fallback' &&
+      item.id !== 'search-bang' &&
+      !item.id.startsWith('suggest-')
+  );
+
+  const results: UrlSuggestion[] = [];
+
+  if (topHit) {
+    results.push(topHit);
+    if (searchFallback) results.push(searchFallback);
+    results.push(...searchSuggestions.slice(0, 3));
+    results.push(...otherItems.slice(0, 3));
+  } else {
+    if (searchFallback) results.push(searchFallback);
+    results.push(...searchSuggestions.slice(0, 5));
+    results.push(...otherItems.slice(0, 3));
+  }
+
+  return results;
+}

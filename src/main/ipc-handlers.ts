@@ -238,6 +238,11 @@ export function registerIpcHandlers(
     return tabManager.setAsDefaultBrowser();
   });
 
+  // Search suggestions handler
+  ipcMain.handle('browser:get-search-suggestions', (_event, query: string, engine?: string) => {
+    return tabManager.getSearchSuggestions(query, engine);
+  });
+
   // Switcher HUD handlers
   ipcMain.handle('browser:open-switcher', () => {
     return tabManager.openSwitcher();

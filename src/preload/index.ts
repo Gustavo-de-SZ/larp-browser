@@ -249,6 +249,10 @@ const api: IpcRendererApi = {
   // System & OS Integration
   isDefaultBrowser: () => ipcRenderer.invoke('browser:is-default-browser'),
   setAsDefaultBrowser: () => ipcRenderer.invoke('browser:set-as-default-browser'),
+
+  // Search Suggestions
+  getSearchSuggestions: (query: string, engine?: string) =>
+    ipcRenderer.invoke('browser:get-search-suggestions', query, engine),
 };
 
 contextBridge.exposeInMainWorld('browserApi', api);

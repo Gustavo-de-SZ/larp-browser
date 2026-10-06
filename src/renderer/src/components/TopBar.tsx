@@ -35,6 +35,9 @@ import {
   computeUrlSuggestions,
   computeInlineAutocomplete,
   cleanUrlForMatching,
+  isLikelyUrl,
+  formatSearchSuggestions,
+  mergeSearchSuggestions,
   type UrlSuggestion,
 } from '../utils/autocomplete';
 
@@ -106,6 +109,16 @@ export const TopBar: React.FC<TopBarProps> = ({
   const skipNextAutocompleteRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchSuggestTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchSuggestSeqRef = useRef<number>(0);
+
+  useEffect(() => {
+    return () => {
+      if (searchSuggestTimeoutRef.current) {
+        clearTimeout(searchSuggestTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Check for app updates
   useEffect(() => {
@@ -259,6 +272,10 @@ export const TopBar: React.FC<TopBarProps> = ({
   };
 
   const handleBlur = (e: React.FocusEvent) => {
+    if (searchSuggestTimeoutRef.current) {
+      clearTimeout(searchSuggestTimeoutRef.current);
+      searchSuggestTimeoutRef.current = null;
+    }
     if (dropdownRef.current && dropdownRef.current.contains(e.relatedTarget as Node)) {
       return;
     }
@@ -272,6 +289,11 @@ export const TopBar: React.FC<TopBarProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawVal = e.target.value;
     setUrlInput(rawVal);
+
+    if (searchSuggestTimeoutRef.current) {
+      clearTimeout(searchSuggestTimeoutRef.current);
+      searchSuggestTimeoutRef.current = null;
+    }
 
     const computed = computeUrlSuggestions(
       rawVal,
@@ -306,6 +328,34 @@ export const TopBar: React.FC<TopBarProps> = ({
     }
 
     setSelectedIndex(-1);
+
+    // Debounce live search suggestions for general searches (when not a URL or top-hit)
+    const trimmed = rawVal.trim();
+    const shouldFetchSuggestions =
+      trimmed.length >= 2 &&
+      !isLikelyUrl(trimmed) &&
+      (!computed[0] || computed[0].type !== 'top-hit') &&
+      state.settings?.enableSearchSuggestions !== false;
+
+    if (shouldFetchSuggestions) {
+      const seq = ++searchSuggestSeqRef.current;
+      searchSuggestTimeoutRef.current = setTimeout(async () => {
+        if (window.browserApi?.getSearchSuggestions) {
+          try {
+            const rawSuggs = await window.browserApi.getSearchSuggestions(
+              trimmed,
+              state.settings?.defaultSearchEngine || 'google'
+            );
+            if (seq === searchSuggestSeqRef.current) {
+              const formatted = formatSearchSuggestions(trimmed, rawSuggs);
+              if (formatted.length > 0) {
+                setSuggestions((prev) => mergeSearchSuggestions(prev, formatted));
+              }
+            }
+          } catch {}
+        }
+      }, 150);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
