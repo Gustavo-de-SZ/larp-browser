@@ -41,7 +41,21 @@ async function build() {
       define,
     });
 
-    console.log('Main and preload build complete!');
+    // 3. Build Guest Tab Preload Process
+    await esbuild.build({
+      entryPoints: ['src/preload/guest.ts'],
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+      target: 'node20',
+      outfile: 'dist/preload/guest.cjs',
+      external: ['electron'],
+      sourcemap: isDev,
+      minify: !isDev,
+      define,
+    });
+
+    console.log('Main, UI preload, and guest preload build complete!');
   } catch (err) {
     console.error('Build failed:', err);
     process.exit(1);

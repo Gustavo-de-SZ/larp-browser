@@ -122,6 +122,10 @@ export class TabManager {
         scrollX?: number;
         scrollY?: number;
       };
+      lastOpenedPopup?: {
+        url: string;
+        timestamp: number;
+      };
     }
   > = new Map();
   private activeTabId: string | null = null;
@@ -1509,6 +1513,7 @@ export class TabManager {
         sandbox: true,
         spellcheck: true,
         partition,
+        preload: path.join(__dirname, '../preload/guest.cjs'),
       },
     });
 
@@ -1623,6 +1628,7 @@ export class TabManager {
         sandbox: true,
         spellcheck: true,
         partition,
+        preload: path.join(__dirname, '../preload/guest.cjs'),
       },
     });
 
@@ -1828,6 +1834,36 @@ export class TabManager {
     }
   }
 
+  /**
+   * Detects if an incoming navigation is a duplicate fallback redirect
+   * triggered by a webpage when native window.open was denied by Electron.
+   */
+  private isMatchingPopupFallback(
+    tab: { lastOpenedPopup?: { url: string; timestamp: number } } | undefined,
+    navUrl: string
+  ): boolean {
+    if (!tab?.lastOpenedPopup) return false;
+    const { url: popupUrl, timestamp } = tab.lastOpenedPopup;
+    // Fallback redirects occur immediately or within ~2-3 seconds
+    if (Date.now() - timestamp > 3000) return false;
+    if (!popupUrl || !navUrl) return false;
+
+    if (popupUrl === navUrl) return true;
+
+    try {
+      const u1 = new URL(navUrl);
+      const u2 = new URL(popupUrl);
+      if (u1.origin === u2.origin && u1.pathname === u2.pathname) {
+        if (!u1.search || !u2.search || u1.search === u2.search) return true;
+        return true;
+      }
+    } catch {
+      if (navUrl.startsWith(popupUrl) || popupUrl.startsWith(navUrl)) return true;
+    }
+
+    return false;
+  }
+
   private setupTabEvents(tabId: string, view: WebContentsView) {
     const wc = view.webContents;
 
@@ -1844,6 +1880,15 @@ export class TabManager {
 
     // Security & External Protocols: Validate navigation and redirects (including deep links)
     wc.on('will-navigate', (event, url) => {
+      const tab = this.tabs.get(tabId);
+      if (tab && this.isMatchingPopupFallback(tab, url)) {
+        console.warn(`[Navigation] Prevented duplicate popup fallback navigation in tab ${tabId} to: ${url}`);
+        event.preventDefault();
+        tab.lastOpenedPopup = undefined;
+        tab.info.isLoading = false;
+        this.notifyStateChange();
+        return;
+      }
       this.handleExternalProtocolNavigation(event, url);
     });
 
@@ -1863,6 +1908,9 @@ export class TabManager {
       if (isMainFrame) {
         const tab = this.tabs.get(tabId);
         if (tab) {
+          if (this.isMatchingPopupFallback(tab, url)) {
+            return;
+          }
           tab.info.url = url;
           if (url === 'about:blank') {
             tab.info.hasLoadedPage = false;
@@ -2161,6 +2209,12 @@ export class TabManager {
 
         // Standard link opened with target="_blank", middle-click, or Ctrl+click -> open as a regular browser tab
         if (details.url && details.url !== 'about:blank') {
+          if (currentTab) {
+            currentTab.lastOpenedPopup = {
+              url: details.url,
+              timestamp: Date.now(),
+            };
+          }
           const isBackground = details.disposition === 'background-tab';
           this.createTab(details.url, isPrivate, profileId, isBackground);
         }
