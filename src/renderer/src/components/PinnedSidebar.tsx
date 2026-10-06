@@ -41,6 +41,8 @@ export const PinnedSidebar: React.FC<PinnedSidebarProps> = ({
 
   const closeMenu = () => setContextMenu(null);
 
+  const isCurrentTabPinned = pinnedTabs.some((t) => t.id === activeTabId);
+
   return (
     <>
       {/* Sidebar Rail */}
@@ -121,16 +123,28 @@ export const PinnedSidebar: React.FC<PinnedSidebarProps> = ({
           })}
         </div>
 
-        {/* Quick Pin / Add Button */}
+        {/* Quick Pin / Unpin Button */}
         {onTogglePinActiveTab && (
           <div className="pt-2 border-t border-[var(--border-subtle)] w-full flex justify-center">
             <button
               type="button"
               onClick={onTogglePinActiveTab}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-              title="Pin Current Tab (Alt+P)"
+              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+                isCurrentTabPinned
+                  ? 'text-amber-500 hover:text-amber-400 hover:bg-amber-500/10 dark:hover:bg-amber-500/15'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
+              title={
+                isCurrentTabPinned
+                  ? 'Unpin Current Tab (Alt+P)'
+                  : 'Pin Current Tab to Sidebar (Alt+P)'
+              }
             >
-              <Pin className="w-3.5 h-3.5" />
+              {isCurrentTabPinned ? (
+                <PinOff className="w-3.5 h-3.5" />
+              ) : (
+                <Pin className="w-3.5 h-3.5" />
+              )}
             </button>
           </div>
         )}
