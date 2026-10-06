@@ -117,6 +117,54 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.5.8'
   );
 
+  // Default browser state
+  const [isDefaultBrowser, setIsDefaultBrowser] = useState<boolean | null>(null);
+  const [isSettingDefaultBrowser, setIsSettingDefaultBrowser] = useState(false);
+
+  useEffect(() => {
+    if (window.browserApi?.isDefaultBrowser) {
+      window.browserApi.isDefaultBrowser().then((isDef) => {
+        setIsDefaultBrowser(isDef);
+      }).catch(() => {});
+    }
+  }, [activeTab]);
+
+  const handleSetDefaultBrowser = async () => {
+    if (isSettingDefaultBrowser || !window.browserApi?.setAsDefaultBrowser) return;
+    setIsSettingDefaultBrowser(true);
+    try {
+      const success = await window.browserApi.setAsDefaultBrowser();
+      if (success) {
+        setIsDefaultBrowser(true);
+        onShowToast?.({
+          type: 'success',
+          message: 'Larp Browser is now your default web browser!',
+        });
+      } else {
+        const check = await window.browserApi.isDefaultBrowser?.();
+        setIsDefaultBrowser(!!check);
+        if (check) {
+          onShowToast?.({
+            type: 'success',
+            message: 'Larp Browser is set as your default browser.',
+          });
+        } else {
+          onShowToast?.({
+            type: 'warning',
+            message: 'Could not set as default browser automatically. Please verify your system settings.',
+          });
+        }
+      }
+    } catch {
+      onShowToast?.({
+        type: 'danger',
+        message: 'Failed to configure default browser associations.',
+      });
+    } finally {
+      setIsSettingDefaultBrowser(false);
+    }
+  };
+
   useEffect(() => {
     if (window.browserApi?.getAppVersion) {
       window.browserApi.getAppVersion().then((v) => {
@@ -919,7 +967,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               }`}
             >
               <Power className="w-4 h-4 text-[var(--text-muted)]" />
-              <span>On Startup</span>
+              <span>Startup & Default</span>
             </button>
 
             <button
@@ -1015,7 +1063,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {activeTab === 'profiles' && 'Profiles & Accounts'}
               {activeTab === 'shortcuts' && 'Keyboard Shortcuts'}
               {activeTab === 'bookmarks' && 'Bookmarks & Favorites'}
-              {activeTab === 'startup' && 'Startup Behavior & Default Page'}
+              {activeTab === 'startup' && 'Startup & Default Browser'}
               {activeTab === 'history' && 'Browsing History & Clear Data'}
               {activeTab === 'downloads' && 'Downloads & Storage'}
               {activeTab === 'passwords' && 'Password Vault'}
@@ -2329,6 +2377,76 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <Check className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-primary)' }} />
                       )}
                     </button>
+                  </div>
+                </div>
+
+                {/* Section C: Default Web Browser */}
+                <div className="space-y-2.5 pt-4 border-t border-[var(--border-subtle)]">
+                  <div>
+                    <h4 className="text-xs font-semibold text-[var(--text-main)]">Default Web Browser</h4>
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      Make Larp Browser your default system browser to open links from other apps and email clients.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] flex items-center justify-between gap-4">
+                    <div className="flex items-center space-x-3 min-w-0">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                        isDefaultBrowser
+                          ? 'bg-emerald-500/10 text-emerald-500 dark:bg-emerald-400/15 dark:text-emerald-400'
+                          : 'bg-black/5 dark:bg-white/5 text-[var(--text-muted)]'
+                      }`}>
+                        {isDefaultBrowser ? (
+                          <CheckCircle2 className="w-4 h-4" />
+                        ) : (
+                          <Globe className="w-4 h-4" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-[var(--text-main)] flex items-center gap-1.5">
+                          <span>{isDefaultBrowser ? 'Larp Browser is your default browser' : 'Larp Browser is not your default browser'}</span>
+                          {isDefaultBrowser && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-normal bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-[var(--text-muted)] truncate">
+                          {isDefaultBrowser
+                            ? 'All web links (HTTP & HTTPS) and HTML documents will open in Larp Browser.'
+                            : 'Set Larp Browser as the default system handler for web links and HTML documents.'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0">
+                      {isDefaultBrowser ? (
+                        <div className="flex items-center space-x-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 px-3 py-1.5 bg-emerald-500/10 rounded-lg">
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Default</span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleSetDefaultBrowser}
+                          disabled={isSettingDefaultBrowser}
+                          className="px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all shadow-xs flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                          style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--text-on-accent)' }}
+                        >
+                          {isSettingDefaultBrowser ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>Setting...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Set as Default</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

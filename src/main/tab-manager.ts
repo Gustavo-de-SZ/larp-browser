@@ -14,6 +14,10 @@ import {
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execFilePromise = promisify(execFile);
 import type {
   BrowserState,
   BrowserSettings,
@@ -1457,6 +1461,94 @@ export class TabManager {
 
     this.notifyStateChange();
     return { ...this.settings };
+  }
+
+  public async isDefaultBrowser(): Promise<boolean> {
+    try {
+      const isClient = app.isDefaultProtocolClient('http') || app.isDefaultProtocolClient('https');
+      if (isClient) return true;
+
+      if (process.platform === 'linux') {
+        // 1. Try xdg-settings get default-web-browser
+        try {
+          const { stdout } = await execFilePromise('xdg-settings', ['get', 'default-web-browser']);
+          if (stdout && stdout.toLowerCase().includes('larp')) {
+            return true;
+          }
+        } catch {}
+
+        // 2. Try xdg-mime query default x-scheme-handler/http
+        try {
+          const { stdout } = await execFilePromise('xdg-mime', ['query', 'default', 'x-scheme-handler/http']);
+          if (stdout && stdout.toLowerCase().includes('larp')) {
+            return true;
+          }
+        } catch {}
+      }
+      return false;
+    } catch (err) {
+      console.warn('[TabManager] Error checking default browser:', err);
+      return false;
+    }
+  }
+
+  public async setAsDefaultBrowser(): Promise<boolean> {
+    try {
+      let electronSuccess = false;
+      try {
+        const httpRes = app.setAsDefaultProtocolClient('http');
+        const httpsRes = app.setAsDefaultProtocolClient('https');
+        electronSuccess = httpRes && httpsRes;
+      } catch (e) {
+        console.warn('[TabManager] app.setAsDefaultProtocolClient failed:', e);
+      }
+
+      if (process.platform === 'linux') {
+        const desktopFile = 'larp-browser.desktop';
+        const userAppDir = path.join(app.getPath('home'), '.local', 'share', 'applications');
+        const userDesktopFile = path.join(userAppDir, desktopFile);
+        const sysDesktopFile = '/usr/share/applications/larp-browser.desktop';
+
+        // If no desktop file exists anywhere (e.g. portable / dev run), generate one in user dir
+        if (!fs.existsSync(sysDesktopFile) && !fs.existsSync(userDesktopFile)) {
+          try {
+            fs.mkdirSync(userAppDir, { recursive: true });
+            const execPath = process.env.APPIMAGE || process.execPath;
+            const desktopContent = `[Desktop Entry]\nName=Larp Browser\nExec="${execPath}" --in-process-gpu %U\nTerminal=false\nType=Application\nIcon=larp-browser\nStartupWMClass=larp-browser\nComment=Larp Browser - Modern desktop browser\nCategories=Network;WebBrowser;\nMimeType=text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;\n`;
+            fs.writeFileSync(userDesktopFile, desktopContent, 'utf-8');
+          } catch (e) {
+            console.warn('[TabManager] Could not write fallback desktop entry:', e);
+          }
+        }
+
+        // Attempt xdg-settings set default-web-browser
+        try {
+          await execFilePromise('xdg-settings', ['set', 'default-web-browser', desktopFile]);
+        } catch (err) {
+          console.warn('[TabManager] xdg-settings set failed:', err);
+        }
+
+        // Attempt xdg-mime default associations
+        try {
+          await execFilePromise('xdg-mime', [
+            'default',
+            desktopFile,
+            'x-scheme-handler/http',
+            'x-scheme-handler/https',
+            'text/html',
+            'application/xhtml+xml',
+          ]);
+        } catch (err) {
+          console.warn('[TabManager] xdg-mime default failed:', err);
+        }
+      }
+
+      const verified = await this.isDefaultBrowser();
+      return verified || electronSuccess;
+    } catch (err) {
+      console.error('[TabManager] Error setting default browser:', err);
+      return false;
+    }
   }
 
   private async applyThemeToTab(tabId: string) {

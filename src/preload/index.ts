@@ -245,6 +245,10 @@ const api: IpcRendererApi = {
     ipcRenderer.invoke('browser:get-site-security-info', tabId),
   clearOriginData: (origin: string) =>
     ipcRenderer.invoke('browser:clear-origin-data', origin),
+
+  // System & OS Integration
+  isDefaultBrowser: () => ipcRenderer.invoke('browser:is-default-browser'),
+  setAsDefaultBrowser: () => ipcRenderer.invoke('browser:set-as-default-browser'),
 };
 
 contextBridge.exposeInMainWorld('browserApi', api);

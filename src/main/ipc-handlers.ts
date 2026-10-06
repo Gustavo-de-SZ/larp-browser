@@ -229,6 +229,15 @@ export function registerIpcHandlers(
     return tabManager.getWeather();
   });
 
+  // Default browser handlers
+  ipcMain.handle('browser:is-default-browser', () => {
+    return tabManager.isDefaultBrowser();
+  });
+
+  ipcMain.handle('browser:set-as-default-browser', () => {
+    return tabManager.setAsDefaultBrowser();
+  });
+
   // Switcher HUD handlers
   ipcMain.handle('browser:open-switcher', () => {
     return tabManager.openSwitcher();

@@ -1,6 +1,6 @@
 {
   "name": "larp-browser",
-  "version": "1.7.7",
+  "version": "1.7.8",
   "type": "module",
   "main": "dist/main/index.cjs",
   "scripts": {
@@ -57,6 +57,20 @@
   "build": {
     "appId": "com.larp.browser",
     "productName": "Larp Browser",
+    "protocols": [
+      {
+        "name": "HTTP",
+        "schemes": [
+          "http"
+        ]
+      },
+      {
+        "name": "HTTPS",
+        "schemes": [
+          "https"
+        ]
+      }
+    ],
     "directories": {
       "output": "release"
     },
@@ -78,7 +92,9 @@
       "syncDesktopName": true,
       "desktop": {
         "entry": {
-          "StartupWMClass": "larp-browser"
+          "StartupWMClass": "larp-browser",
+          "MimeType": "text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;",
+          "Categories": "Network;WebBrowser;"
         }
       }
     },

@@ -379,6 +379,10 @@ export interface IpcRendererApi {
   clearSitePermissions: (origin?: string) => Promise<void>;
   getSiteSecurityInfo: (tabId?: string) => Promise<SiteSecurityInfo | null>;
   clearOriginData: (origin: string) => Promise<boolean>;
+
+  // System & OS Integration
+  isDefaultBrowser: () => Promise<boolean>;
+  setAsDefaultBrowser: () => Promise<boolean>;
 }
 
 declare global {
