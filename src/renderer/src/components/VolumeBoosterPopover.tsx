@@ -90,6 +90,11 @@ export const VolumeBoosterPopover: React.FC<VolumeBoosterPopoverProps> = ({
   const handleBoostChange = (newVal: number, persistDomain = rememberDomain) => {
     const clamped = Math.max(0, Math.min(600, Math.round(newVal)));
     setBoost(clamped);
+    if (clamped > 0 && activeTab.isMuted && window.browserApi?.toggleMuteTab) {
+      window.browserApi.toggleMuteTab(activeTab.id);
+    } else if (clamped === 0 && !activeTab.isMuted && window.browserApi?.toggleMuteTab) {
+      window.browserApi.toggleMuteTab(activeTab.id);
+    }
     if (window.browserApi?.setTabVolumeBoost) {
       window.browserApi.setTabVolumeBoost(activeTab.id, clamped, persistDomain);
     }
@@ -138,54 +143,73 @@ export const VolumeBoosterPopover: React.FC<VolumeBoosterPopoverProps> = ({
   };
 
   return (
-    <div
-      ref={popoverRef}
-      className="fixed top-12 right-24 z-50 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border shadow-2xl overflow-hidden animate-scale-up select-none flex flex-col"
-      style={{
-        backgroundColor: 'var(--bg-app)',
-        borderColor: 'var(--border-subtle)',
-        color: 'var(--text-main)',
-      }}
-    >
-      {/* Header */}
+    <>
+      {/* Backdrop */}
       <div
-        className="px-4 py-3 border-b flex items-center justify-between"
-        style={{ borderColor: 'var(--border-subtle)' }}
+        className="fixed inset-0 z-40 bg-black/15 backdrop-blur-[1px]"
+        onClick={onClose}
+      />
+
+      <div
+        ref={popoverRef}
+        className="fixed top-12 right-12 md:right-28 z-50 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border shadow-2xl overflow-hidden animate-scale-up select-none flex flex-col backdrop-blur-md"
+        style={{
+          backgroundColor: 'var(--bg-app)',
+          borderColor: 'var(--border-subtle)',
+          color: 'var(--text-main)',
+        }}
       >
-        <div className="flex items-center space-x-2">
-          {boost === 0 ? (
-            <VolumeX className="w-4 h-4 text-zinc-400" />
-          ) : boost > 200 ? (
-            <Volume2 className="w-4 h-4 text-amber-400 animate-pulse" />
-          ) : (
-            <Volume1 className="w-4 h-4 text-[var(--accent-primary)]" />
-          )}
-          <span className="text-xs font-semibold tracking-tight">Volume Booster</span>
-
-          {activeTab.audioPlaying ? (
-            <span className="flex items-center space-x-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-              <span>Playing</span>
-            </span>
-          ) : activeTab.isMuted ? (
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-rose-500/15 text-rose-400 border border-rose-500/30">
-              Muted
-            </span>
-          ) : (
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] text-[var(--text-muted)] bg-black/5 dark:bg-white/5">
-              Ready
-            </span>
-          )}
-        </div>
-
-        <button
-          onClick={onClose}
-          className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-          title="Close"
+        {/* Header */}
+        <div
+          className="px-4 py-3 border-b flex items-center justify-between"
+          style={{ borderColor: 'var(--border-subtle)' }}
         >
-          <X className="w-3.5 h-3.5" />
-        </button>
-      </div>
+          <div className="flex items-center space-x-2">
+            {activeTab.isMuted || boost === 0 ? (
+              <VolumeX className="w-4 h-4 text-rose-400" />
+            ) : boost > 200 ? (
+              <Volume2 className="w-4 h-4 text-amber-400 animate-pulse" />
+            ) : (
+              <Volume1 className="w-4 h-4 text-[var(--accent-primary)]" />
+            )}
+            <span className="text-xs font-semibold tracking-tight">Volume Booster</span>
+
+            <button
+              type="button"
+              onClick={() => window.browserApi?.toggleMuteTab(activeTab.id)}
+              className={`flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-all cursor-pointer ${
+                activeTab.isMuted
+                  ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:bg-rose-500/30'
+                  : activeTab.audioPlaying
+                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25'
+                  : 'text-[var(--text-muted)] bg-black/5 dark:bg-white/5 hover:bg-black/10'
+              }`}
+              title={activeTab.isMuted ? 'Tab is muted. Click to unmute.' : 'Click to mute tab'}
+            >
+              {activeTab.isMuted ? (
+                <>
+                  <VolumeX className="w-3 h-3 text-rose-400" />
+                  <span>Muted</span>
+                </>
+              ) : activeTab.audioPlaying ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  <span>Playing</span>
+                </>
+              ) : (
+                <span>Ready</span>
+              )}
+            </button>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+            title="Close"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
 
       {/* Main Controls Section */}
       <div className="p-4 space-y-4">
@@ -306,5 +330,6 @@ export const VolumeBoosterPopover: React.FC<VolumeBoosterPopoverProps> = ({
         </span>
       </div>
     </div>
-  );
+  </>
+);
 };

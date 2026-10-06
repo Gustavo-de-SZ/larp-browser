@@ -627,7 +627,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                 <button
                   type="button"
                   onClick={handleToggleMute}
-                  className="p-0.5 rounded text-[var(--accent-primary)] hover:bg-black/5 dark:hover:bg-white/5"
+                  className="p-0.5 rounded text-[var(--accent-primary)] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
                   title={activeTab.isMuted ? 'Unmute Tab' : 'Mute Tab'}
                 >
                   {activeTab.isMuted ? (
@@ -890,19 +890,35 @@ export const TopBar: React.FC<TopBarProps> = ({
           {/* Volume Booster Button */}
           <button
             onClick={onToggleVolumeBooster}
+            onAuxClick={(e) => {
+              if (e.button === 1 && activeTab) {
+                e.preventDefault();
+                window.browserApi.toggleMuteTab(activeTab.id);
+              }
+            }}
+            onContextMenu={(e) => {
+              if (activeTab) {
+                e.preventDefault();
+                window.browserApi.toggleMuteTab(activeTab.id);
+              }
+            }}
             className={`p-1.5 rounded-md transition-colors cursor-pointer relative ${
               isVolumeBoosterOpen
                 ? 'text-[var(--accent-primary)] bg-black/10 dark:bg-white/10'
+                : activeTab?.isMuted
+                ? 'text-rose-400 bg-rose-500/15 border border-rose-500/30'
                 : (activeTab?.volumeBoost ?? 100) > 100
                 ? 'text-amber-400 bg-amber-500/15 border border-amber-500/30'
                 : activeTab?.audioPlaying
                 ? 'text-emerald-400 bg-emerald-500/10'
                 : 'text-[var(--text-muted)] hover:text-[var(--accent-primary)] hover:bg-black/5 dark:hover:bg-white/5'
             }`}
-            title={`Volume Booster (${activeTab?.volumeBoost ?? 100}%)${activeTab?.audioPlaying ? ' — Audio Playing' : ''}`}
+            title={`Volume Booster (${activeTab?.volumeBoost ?? 100}%)${
+              activeTab?.isMuted ? ' — Muted' : activeTab?.audioPlaying ? ' — Audio Playing' : ''
+            } (Click to open, Right/Middle-click to mute)`}
           >
-            {(activeTab?.volumeBoost ?? 100) === 0 ? (
-              <VolumeX className="w-3.5 h-3.5 text-zinc-400" />
+            {activeTab?.isMuted || (activeTab?.volumeBoost ?? 100) === 0 ? (
+              <VolumeX className="w-3.5 h-3.5 text-rose-400" />
             ) : (activeTab?.volumeBoost ?? 100) > 100 ? (
               <Volume2 className="w-3.5 h-3.5 text-amber-400" />
             ) : (

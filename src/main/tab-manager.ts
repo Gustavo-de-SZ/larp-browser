@@ -3658,6 +3658,13 @@ export class TabManager {
 
             function scanAndHook() {
               document.querySelectorAll('video, audio').forEach(hookElement);
+              document.querySelectorAll('iframe').forEach((iframe) => {
+                try {
+                  if (iframe.contentDocument) {
+                    iframe.contentDocument.querySelectorAll('video, audio').forEach(hookElement);
+                  }
+                } catch (e) {}
+              });
             }
 
             // MutationObserver to hook dynamically created elements (e.g. YouTube, Twitter, Twitch)
@@ -3686,9 +3693,20 @@ export class TabManager {
               setGain(val) {
                 currentGain = val;
                 getOrCreateContext();
+                scanAndHook();
                 if (gainNode && ctx) {
                   gainNode.gain.setValueAtTime(val, ctx.currentTime);
                 }
+                // Fallback direct volume adjustment on all media elements
+                document.querySelectorAll('video, audio').forEach((mediaEl) => {
+                  try {
+                    if (val <= 1.0) {
+                      mediaEl.volume = Math.max(0, val);
+                    } else {
+                      mediaEl.volume = 1.0;
+                    }
+                  } catch (e) {}
+                });
               },
               getGain() {
                 return currentGain;
@@ -3717,6 +3735,22 @@ export class TabManager {
     if (!tab) return;
     const clamped = Math.max(0, Math.min(600, Math.round(boostPercent)));
     tab.info.volumeBoost = clamped;
+
+    if (clamped === 0) {
+      try {
+        if (tab.view?.webContents && !tab.view.webContents.isDestroyed()) {
+          tab.view.webContents.setAudioMuted(true);
+        }
+      } catch {}
+      tab.info.isMuted = true;
+    } else if (tab.info.isMuted && clamped > 0) {
+      try {
+        if (tab.view?.webContents && !tab.view.webContents.isDestroyed()) {
+          tab.view.webContents.setAudioMuted(false);
+        }
+      } catch {}
+      tab.info.isMuted = false;
+    }
 
     if (rememberDomain && tab.info.url && tab.info.url !== 'about:blank') {
       try {

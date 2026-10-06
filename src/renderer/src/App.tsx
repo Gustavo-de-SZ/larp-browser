@@ -329,28 +329,22 @@ export const App: React.FC = () => {
     setIsOmnibarOpen(false);
   }, [state.activeTabId]);
 
+  const isAnyModalOpen =
+    isSettingsOpen ||
+    isShortcutsOpen ||
+    isFavoritesOpen ||
+    isOmnibarOpen ||
+    isDownloadsOpen ||
+    isProfileOpen ||
+    isSecurityOpen ||
+    isVolumeBoosterOpen;
+
   // Synchronize modal open state with Electron main process so native WebContentsView is detached
   useEffect(() => {
-    const isAnyModalOpen =
-      isSettingsOpen ||
-      isShortcutsOpen ||
-      isFavoritesOpen ||
-      isOmnibarOpen ||
-      isDownloadsOpen ||
-      isProfileOpen ||
-      isSecurityOpen;
     if (window.browserApi?.setModalOpen) {
       window.browserApi.setModalOpen(isAnyModalOpen);
     }
-  }, [
-    isSettingsOpen,
-    isShortcutsOpen,
-    isFavoritesOpen,
-    isOmnibarOpen,
-    isDownloadsOpen,
-    isProfileOpen,
-    isSecurityOpen,
-  ]);
+  }, [isAnyModalOpen]);
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
   const isNewTab = !activeTab || !activeTab.url || activeTab.url === 'about:blank' || !activeTab.hasLoadedPage;
@@ -421,7 +415,7 @@ export const App: React.FC = () => {
           {isNewTab ? (
             <NewTabPage state={state} theme={theme} />
           ) : (
-            (state.isSwitcherOpen || isSettingsOpen || isShortcutsOpen || isFavoritesOpen || isOmnibarOpen || isDownloadsOpen || isProfileOpen) && activeTab?.previewImage ? (
+            (state.isSwitcherOpen || isAnyModalOpen) && activeTab?.previewImage ? (
               <img
                 src={activeTab.previewImage}
                 alt="Active tab preview"

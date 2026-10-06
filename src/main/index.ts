@@ -21,6 +21,7 @@ if (process.platform === 'linux') {
   // Prevent multithreaded Mesa driver sandbox crash on Intel Iris Xe / Linux
   app.commandLine.appendSwitch('in-process-gpu');
 }
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 const appStartTime = performance.now();
 let mainWindow: BrowserWindow | null = null;
