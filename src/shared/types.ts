@@ -265,6 +265,7 @@ export interface IpcRendererApi {
   onStateUpdate: (callback: (state: BrowserState) => void) => () => void;
   onToggleModal: (callback: (modal: 'settings' | 'shortcuts' | 'history' | 'passwords' | 'downloads') => void) => () => void;
   onPermissionRequest: (callback: (request: SitePermissionRequest) => void) => () => void;
+  onPermissionDismiss?: (callback: (requestId: string) => void) => () => void;
   onFocusOmnibar: (callback: () => void) => () => void;
   onToggleFind: (callback: () => void) => () => void;
   onToggleFavorites: (callback: () => void) => () => void;

@@ -43,6 +43,16 @@ const api: IpcRendererApi = {
     };
   },
 
+  onPermissionDismiss: (callback: (requestId: string) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, id: string) => {
+      callback(id);
+    };
+    ipcRenderer.on('browser:permission-dismiss', listener);
+    return () => {
+      ipcRenderer.removeListener('browser:permission-dismiss', listener);
+    };
+  },
+
   onFocusOmnibar: (callback: () => void) => {
     const listener = () => {
       callback();

@@ -26,6 +26,7 @@ interface PendingRequest {
   mediaTypes?: ('video' | 'audio')[];
   callback: (permissionGranted: boolean) => void;
   webContentsId: number;
+  tabId?: string | null;
 }
 
 export class PermissionManager {
@@ -35,6 +36,7 @@ export class PermissionManager {
   private attachedSessions: WeakSet<Session> = new WeakSet();
   private getWindow: () => BrowserWindow | null;
   private getTabIdForWebContents: (wc: WebContents) => string | null;
+  private onPendingChange?: () => void;
 
   constructor(
     getWindow: () => BrowserWindow | null,
@@ -104,6 +106,18 @@ export class PermissionManager {
     this.savePermissions();
   }
 
+  public setOnPendingChange(cb: () => void) {
+    this.onPendingChange = cb;
+  }
+
+  public hasPendingRequestForTab(tabId: string | null): boolean {
+    if (!tabId) return false;
+    for (const req of this.pendingRequests.values()) {
+      if (req.tabId === tabId || !req.tabId) return true;
+    }
+    return false;
+  }
+
   public handleResponse(
     requestId: string,
     decision: 'allow' | 'deny' | 'dismiss',
@@ -113,6 +127,7 @@ export class PermissionManager {
     if (!pending) return;
 
     this.pendingRequests.delete(requestId);
+    this.onPendingChange?.();
 
     const granted = decision === 'allow';
     pending.callback(granted);
@@ -208,7 +223,9 @@ export class PermissionManager {
         mediaTypes,
         callback,
         webContentsId: webContents.id,
+        tabId,
       });
+      this.onPendingChange?.();
 
       const requestPayload: SitePermissionRequest = {
         id: requestId,
@@ -242,11 +259,20 @@ export class PermissionManager {
   }
 
   public cleanupForWebContents(wcId: number) {
+    let changed = false;
+    const win = this.getWindow();
     for (const [id, req] of this.pendingRequests.entries()) {
       if (req.webContentsId === wcId) {
         req.callback(false);
         this.pendingRequests.delete(id);
+        changed = true;
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('browser:permission-dismiss', id);
+        }
       }
+    }
+    if (changed) {
+      this.onPendingChange?.();
     }
   }
 }

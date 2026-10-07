@@ -32,7 +32,7 @@ export const App: React.FC = () => {
   const [isHtmlFullscreen, setIsHtmlFullscreen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTabType>('appearance');
   const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const [permissionRequest, setPermissionRequest] = useState<SitePermissionRequest | null>(null);
+  const [permissionRequests, setPermissionRequests] = useState<SitePermissionRequest[]>([]);
 
   const showToast = (toast: Omit<ToastItem, 'id'>) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -223,10 +223,27 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (!window.browserApi?.onPermissionRequest) return;
     const unsub = window.browserApi.onPermissionRequest((req) => {
-      setPermissionRequest(req);
+      setPermissionRequests((prev) => [...prev.filter((r) => r.id !== req.id), req]);
     });
     return () => unsub();
   }, []);
+
+  // Listen for dismissed/cleaned-up permission requests
+  useEffect(() => {
+    if (!window.browserApi?.onPermissionDismiss) return;
+    const unsub = window.browserApi.onPermissionDismiss((id) => {
+      setPermissionRequests((prev) => prev.filter((r) => r.id !== id));
+    });
+    return () => unsub();
+  }, []);
+
+  // Clean up any pending requests when their tab is closed
+  useEffect(() => {
+    const activeTabIds = new Set(state.tabs.map((t) => t.id));
+    setPermissionRequests((prev) =>
+      prev.filter((r) => !r.tabId || activeTabIds.has(r.tabId))
+    );
+  }, [state.tabs]);
 
   const handlePermissionRespond = (
     id: string,
@@ -236,7 +253,7 @@ export const App: React.FC = () => {
     if (window.browserApi) {
       window.browserApi.respondPermissionRequest(id, decision, remember);
     }
-    setPermissionRequest((prev) => (prev?.id === id ? null : prev));
+    setPermissionRequests((prev) => prev.filter((r) => r.id !== id));
   };
 
   const activeTabIdRef = React.useRef(state.activeTabId);
@@ -348,6 +365,10 @@ export const App: React.FC = () => {
   const isNewTab = !activeTab || !activeTab.url || activeTab.url === 'about:blank' || !activeTab.hasLoadedPage;
   const pinnedTabs = state.tabs.filter((t) => t.isPinned);
   const showPinnedSidebar = (state.settings?.showPinnedSidebar ?? true) && pinnedTabs.length > 0;
+  const activeTabPermissionRequest =
+    permissionRequests.find(
+      (r) => r.tabId === state.activeTabId || (!r.tabId && state.activeTabId)
+    ) || null;
 
   return (
     <div
@@ -389,6 +410,15 @@ export const App: React.FC = () => {
             onClose={() => setIsFindOpen(false)}
             theme={theme}
           />
+
+          {/* Docked Site Permission Prompt Banner */}
+          {activeTabPermissionRequest && (
+            <PermissionPrompt
+              request={activeTabPermissionRequest}
+              onRespond={handlePermissionRespond}
+              theme={theme}
+            />
+          )}
         </>
       )}
 
@@ -501,13 +531,6 @@ export const App: React.FC = () => {
           }}
         />
       )}
-
-      {/* Interactive Site Permission Prompt Banner */}
-      <PermissionPrompt
-        request={permissionRequest}
-        onRespond={handlePermissionRespond}
-        theme={theme}
-      />
 
       {/* Floating Toast Feedback Notifications */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />

@@ -38,6 +38,7 @@ import { PermissionManager } from './permission-manager';
 export const TOP_BAR_HEIGHT = 44;
 export const BOOKMARKS_BAR_HEIGHT = 28;
 export const FIND_BAR_HEIGHT = 36;
+export const PERMISSION_BAR_HEIGHT = 38;
 export const PINNED_SIDEBAR_WIDTH = 48;
 
 export function getSearchEngineHomeUrl(engine: string): string {
@@ -191,6 +192,9 @@ export class TabManager {
       () => this.window,
       (wc) => this.getTabIdByWebContents(wc)
     );
+    this.permissionManager.setOnPendingChange(() => {
+      this.updateActiveViewBounds();
+    });
     this.settingsPath = path.join(app.getPath('userData'), 'larp-settings.json');
     this.bookmarksPath = path.join(app.getPath('userData'), 'larp-bookmarks.json');
     this.historyPath = path.join(app.getPath('userData'), 'larp-history.json');
@@ -3367,10 +3371,15 @@ export class TabManager {
     const showSidebar = (this.settings.showPinnedSidebar ?? true) && hasPinnedTabs;
     const sidebarWidth = showSidebar ? PINNED_SIDEBAR_WIDTH : 0;
 
+    const hasPendingPermission = this.activeTabId
+      ? this.permissionManager.hasPendingRequestForTab(this.activeTabId)
+      : false;
+
     const topOffset =
       TOP_BAR_HEIGHT +
       (this.settings.showBookmarksBar ? BOOKMARKS_BAR_HEIGHT : 0) +
-      (this.isFindOpen ? FIND_BAR_HEIGHT : 0);
+      (this.isFindOpen ? FIND_BAR_HEIGHT : 0) +
+      (hasPendingPermission ? PERMISSION_BAR_HEIGHT : 0);
     tab.view.setBounds({
       x: sidebarWidth,
       y: topOffset,
