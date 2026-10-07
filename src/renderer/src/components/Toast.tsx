@@ -74,9 +74,9 @@ const ToastCard: React.FC<{ toast: ToastItem; onDismiss: () => void }> = ({ toas
         color: 'var(--text-main)',
       }}
     >
-      <div className="flex items-center space-x-2.5 overflow-hidden mr-2">
+      <div className="flex items-center space-x-2.5 mr-2 flex-1 min-w-0">
         {getIcon()}
-        <span className="text-xs font-medium truncate">{toast.message}</span>
+        <span className="text-xs font-medium leading-relaxed break-words">{toast.message}</span>
       </div>
       <button
         onClick={onDismiss}

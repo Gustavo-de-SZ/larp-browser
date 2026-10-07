@@ -221,6 +221,10 @@ export class TabManager {
 
     // Set Chromium native theme
     nativeTheme.themeSource = this.settings.theme;
+
+    if (process.platform === 'linux') {
+      this.ensureLinuxDesktopIntegration().catch(() => {});
+    }
   }
 
   private loadSettings() {
@@ -1468,6 +1472,86 @@ export class TabManager {
     return { ...this.settings };
   }
 
+  private async resolveLinuxExecCmd(): Promise<string> {
+    try {
+      // 1. Check if larp-browser binary is available in PATH or at /usr/bin/larp-browser
+      if (fs.existsSync('/usr/bin/larp-browser')) {
+        return 'larp-browser';
+      }
+      try {
+        await execFilePromise('which', ['larp-browser']);
+        return 'larp-browser';
+      } catch {}
+
+      // 2. Check APPIMAGE or execPath
+      const rawExec = process.env.APPIMAGE || process.execPath;
+      if (!rawExec.includes(' ')) {
+        return rawExec;
+      }
+
+      // 3. Executable path contains spaces (e.g. "/opt/Larp Browser/larp-browser").
+      // xdg-settings naively splits Exec= by space using `read first rest`, failing when quotes enclose a spaced path.
+      // We create a persistent space-free symlink in ~/.local/share/larp-browser/larp-browser.
+      const symlinkDir = path.join(app.getPath('home'), '.local', 'share', 'larp-browser');
+      fs.mkdirSync(symlinkDir, { recursive: true });
+      const symlinkPath = path.join(symlinkDir, 'larp-browser');
+      try {
+        if (fs.existsSync(symlinkPath)) {
+          fs.unlinkSync(symlinkPath);
+        }
+      } catch {}
+      fs.symlinkSync(rawExec, symlinkPath);
+      return symlinkPath;
+    } catch (err) {
+      console.warn('[TabManager] Error resolving linux exec cmd:', err);
+      return 'larp-browser';
+    }
+  }
+
+  public async ensureLinuxDesktopIntegration(): Promise<void> {
+    if (process.platform !== 'linux') return;
+    try {
+      const desktopFile = 'larp-browser.desktop';
+      const userAppDir = path.join(app.getPath('home'), '.local', 'share', 'applications');
+      const userDesktopFile = path.join(userAppDir, desktopFile);
+      const execCmd = await this.resolveLinuxExecCmd();
+
+      fs.mkdirSync(userAppDir, { recursive: true });
+      const desktopContent = [
+        '[Desktop Entry]',
+        'Name=Larp Browser',
+        `Exec=${execCmd} --in-process-gpu %U`,
+        'Terminal=false',
+        'Type=Application',
+        'Icon=larp-browser',
+        'StartupWMClass=larp-browser',
+        'Comment=Larp Browser - Modern desktop browser with Alt-Tab visual tab switching and vibrant themes',
+        'Categories=Network;WebBrowser;',
+        'MimeType=text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;',
+        ''
+      ].join('\n');
+
+      let needsWrite = true;
+      if (fs.existsSync(userDesktopFile)) {
+        try {
+          const existing = fs.readFileSync(userDesktopFile, 'utf8');
+          if (existing.trim() === desktopContent.trim()) {
+            needsWrite = false;
+          }
+        } catch {}
+      }
+
+      if (needsWrite) {
+        fs.writeFileSync(userDesktopFile, desktopContent, 'utf-8');
+        try {
+          await execFilePromise('update-desktop-database', [userAppDir]);
+        } catch {}
+      }
+    } catch (err) {
+      console.warn('[TabManager] Failed to ensure linux desktop integration:', err);
+    }
+  }
+
   public async isDefaultBrowser(): Promise<boolean> {
     try {
       const isClient = app.isDefaultProtocolClient('http') || app.isDefaultProtocolClient('https');
@@ -1487,6 +1571,40 @@ export class TabManager {
           const { stdout } = await execFilePromise('xdg-mime', ['query', 'default', 'x-scheme-handler/http']);
           if (stdout && stdout.toLowerCase().includes('larp')) {
             return true;
+          }
+        } catch {}
+
+        // 3. Try xdg-mime query default x-scheme-handler/https
+        try {
+          const { stdout } = await execFilePromise('xdg-mime', ['query', 'default', 'x-scheme-handler/https']);
+          if (stdout && stdout.toLowerCase().includes('larp')) {
+            return true;
+          }
+        } catch {}
+
+        // 4. Try gio mime x-scheme-handler/http (Wayland / GIO)
+        try {
+          const { stdout } = await execFilePromise('gio', ['mime', 'x-scheme-handler/http']);
+          if (stdout && stdout.toLowerCase().includes('larp-browser.desktop')) {
+            return true;
+          }
+        } catch {}
+
+        // 5. Try reading ~/.config/mimeapps.list directly
+        try {
+          const mimeappsPath = path.join(app.getPath('home'), '.config', 'mimeapps.list');
+          if (fs.existsSync(mimeappsPath)) {
+            const content = fs.readFileSync(mimeappsPath, 'utf-8');
+            const defaultMatch = content.match(/\[Default Applications\]([\s\S]*?)(?:\[|$)/);
+            if (defaultMatch) {
+              const defaultSection = defaultMatch[1];
+              if (
+                defaultSection.includes('x-scheme-handler/http=larp-browser.desktop') ||
+                defaultSection.includes('x-scheme-handler/https=larp-browser.desktop')
+              ) {
+                return true;
+              }
+            }
           }
         } catch {}
       }
@@ -1510,21 +1628,7 @@ export class TabManager {
 
       if (process.platform === 'linux') {
         const desktopFile = 'larp-browser.desktop';
-        const userAppDir = path.join(app.getPath('home'), '.local', 'share', 'applications');
-        const userDesktopFile = path.join(userAppDir, desktopFile);
-        const sysDesktopFile = '/usr/share/applications/larp-browser.desktop';
-
-        // If no desktop file exists anywhere (e.g. portable / dev run), generate one in user dir
-        if (!fs.existsSync(sysDesktopFile) && !fs.existsSync(userDesktopFile)) {
-          try {
-            fs.mkdirSync(userAppDir, { recursive: true });
-            const execPath = process.env.APPIMAGE || process.execPath;
-            const desktopContent = `[Desktop Entry]\nName=Larp Browser\nExec="${execPath}" --in-process-gpu %U\nTerminal=false\nType=Application\nIcon=larp-browser\nStartupWMClass=larp-browser\nComment=Larp Browser - Modern desktop browser\nCategories=Network;WebBrowser;\nMimeType=text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;\n`;
-            fs.writeFileSync(userDesktopFile, desktopContent, 'utf-8');
-          } catch (e) {
-            console.warn('[TabManager] Could not write fallback desktop entry:', e);
-          }
-        }
+        await this.ensureLinuxDesktopIntegration();
 
         // Attempt xdg-settings set default-web-browser
         try {
@@ -1545,6 +1649,68 @@ export class TabManager {
           ]);
         } catch (err) {
           console.warn('[TabManager] xdg-mime default failed:', err);
+        }
+
+        // Attempt gio mime associations if available (Wayland / GIO)
+        try {
+          await execFilePromise('gio', ['mime', 'x-scheme-handler/http', desktopFile]);
+          await execFilePromise('gio', ['mime', 'x-scheme-handler/https', desktopFile]);
+        } catch {}
+
+        // Direct write fallback to ~/.config/mimeapps.list to guarantee associations are saved
+        try {
+          const mimeappsPath = path.join(app.getPath('home'), '.config', 'mimeapps.list');
+          let content = fs.existsSync(mimeappsPath) ? fs.readFileSync(mimeappsPath, 'utf-8') : '';
+          const mimeTypes = ['x-scheme-handler/http', 'x-scheme-handler/https', 'text/html', 'application/xhtml+xml'];
+
+          let inDefaultSection = false;
+          const lines = content.split(/\r?\n/);
+          let hasDefaultSection = false;
+          const remainingTypes = new Set(mimeTypes);
+
+          for (let i = 0; i < lines.length; i++) {
+            const trimmed = lines[i].trim();
+            if (trimmed === '[Default Applications]') {
+              inDefaultSection = true;
+              hasDefaultSection = true;
+              continue;
+            } else if (trimmed.startsWith('[')) {
+              if (inDefaultSection) {
+                for (const mt of remainingTypes) {
+                  lines.splice(i, 0, `${mt}=${desktopFile}`);
+                  i++;
+                }
+                remainingTypes.clear();
+              }
+              inDefaultSection = false;
+            } else if (inDefaultSection) {
+              for (const mt of remainingTypes) {
+                if (trimmed.startsWith(`${mt}=`)) {
+                  lines[i] = `${mt}=${desktopFile}`;
+                  remainingTypes.delete(mt);
+                  break;
+                }
+              }
+            }
+          }
+
+          if (inDefaultSection && remainingTypes.size > 0) {
+            for (const mt of remainingTypes) {
+              lines.push(`${mt}=${desktopFile}`);
+            }
+            remainingTypes.clear();
+          }
+
+          if (!hasDefaultSection) {
+            lines.push('', '[Default Applications]');
+            for (const mt of remainingTypes) {
+              lines.push(`${mt}=${desktopFile}`);
+            }
+          }
+
+          fs.writeFileSync(mimeappsPath, lines.join('\n'), 'utf-8');
+        } catch (mimeErr) {
+          console.warn('[TabManager] Error updating mimeapps.list directly:', mimeErr);
         }
       }
 
