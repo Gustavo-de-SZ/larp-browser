@@ -5,30 +5,75 @@ import { DownloadManager } from './download-manager';
 import { UpdateManager } from './update-manager';
 import { registerIpcHandlers } from './ipc-handlers';
 import { registerShortcuts } from './shortcuts';
+import { extractUrlsFromArgs } from './url-handler';
 
-// Silence Electron internal desktop security warnings in dev mode (web tabs load external 3rd-party sites)
-process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
+// Ensure single instance lock so external URL clicks route to the existing browser instance
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
-// Ensure app identity and version are explicitly set (prevents dev/unbundled fallback to Electron engine version)
-app.setName(process.env.APP_NAME || 'Larp Browser');
-if (process.env.APP_VERSION) {
-  const version = process.env.APP_VERSION;
-  app.getVersion = () => version;
-}
-
-// Linux performance, display backend, and hardware GPU acceleration flags
-if (process.platform === 'linux') {
-  // Prevent multithreaded Mesa driver sandbox crash on Intel Iris Xe / Linux
-  app.commandLine.appendSwitch('in-process-gpu');
-}
-app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
-
-const appStartTime = performance.now();
 let mainWindow: BrowserWindow | null = null;
 let tabManager: TabManager | null = null;
 let downloadManager: DownloadManager | null = null;
 let updateManager: UpdateManager | null = null;
+let pendingUrlsToOpen: string[] = [];
 
+if (!gotSingleInstanceLock) {
+  // Another instance is already running; second-instance event has been sent to it
+  app.quit();
+} else {
+  // Handle second instance launch (e.g. user clicked URL in another app while browser is already open)
+  app.on('second-instance', (_event, commandLine) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      if (!mainWindow.isVisible()) mainWindow.show();
+      mainWindow.focus();
+    }
+
+    const urls = extractUrlsFromArgs(commandLine);
+    console.log('[SingleInstance] Received second-instance launch. Forwarded URLs:', urls);
+    if (urls.length > 0) {
+      if (tabManager) {
+        for (const url of urls) {
+          tabManager.createTab(url);
+        }
+      } else {
+        pendingUrlsToOpen.push(...urls);
+      }
+    }
+  });
+
+  // Handle open-url (macOS and registered system URL protocol handlers)
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    if (tabManager) {
+      tabManager.createTab(url);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        if (!mainWindow.isVisible()) mainWindow.show();
+        mainWindow.focus();
+      }
+    } else {
+      pendingUrlsToOpen.push(url);
+    }
+  });
+
+  // Silence Electron internal desktop security warnings in dev mode (web tabs load external 3rd-party sites)
+  process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
+
+  // Ensure app identity and version are explicitly set (prevents dev/unbundled fallback to Electron engine version)
+  app.setName(process.env.APP_NAME || 'Larp Browser');
+  if (process.env.APP_VERSION) {
+    const version = process.env.APP_VERSION;
+    app.getVersion = () => version;
+  }
+
+  // Linux performance, display backend, and hardware GPU acceleration flags
+  if (process.platform === 'linux') {
+    // Prevent multithreaded Mesa driver sandbox crash on Intel Iris Xe / Linux
+    app.commandLine.appendSwitch('in-process-gpu');
+  }
+  app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
+  const appStartTime = performance.now();
 const isDev = process.env.NODE_ENV === 'development';
 
 function setupSecurityDefaults() {
@@ -114,8 +159,14 @@ async function createWindow() {
     await mainWindow.loadFile(indexPath);
   }
 
-  // Initialize session based on user's startup preferences (new tab, restore previous session, or custom URL)
-  await tabManager.initializeSession();
+  const initialUrls = [
+    ...extractUrlsFromArgs(process.argv),
+    ...pendingUrlsToOpen,
+  ];
+  pendingUrlsToOpen = [];
+
+  // Initialize session based on user's startup preferences (or external initial URLs)
+  await tabManager.initializeSession(initialUrls);
 
   // Developer automated benchmark harness
   const isBenchmark = process.argv.includes('--benchmark') || process.env.LARP_BENCHMARK === '1';
@@ -171,3 +222,4 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+}

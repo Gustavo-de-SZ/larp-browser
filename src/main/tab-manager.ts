@@ -1315,7 +1315,10 @@ export class TabManager {
     }
   }
 
-  public async initializeSession() {
+  public async initializeSession(initialUrls: string[] = []) {
+    const validInitialUrls = initialUrls.filter((u) => u && u !== 'about:blank');
+    const hasInitialUrls = validInitialUrls.length > 0;
+
     const shouldRestore =
       this.settings.restoreSessionOnStartup ?? (this.settings.startupBehavior === 'continue');
 
@@ -1346,6 +1349,12 @@ export class TabManager {
           if (targetActiveId) {
             await this.switchTab(targetActiveId);
           }
+          if (hasInitialUrls) {
+            for (const url of validInitialUrls) {
+              await this.createTab(url);
+            }
+            return;
+          }
           if (this.tabs.size > 0) {
             return;
           }
@@ -1372,6 +1381,13 @@ export class TabManager {
       } catch (err) {
         // Ignore
       }
+    }
+
+    if (hasInitialUrls) {
+      for (const url of validInitialUrls) {
+        await this.createTab(url);
+      }
+      return;
     }
 
     const mode =
@@ -3433,7 +3449,9 @@ export class TabManager {
       const prevTab = this.tabs.get(this.activeTabId)!;
       if (prevTab.view) {
         try {
-          this.window.contentView.removeChildView(prevTab.view);
+          if (this.window && !this.window.isDestroyed()) {
+            this.window.contentView.removeChildView(prevTab.view);
+          }
         } catch {
           // Ignore if not already attached
         }
@@ -3461,6 +3479,7 @@ export class TabManager {
   }
 
   public attachActiveTabView() {
+    if (!this.window || this.window.isDestroyed()) return;
     if (!this.activeTabId || !this.tabs.has(this.activeTabId)) return;
     if (this.isSwitcherOpen || this.isModalOpen) return;
     const tab = this.tabs.get(this.activeTabId)!;
@@ -3498,6 +3517,7 @@ export class TabManager {
   }
 
   public detachActiveTabView() {
+    if (!this.window || this.window.isDestroyed()) return;
     if (!this.activeTabId || !this.tabs.has(this.activeTabId)) return;
     const tab = this.tabs.get(this.activeTabId)!;
     if (tab.view) {
