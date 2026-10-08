@@ -2,6 +2,8 @@ import {
   app,
   BrowserWindow,
   WebContentsView,
+  webFrameMain,
+  type WebFrameMain,
   nativeTheme,
   safeStorage,
   dialog,
@@ -1863,6 +1865,7 @@ export class TabManager {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
+        nodeIntegrationInSubFrames: true,
         sandbox: true,
         spellcheck: true,
         partition,
@@ -1978,6 +1981,7 @@ export class TabManager {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
+        nodeIntegrationInSubFrames: true,
         sandbox: true,
         spellcheck: true,
         partition,
@@ -2405,6 +2409,33 @@ export class TabManager {
         this.applyThemeToTab(tabId);
         this.capturePreview(tabId).then((img) => {
           if (img) this.notifyStateChange();
+        });
+      }
+    });
+
+    // Synchronize volume boost to subframes (iframes/embedded players) when they load or navigate
+    wc.on('did-frame-finish-load', (_event, _isMainFrame, frameProcessId, frameRoutingId) => {
+      const tab = this.tabs.get(tabId);
+      if (tab && tab.info.volumeBoost && tab.info.volumeBoost !== 100) {
+        try {
+          const frame = webFrameMain.fromId(frameProcessId, frameRoutingId);
+          if (frame && !frame.detached && !frame.isDestroyed()) {
+            this.applyVolumeBoostToFrame(tabId, frame).catch(() => {});
+          }
+        } catch {
+          // Ignore
+        }
+      }
+    });
+
+    wc.on('frame-created', (_event, details) => {
+      const tab = this.tabs.get(tabId);
+      if (tab && tab.info.volumeBoost && tab.info.volumeBoost !== 100 && details.frame) {
+        const frame = details.frame;
+        frame.once('dom-ready', () => {
+          if (!frame.detached && !frame.isDestroyed()) {
+            this.applyVolumeBoostToFrame(tabId, frame).catch(() => {});
+          }
         });
       }
     });
@@ -4018,13 +4049,8 @@ export class TabManager {
 
   // --- Tab Audio Volume Booster ---
 
-  public async applyVolumeBoostToTab(tabId: string): Promise<void> {
-    const tab = this.tabs.get(tabId);
-    if (!tab || !tab.view || tab.view.webContents.isDestroyed()) return;
-    const boostPercent = tab.info.volumeBoost ?? 100;
-    const factor = Math.max(0, Math.min(600, boostPercent)) / 100;
-
-    const script = `
+  private getVolumeBoostScript(factor: number): string {
+    return `
       (function() {
         try {
           const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -4072,18 +4098,28 @@ export class TabManager {
               }
             }
 
-            function scanAndHook() {
-              document.querySelectorAll('video, audio').forEach(hookElement);
-              document.querySelectorAll('iframe').forEach((iframe) => {
-                try {
-                  if (iframe.contentDocument) {
-                    iframe.contentDocument.querySelectorAll('video, audio').forEach(hookElement);
+            function scanAndHook(root) {
+              const node = root || document;
+              if (!node) return;
+              if (node.querySelectorAll) {
+                node.querySelectorAll('video, audio').forEach(hookElement);
+                node.querySelectorAll('iframe').forEach((iframe) => {
+                  try {
+                    if (iframe.contentDocument) {
+                      scanAndHook(iframe.contentDocument);
+                    }
+                  } catch (e) {}
+                });
+                // Pierce open Shadow DOM trees
+                node.querySelectorAll('*').forEach((el) => {
+                  if (el.shadowRoot) {
+                    scanAndHook(el.shadowRoot);
                   }
-                } catch (e) {}
-              });
+                });
+              }
             }
 
-            // MutationObserver to hook dynamically created elements (e.g. YouTube, Twitter, Twitch)
+            // MutationObserver to hook dynamically created elements (e.g. YouTube, Twitter, Hotmart, Vimeo)
             const observer = new MutationObserver(() => scanAndHook());
             if (document.body) {
               observer.observe(document.body, { childList: true, subtree: true });
@@ -4093,15 +4129,29 @@ export class TabManager {
               });
             }
 
-            // Hook on play event capture
-            window.addEventListener('play', (e) => {
-              if (e.target && (e.target.tagName === 'VIDEO' || e.target.tagName === 'AUDIO')) {
-                hookElement(e.target);
-                if (ctx && ctx.state === 'suspended') {
-                  ctx.resume().catch(() => {});
+            // Resume AudioContext whenever user interacts or playback starts
+            const resumeAudio = () => {
+              if (ctx && ctx.state === 'suspended') {
+                ctx.resume().catch(() => {});
+              }
+            };
+            ['click', 'pointerdown', 'keydown'].forEach((evt) => {
+              window.addEventListener(evt, resumeAudio, { capture: true, passive: true });
+            });
+
+            // Hook on play/playing event capture across normal and shadow DOM trees
+            const onPlayHandler = (e) => {
+              const path = (e && typeof e.composedPath === 'function') ? e.composedPath() : [e && e.target];
+              for (const el of path) {
+                if (el && (el.tagName === 'VIDEO' || el.tagName === 'AUDIO')) {
+                  hookElement(el);
+                  resumeAudio();
+                  break;
                 }
               }
-            }, true);
+            };
+            window.addEventListener('play', onPlayHandler, true);
+            window.addEventListener('playing', onPlayHandler, true);
 
             scanAndHook();
 
@@ -4113,7 +4163,7 @@ export class TabManager {
                 if (gainNode && ctx) {
                   gainNode.gain.setValueAtTime(val, ctx.currentTime);
                 }
-                // Fallback direct volume adjustment on all media elements
+                // Direct volume adjustment fallback on all media elements
                 document.querySelectorAll('video, audio').forEach((mediaEl) => {
                   try {
                     if (val <= 1.0) {
@@ -4138,11 +4188,33 @@ export class TabManager {
         }
       })();
     `;
+  }
 
-    try {
-      await tab.view.webContents.executeJavaScript(script);
-    } catch {
-      // Ignore
+  public async applyVolumeBoostToTab(tabId: string): Promise<void> {
+    const tab = this.tabs.get(tabId);
+    if (!tab || !tab.view || tab.view.webContents.isDestroyed()) return;
+    const boostPercent = tab.info.volumeBoost ?? 100;
+    const factor = Math.max(0, Math.min(600, boostPercent)) / 100;
+    const script = this.getVolumeBoostScript(factor);
+
+    const wc = tab.view.webContents;
+    const frames = wc.mainFrame ? wc.mainFrame.framesInSubtree : [];
+    for (const frame of frames) {
+      if (!frame.detached && !frame.isDestroyed()) {
+        frame.executeJavaScript(script).catch(() => {});
+      }
+    }
+  }
+
+  public async applyVolumeBoostToFrame(tabId: string, frame: WebFrameMain): Promise<void> {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return;
+    const boostPercent = tab.info.volumeBoost ?? 100;
+    const factor = Math.max(0, Math.min(600, boostPercent)) / 100;
+    const script = this.getVolumeBoostScript(factor);
+
+    if (!frame.detached && !frame.isDestroyed()) {
+      frame.executeJavaScript(script).catch(() => {});
     }
   }
 
